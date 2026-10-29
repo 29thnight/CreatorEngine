@@ -33,25 +33,25 @@ public:
 
 	void Update(float deltaTime);
 public:
-	//Å°º¸µå ¸¶¿ì½º ***** Down Pressed holdÀÎ°Å Down Ã¹Æ½µµ¹Ş°Ô ¼öÁ¤ÇÊ¿ä ÀÌ¸§ ÅëÀÏÇÊ¿ä
+	//í‚¤ë³´ë“œ ë§ˆìš°ìŠ¤ ***** Down Pressed holdì¸ê±° Down ì²«í‹±ë„ë°›ê²Œ ìˆ˜ì •í•„ìš” ì´ë¦„ í†µì¼í•„ìš”
 	void KeyBoardUpdate();
-	//´©¸§
+	//ëˆ„ë¦„
 	bool IsKeyDown(auto key) const
 	{
 		return m_keyboardState.GetKeyState(static_cast<size_t>(key)) == KeyState::Down;
 	}
-	// ´©¸£´ÂÁß
+	// ëˆ„ë¥´ëŠ”ì¤‘
 	bool IsKeyPressed(auto key) const
 	{
 		return m_keyboardState.GetKeyState(static_cast<size_t>(key)) == KeyState::Pressed;
 	}
-	//¶À
+	//ë—Œ
 	bool IsKeyReleased(auto key) const
 	{
 		return m_keyboardState.GetKeyState(static_cast<size_t>(key)) == KeyState::Released;
 	}
 
-	//Å° ¼¼ÆÃ º¯°æ¿ë?
+	//í‚¤ ì„¸íŒ… ë³€ê²½ìš©?
 	bool IsAnyKeyPressed();
 
 	void MouseUpdate();
@@ -61,11 +61,11 @@ public:
 	math::vector2 GetMouseDelta() const;
 	bool IsWheelUp();
 	bool IsWheelDown();
-	//´©¸£´ÂÁß
+	//ëˆ„ë¥´ëŠ”ì¤‘
 	bool IsMouseButtonDown(MouseKey button);
-	//ÇÑ¹ø´©¸¥°Å
+	//í•œë²ˆëˆ„ë¥¸ê±°
 	bool IsMouseButtonPressed(MouseKey button);
-	//¶À
+	//ë—Œ
 	bool IsMouseButtonReleased(MouseKey button);
 	void HideCursor();
 	void ShowCursor();
@@ -86,7 +86,7 @@ public:
 	HWND WindowHandle() const noexcept { return hwnd; }
 
 public:
-	//ÀÌ ¾Æ·¡´Â ÆĞµå ÄÁÆ®·Ñ·¯
+	//ì´ ì•„ë˜ëŠ” íŒ¨ë“œ ì»¨íŠ¸ë¡¤ëŸ¬
 	void PadUpdate();
 	void GamePadUpdate();
 
@@ -114,7 +114,7 @@ public:
 	IGameInputDevice*				m_keyboardDevice{ nullptr };
 	ce::dynamic_array<GameInputKeyState>	m_GameInputKeyStates{};
 	GameInputMouseState				m_GameInputMouseState{};
-	//ºñÆ® ÇÃ·¹±×ÀÇ Á¤¼ö¸¦ º¸¿©ÁÖÁö
+	//ë¹„íŠ¸ í”Œë ˆê·¸ì˜ ì •ìˆ˜ë¥¼ ë³´ì—¬ì£¼ì§€
 	key_bit_flag                      m_curKeyStates{};
 	mouse_bit_flag                    m_curMouseState{};
 
@@ -123,15 +123,15 @@ public:
 
 private:
 	HWND							hwnd{};
-	//¸¶¿ì½º
+	//ë§ˆìš°ìŠ¤
 	MouseState						m_mouseState{};
 	math::vector2							m_prevMousePos{};
 	math::vector2							m_mousePos{};
 	math::vector2							m_mouseDelta{};
-	//¸¶¿ì½º ÈÙ
+	//ë§ˆìš°ìŠ¤ íœ 
 	int16							m_mouseWheelDelta{};
 	int16							m_prevMouseWheelDelta{};
-	//Ä¿¼­ ¼û±â±â
+	//ì»¤ì„œ ìˆ¨ê¸°ê¸°
 	bool							m_isCursorHidden{ false };
 	bool							m_wantCursorHidden{ false };
 	bool							m_gameInputOwned{ true };
@@ -140,7 +140,7 @@ private:
 public:
 	GameInputGamepadState			m_GameInputPadState[kMaxController]{};
 	gamepad_bit_flag					m_curPadState[kMaxController]{};
-	//ÆĞµå ÃÖ¼Ú°ª
+	//íŒ¨ë“œ ìµœì†Ÿê°’
 	float							deadZone = 0.24f;
 	float							triggerdeadZone = 0.1f;
 
@@ -149,8 +149,8 @@ private:
 	PadState						m_padState{};
 	math::vector2							m_controllerThumbL[kMaxController]{};
 	math::vector2							m_controllerThumbR[kMaxController]{};
-	float							m_controllerTriggerL[kMaxController]{}; // ¿ŞÂÊ Æ®¸®°Å
-	float							m_controllerTriggerR[kMaxController]{}; // ¿À¸¥ÂÊ Æ®¸®°Å
+	float							m_controllerTriggerL[kMaxController]{}; // ì™¼ìª½ íŠ¸ë¦¬ê±°
+	float							m_controllerTriggerR[kMaxController]{}; // ì˜¤ë¥¸ìª½ íŠ¸ë¦¬ê±°
 	float							m_controllerVibrationTime[kMaxController]{};
 };
 

@@ -10,7 +10,7 @@ void RunObjectSpaceInstances(RecordingChangeDevice& device, ProbeRoots& roots, P
     const auto normal=asset.CreateNode("ShaderNodeNormalMap",-200,0);
     const auto out=asset.CreateNode("ShaderNodeOutputMaterial",200,0);
     asset.activeOutput=out;
-    asset.graph.SetSocketValue(Pin(asset.graph,normal,"Color",Direction::Input),std::array<double,4>{.8,.3,.9,1});
+    asset.graph.SetSocketValue(Pin(asset.graph,normal,"Color",Direction::Input),ce::fixed_array<double,4>{.8,.3,.9,1});
     Check(asset.graph.Connect(Pin(asset.graph,normal,"Normal",Direction::Output),Pin(asset.graph,bsdf,"Normal",Direction::Input)).has_value(),"Object TBN link");
     Check(asset.graph.Connect(Pin(asset.graph,bsdf,"BSDF",Direction::Output),Pin(asset.graph,out,"Surface",Direction::Input)).has_value(),"Object surface link");
     const auto program=GenerateMaterialSlang(asset); Check(bool(program),"Object material generation");
@@ -132,7 +132,7 @@ void RunObjectSpaceInstances(RecordingChangeDevice& device, ProbeRoots& roots, P
             graph->AddPass("Probe.Object.AO",{{ao,RHIResourceState::RenderTarget,RGAccessMode::Write}},[ao,&device](const auto&e){const auto color=e.ResolveHandle(ao);const auto target=device.CreateRenderTargets({&color,1});e.encoder->BindRenderTargets(target);const float white[4]{1,1,1,1};e.encoder->ClearRenderTargets(target,white);});
             SceneColorInputs commands{host.DeclareLayerWork(*graph,final.blendedList).layer,{}};if(host.MaterialWork())commands.material=host.MaterialWork()->GraphInputs(*graph);
             const auto lit=host.DeclareColor(*graph,output,commands,SceneHost::DeclareHdrTarget(*graph,context),ao,{});
-            std::array<RGHandle,5> temporal;const std::array formats{RHIFormat::RG16Float,RHIFormat::R16Float,RHIFormat::R16Float,RHIFormat::R16Float,RHIFormat::D32Float};
+            ce::fixed_array<RGHandle,5> temporal;const std::array formats{RHIFormat::RG16Float,RHIFormat::R16Float,RHIFormat::R16Float,RHIFormat::R16Float,RHIFormat::D32Float};
             std::vector<EnhancedRenderGraph::RGPassUsage> clear;
             for(unsigned i=0;i<5;++i){RGTextureDesc d;d.width=d.height=48;d.format=formats[i];d.allowRenderTarget=i<4;d.allowDepthStencil=i==4;temporal[i]=graph->Write(graph->CreateTexture(d));clear.push_back({temporal[i],i==4?RHIResourceState::DepthWrite:RHIResourceState::RenderTarget,RGAccessMode::Write});}
             graph->AddPass("Probe.Object.TemporalClear",clear,[temporal,&device](const auto& e){std::array<RHITextureHandle,4> colors;for(unsigned i=0;i<4;++i)colors[i]=e.ResolveHandle(temporal[i]);const auto d=RHIDepthTargetDesc::Depth(e.ResolveHandle(temporal[4]),RHIFormat::D32Float);const auto t=device.CreateRenderTargets(colors,&d);const float zero[4]{};e.encoder->BindRenderTargets(t);e.encoder->ClearRenderTargets(t,zero);e.encoder->ClearDepthTarget(t,1.f);});

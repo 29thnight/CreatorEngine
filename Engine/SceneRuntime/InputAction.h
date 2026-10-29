@@ -91,7 +91,7 @@ public:
 			{
 				SetControllerButton(ControllerButton::LEFT_THUMB);
 			}
-			else if (inputType == InputType::Mouse) //»ç½Ç»ó ¸ø¾¸ ¤·¤·
+			else if (inputType == InputType::Mouse) //ì‚¬ì‹¤ìƒ ëª»ì”€ ã…‡ã…‡
 			{
 				key[0] = static_cast<size_t>(MouseKey::LEFT);
 				key[1] = static_cast<size_t>(MouseKey::LEFT);
@@ -126,12 +126,12 @@ public:
 	InputValue value; //0
 
 	[[reflgen::ignore]]
-	std::string objName; //ÇÊ¿ä¾øÀ½
+	std::string objName; //í•„ìš”ì—†ìŒ
 
-	//ÀÚ±â ½Äº°ÀÌ¸§
+	//ìê¸° ì‹ë³„ì´ë¦„
 	
 	std::string m_scriptName  = "None";
-	//½ÇÇàÇÔ ÇÔ¼öÀÌ¸§ Attak
+	//ì‹¤í–‰í•¨ í•¨ìˆ˜ì´ë¦„ Attak
 	std::string funName = "None";
 
 	[[reflgen::ignore]]

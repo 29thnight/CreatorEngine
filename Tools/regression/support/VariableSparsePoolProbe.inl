@@ -16,7 +16,7 @@ void RunVariableSparsePool(RecordingChangeDevice& device)
     auto allocation = pool->Create(8 * RHISparseTileBytes, error);
     Check(bool(allocation), "Variable slab virtual allocation " + error);
     const auto address = device.Resolve(allocation->buffer)->GetGPUVirtualAddress();
-    const std::map<uint32_t, uint32_t> four{{0, 2}, {1, 1}, {2, 0}, {3, 0}};
+    const ce::engine_ordered_map<uint32_t, uint32_t> four{{0, 2}, {1, 1}, {2, 0}, {3, 0}};
     Check(pool->Prepare(allocation, four, error) && pool->GetStats().slabs == 2 &&
               pool->GetStats().physicalBytes == 4 * RHISparseTileBytes,
           "Demand grows a second physical slab without replacing the reserved resource " + error);

@@ -8,7 +8,7 @@ void RunClusterResidencyState(const own::shared_owner<const assets::cluster::Arc
     archive->packetSizes.clear(); archive->fileOffsets.clear(); archive->pageReader = {};
     const auto pageBytes = archive->packets[0].size();
     Check(pageBytes == archive->packets[1].size(), "Symmetric page fixture sizes");
-    std::vector<experiment::MeshClusterGroup> groups(3);
+    ce::dynamic_array<experiment::MeshClusterGroup> groups(3);
     for (uint32_t group = 0; group < 3; ++group)
     {
         groups[group].firstMeshlet = group; groups[group].meshletCount = 1;
@@ -90,7 +90,7 @@ void RunClusterResidencyState(const own::shared_owner<const assets::cluster::Arc
     Check(complete->groups[0] && material_graph_test::SamePinnedObject(complete->packets[0], incomplete->packets[0]) && complete->revision > incomplete->revision,
         "Final page atomically makes the complete child group selectable");
     auto asynchronous = own::make_shared<Archive>(*archive);
-    auto backing = own::make_shared<const std::vector<std::vector<std::byte>>>(archive->packets);
+    auto backing = own::make_shared<const ce::dynamic_array<ce::dynamic_array<std::byte>>>(archive->packets);
     auto failure = own::make_shared<std::atomic<bool>>(true);
     std::promise<void> release;
     const auto gate = release.get_future().share();
@@ -259,7 +259,7 @@ void RunClusterStorage(RecordingChangeDevice& device, ProbeRoots& roots, ProbePi
     {
         constexpr uint32_t count = 64;
         const auto stride = assets::StrideOf(mask);
-        std::vector<std::byte> raw(count * stride);
+        ce::dynamic_array<std::byte> raw(count * stride);
         for (uint32_t vertex = 0; vertex < count; ++vertex)
         {
             const auto set = [&](assets::VertexAttribute attribute, std::initializer_list<float> values) {
@@ -299,7 +299,7 @@ void RunClusterStorage(RecordingChangeDevice& device, ProbeRoots& roots, ProbePi
         }
         const auto archive = Build(mask, count, raw, meshlets);
         reference = archive;
-        std::vector<std::byte> expected, reversed;
+        ce::dynamic_array<std::byte> expected, reversed;
         Check(Decode(archive->packets[0], expected, error) && Decode(archive->packets[1], reversed, error), "Cluster CPU decode " + error);
         for (uint32_t vertex = 0; vertex < count; ++vertex)
         {
@@ -339,11 +339,11 @@ void RunClusterStorage(RecordingChangeDevice& device, ProbeRoots& roots, ProbePi
             {
                 Put(bad, mutation == 1 ? 0 : mutation == 2 ? 12 : mutation == 3 ? 16 : 36, 0xffffffffu);
             }
-            std::vector<std::byte> output;
+            ce::dynamic_array<std::byte> output;
             Check(!Decode(bad, output, error) && output.empty(), "Invalid cluster packet rejected transactionally");
             ++rejected;
         }
-        std::vector<std::byte> topology(sizeof(RHIMeshletBufferHeader) + count * 8);
+        ce::dynamic_array<std::byte> topology(sizeof(RHIMeshletBufferHeader) + count * 8);
         Put(topology, 0, 5); Put(topology, 80, sizeof(RHIMeshletBufferHeader));
         const auto packetOffset = static_cast<uint32_t>(topology.size());
         topology.insert(topology.end(), archive->packets[0].begin(), archive->packets[0].end());
@@ -354,7 +354,7 @@ void RunClusterStorage(RecordingChangeDevice& device, ProbeRoots& roots, ProbePi
         }
         const bool skin = assets::Has(mask, assets::VertexAttribute::BoneIndices);
         const uint32_t boneCount = skin ? 2 : 0;
-        std::vector<std::byte> pose(160);
+        ce::dynamic_array<std::byte> pose(160);
         Put(pose, 0, boneCount);
         std::array<math::matrix4x4, 2> bones{math::matrix4x4::identity(), math::matrix4x4::identity()};
         bones[0].m[3][0] = .3f; bones[1].m[3][1] = -.25f;

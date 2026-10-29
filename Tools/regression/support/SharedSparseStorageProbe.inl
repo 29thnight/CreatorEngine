@@ -94,21 +94,21 @@ void RunSharedSparseStorage(RecordingChangeDevice& device)
     storage.pool = own::make_shared<RHISharedSparsePagePool>(device, 3);
     SparseClusterPayload payload;
     payload.virtualBytes = 3 * RHISparseTileBytes;
-    const auto packet = own::make_shared<const std::vector<std::byte>>(32, std::byte{0x42});
+    const auto packet = own::make_shared<const ce::dynamic_array<std::byte>>(32, std::byte{0x42});
     payload.packets = {{uint32_t(RHISparseTileBytes), 1, packet}, {uint32_t(RHISparseTileBytes + 32), 0, packet}};
     Check(storage.Prepare(payload, 32, 1024, error), "Packed storage prepare");
     Check(storage.allocation->tiles.size() == 2 && storage.NeedsPacket(payload.packets[0]),
           "Two packed packets use one data tile");
-    storage.Commit(storage.serial, storage.Revision(), payload, std::vector<std::byte>(32));
+    storage.Commit(storage.serial, storage.Revision(), payload, ce::dynamic_array<std::byte>(32));
     payload.packets.push_back({uint32_t(2 * RHISparseTileBytes - 16), 0, packet});
     Check(storage.Prepare(payload, 32, 1024, error) && !storage.NeedsPacket(payload.packets[0]) &&
               !storage.NeedsPacket(payload.packets[1]) && storage.NeedsPacket(payload.packets[2]),
           "Incremental refinement transfers only newly admitted packets");
     const auto neverSubmitted = storage.serial;
     Check(storage.Prepare(payload, 32, 1024, error), "Retry preparation after abandoned recording");
-    storage.Commit(neverSubmitted, storage.Revision(), payload, std::vector<std::byte>(32));
+    storage.Commit(neverSubmitted, storage.Revision(), payload, ce::dynamic_array<std::byte>(32));
     Check(storage.NeedsPacket(payload.packets[2]), "Aborted or stale upload cannot publish a committed packet");
-    storage.Commit(storage.serial, storage.Revision(), payload, std::vector<std::byte>(32));
+    storage.Commit(storage.serial, storage.Revision(), payload, ce::dynamic_array<std::byte>(32));
     Check(!storage.NeedsPacket(payload.packets[2]), "Completed crossing packet publishes its upload proof");
     auto other = storage.pool->Create(3 * RHISparseTileBytes, error);
     storage.SetEvictable(true);
@@ -119,7 +119,7 @@ void RunSharedSparseStorage(RecordingChangeDevice& device)
     Check(storage.Prepare(payload, 32, 1024, error) && storage.NeedsPacket(payload.packets[2]) &&
               !storage.NeedsPacket(payload.packets[0]),
           "Remapped packet is reuploaded while retained packet is reused");
-    storage.Commit(storage.serial, storage.Revision(), payload, std::vector<std::byte>(32));
+    storage.Commit(storage.serial, storage.Revision(), payload, ce::dynamic_array<std::byte>(32));
     storage.SetEvictable(true);
     Check(storage.pool->Prepare(other, {{0, 2}, {1, 2}, {2, 2}}, error) && storage.allocation->tiles.empty(),
           "Idle root and metadata pages are reclaimed after optional pages");
@@ -152,7 +152,7 @@ void RunSharedSparseStorage(RecordingChangeDevice& device)
     fallbackPayload.virtualBytes = 3 * RHISparseTileBytes;
     fallbackPayload.packets = {{uint32_t(RHISparseTileBytes), 1, packet},
         {uint32_t(2 * RHISparseTileBytes), 0, packet}};
-    std::vector<std::byte> metadata(32);
+    ce::dynamic_array<std::byte> metadata(32);
     uint64_t allowance{};
     bool limited{};
     const auto rebuild = [&](const assets::cluster::ResidentSet& selected)

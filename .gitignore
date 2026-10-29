@@ -683,3 +683,6 @@ Dynamic_CPP/Assets/Prefabs/BTSmokeProbe.prefab
 /Dynamic_CPP/Saved/Editor/Cache/
 /Dynamic_CPP/Saved/Editor/Dump/
 /Dynamic_CPP/Saved/Editor/Editor/Workspaces/*.rejected
+
+# Desloppify local analysis state
+/.desloppify/

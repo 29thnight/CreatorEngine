@@ -27,14 +27,14 @@ VerifiedProduct RefractionProduct(const std::filesystem::path& root, bool hybrid
         asset.graph.SetSocketValue(pin, value);
         Check(asset.graph.FindPin(pin)->value == value, name);
     };
-    set("Base Color", std::array<double, 4>{1, 1, 1, 1});
+    set("Base Color", ce::fixed_array<double, 4>{1, 1, 1, 1});
     set("Metallic", hybrid ? .3 : 0.0);
     set("Subsurface Weight", hybrid ? .4 : 0.0);
     set("Subsurface Scale", 0.0);
     if (film)
     {
         set("Specular IOR Level", 0.0);
-        set("Specular Tint", std::array<double, 4>{.5, .7, .9, 1});
+        set("Specular Tint", ce::fixed_array<double, 4>{.5, .7, .9, 1});
         set("Thin Film Thickness", 420.0);
         set("Thin Film IOR", 1.33);
     }
@@ -43,7 +43,7 @@ VerifiedProduct RefractionProduct(const std::filesystem::path& root, bool hybrid
           "Refraction alpha texture");
     connect(image, "Alpha", surface, "Alpha");
     connect(surface, "BSDF", output, "Surface");
-    std::vector<LXMaterialDiagnostic> diagnostics;
+    ce::dynamic_array<LXMaterialDiagnostic> diagnostics;
     const auto program = GenerateMaterialSlang(asset, &diagnostics);
     Check(program && (program->features & 0x0800u), "Refraction feature extraction");
     const auto product = CookedScene(*program, hybrid ? "refraction-hybrid-product"
@@ -143,9 +143,9 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     camera.projection.m[3][3] = 2;
     camera.eyePosition = math::vector3(0, 0, -2);
     context.camera = &camera;
-    const std::vector<EnhancedLight> lights;
+    const ce::dynamic_array<EnhancedLight> lights;
     context.lights = &lights;
-    const std::vector<EnhancedDrawItem> forwardDraws;
+    const ce::dynamic_array<EnhancedDrawItem> forwardDraws;
     context.forwardDraws = &forwardDraws;
     Check(tiles.Initialize(context, error), "Refraction actual Scene passes");
     WaitSceneProgram(host, context, background->generation);
@@ -224,7 +224,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             }
             occluder.draw.materialGraphInstance = background;
             occluder.draw.materialGraphSlot = 33;
-            std::vector draws{glass.draw, backdrop.draw};
+            ce::dynamic_array<EnhancedDrawItem> draws{glass.draw, backdrop.draw};
             if (fixture != 2) draws.push_back(occluder.draw);
             context.draws = &draws;
             own::shared_owner<const SceneViewInput> input;
@@ -279,7 +279,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
 
 
             lighting = SceneHost::DeclareHdrTarget(*graph, context);
-            lighting = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
+            lighting = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : ce::fixed_array<RGHandle,2>{}}, lighting, ao, {});
             tiles.SetDepth(outputs.depth);
             tiles.Declare(*graph, context);
             const auto blended = host.DeclareBlendedStream(*graph, meteorLayerWork, lighting, {}, tiles.GetLighting());

@@ -12,7 +12,7 @@ void RunTemporalBuckets(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     if(transmitting){
         IndirectMaterialBatch invalid;invalid.device=&device;
         auto& bucket = invalid.AppendBucket(); bucket.roots = {2, 1};
-        const std::array<uint32_t,1> words{};const std::array<std::array<uint32_t,4>,1> records{};
+        const std::array<uint32_t,1> words{};const std::array<ce::fixed_array<uint32_t,4>,1> records{};
         Check(!invalid.Upload(words,records,32,error)&&error.find("strictly increasing")!=std::string::npos&&!invalid.output.IsValid(),"Invalid indirect root order is rejected before allocation/recording");
     }
     const auto generation = store.Load(id, [&](CookedProgram& cooked, std::string&) {
@@ -70,7 +70,7 @@ void RunTemporalBuckets(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             SceneSurfaceTargets surface;surface.Declare(*graph,context);
             const auto visible=host.DeclareGBuffer(*graph,final,surface.GetOutputs());
 
-            std::array<RGHandle, 5> targets;
+            ce::fixed_array<RGHandle, 5> targets;
             std::array<RHIReadback, 5> readbacks;
             const std::array formats{RHIFormat::RG16Float, RHIFormat::R16Float, RHIFormat::R16Float, RHIFormat::R16Float, RHIFormat::D32Float};
             std::vector<EnhancedRenderGraph::RGPassUsage> clearUses;
@@ -91,7 +91,7 @@ void RunTemporalBuckets(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             });
             const auto packets=host.MaterialWork();
             Check(bool(packets)!=transmitting,"Transmitting Temporal uses camera meshlets; opaque uses material packets");
-            targets=host.DeclareTemporal(*graph,visible.visibility,packets?packets->GraphInputs(*graph):std::array<RGHandle,2>{},final.blendedList,targets);
+            targets=host.DeclareTemporal(*graph,visible.visibility,packets?packets->GraphInputs(*graph):ce::fixed_array<RGHandle,2>{},final.blendedList,targets);
             for(unsigned i=0;i<5;++i) graph->AddPass("Probe.Temporal.Read",{{targets[i],RHIResourceState::CopySource,RGAccessMode::Read}},
                 [target=targets[i],readback=readbacks[i]](const auto& execution){execution.encoder->CopyToReadback(readback,execution.ResolveHandle(target));},true);
             RecordingChangeDevice::VisibilityBindingAudit visibilityBindings{device, *graph, visible.visibility};

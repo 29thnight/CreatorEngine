@@ -37,7 +37,7 @@ void RunGeometryPreparationScale(RecordingChangeDevice& device, ProbeRoots& root
         Check(cookedMeshes.Resolve(geometry.draw.modelMeshView, geometry.draw.modelMeshView, error),
               "Scale fixture cook " + error);
     }
-    std::vector<EnhancedDrawItem> draws(count);
+    ce::dynamic_array<EnhancedDrawItem> draws(count);
     for (unsigned index = 0; index < count; ++index)
     {
         draws[index] = meshes[index % unique].draw;

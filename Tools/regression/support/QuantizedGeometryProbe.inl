@@ -25,7 +25,7 @@ void RunQuantizedGeometry(RecordingChangeDevice& device, ProbeRoots& roots, Prob
         for (unsigned count : {1u, 1031u})
         {
             const auto stride = assets::StrideOf(mask);
-            std::vector<std::byte> original(std::size_t(count) * stride);
+            ce::dynamic_array<std::byte> original(std::size_t(count) * stride);
             for (unsigned vertex = 0; vertex < count; ++vertex)
             {
                 for (unsigned channel = 0; channel < stride / 4; ++channel)
@@ -57,7 +57,7 @@ void RunQuantizedGeometry(RecordingChangeDevice& device, ProbeRoots& roots, Prob
                     Put(original, std::size_t(vertex) * stride + channel * 4, bits);
                 }
             }
-            std::vector<std::byte> packet, roundtrip;
+            ce::dynamic_array<std::byte> packet, roundtrip;
             Check(Encode(mask, count, original, packet, error), "Quantized CPU encode " + error);
             Check(Decode(packet, mask, count, roundtrip, error) && roundtrip == original, "Quantized CPU bit-exact roundtrip " + error);
             if (count > 1)
@@ -122,7 +122,7 @@ void RunQuantizedGeometry(RecordingChangeDevice& device, ProbeRoots& roots, Prob
             }
             auto nonfinite = original;
             Put(nonfinite, 0, 0x7fc00000);
-            std::vector<std::byte> rejected;
+            ce::dynamic_array<std::byte> rejected;
             Check(!Encode(mask, count, nonfinite, rejected, error) && rejected.empty(), "Reject nonfinite authored position");
             ++corruptions;
             Check(device.BeginFrame(error), "Quantized GPU begin");

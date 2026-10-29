@@ -15,16 +15,16 @@ enum class InputType
 
 enum class KeyState
 {
-	Idle,  //±âº»
-	Down, //ÇÑ¹ø ´©¸¥°Å
-	Pressed,   //´©¸£´ÂÁß
-	Released, //´­·¶´Ù°¡ ¶ÂÀ»¶§
+	Idle,  //ê¸°ë³¸
+	Down, //í•œë²ˆ ëˆ„ë¥¸ê±°
+	Pressed,   //ëˆ„ë¥´ëŠ”ì¤‘
+	Released, //ëˆŒë €ë‹¤ê°€ ë—ì„ë•Œ
 };
 
 //class KeyboardState
 //{
 //public:
-//	//´Ù idle»óÅÂ·Î ¸¸µé±â
+//	//ë‹¤ idleìƒíƒœë¡œ ë§Œë“¤ê¸°
 //	KeyboardState() {
 //		memset(keyboardkeyStates, 0, sizeof(KeyState) * kKeyboardCount);
 //	}

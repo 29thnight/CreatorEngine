@@ -57,7 +57,7 @@ export namespace ce
 {
     thread_pool& get_thread_pool();
 }
-namespace job_detail
+export namespace job_detail
 {
     struct completion_state;
     struct scheduler_state;

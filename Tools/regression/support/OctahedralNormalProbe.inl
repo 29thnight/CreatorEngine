@@ -5,7 +5,7 @@ void RunOctahedralNormalContract()
     using assets::quantized::Put;
     const auto mask = kModelVertexMasks.front(), stride = StrideOf(mask);
     constexpr uint32_t count = 64;
-    std::vector<std::byte> raw(count * stride);
+    ce::dynamic_array<std::byte> raw(count * stride);
     double maxError{}, minDot = 1;
     for (uint32_t i = 0; i < count; ++i)
     {
@@ -19,7 +19,7 @@ void RunOctahedralNormalContract()
     grid.octahedralNormals = false;
     auto scalar = Encode(mask, count, raw, grid);
     Check(quantized::Word(oct, 28) == 1 && oct.size() < scalar.size(), "Directional codec reduces actual packet bytes");
-    std::vector<std::byte> decoded;
+    ce::dynamic_array<std::byte> decoded;
     std::string error;
     Check(Decode(oct, decoded, error), "Octahedral CPU packet decode " + error);
     for (uint32_t i = 0; i < count; ++i)
@@ -36,7 +36,7 @@ void RunOctahedralNormalContract()
         minDot = std::min(minDot, dot);
     }
     Check(maxError <= Policy{}.absoluteError[1] && minDot > .999998, "Normal angular/component error bound");
-    for (auto direction : {std::array<float, 3>{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}})
+    for (auto direction : {ce::fixed_array<float, 3>{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}})
     {
         const auto normal = DecodeOctahedralNormal(EncodeOctahedralNormal(direction));
         double dot{};

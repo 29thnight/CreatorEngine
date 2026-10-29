@@ -1,6 +1,6 @@
 struct CountedClusterBytes final : experiment::cooked::ArtifactByteSource
 {
-    std::vector<std::byte> bytes;
+    ce::dynamic_array<std::byte> bytes;
     std::vector<std::pair<uint64_t, uint64_t>> allowed;
     mutable std::atomic<uint64_t> readBytes{}, reads{}, rejectedBulk{};
     std::atomic<bool> corruptPage{};

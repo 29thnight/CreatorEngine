@@ -22,12 +22,12 @@ void CheckCsmContracts(RecordingChangeDevice& device, const own::shared_owner<co
     caster.worldMatrix.m[3][0] = position.x;
     caster.worldMatrix.m[3][1] = position.y;
     caster.worldMatrix.m[3][2] = position.z;
-    std::vector<EnhancedDrawItem> casters{caster};
+    ce::dynamic_array<EnhancedDrawItem> casters{caster};
     FrameCameraSnapshot camera;
     camera.projection = math::perspective_fov_lh(1.f, 1.f, .1f, 1000.f);
     camera.inverseView = math::matrix4x4::identity();
     camera.nearPlane = .1f; camera.farPlane = 1000.f; camera.forward = {0, 0, 1};
-    std::vector<EnhancedLight> lights(2);
+    ce::dynamic_array<EnhancedLight> lights(2);
     for (auto& light : lights) light.direction = {direction.x, direction.y, direction.z, 0};
     lights[0].color.a = 1; lights[1].color.a = 2;
     EnhancedFrameContext context;
@@ -90,10 +90,10 @@ VerifiedProduct ShadowDecalProduct(const std::filesystem::path& root, bool layer
     const auto output = asset.CreateNode("ShaderNodeOutputMaterial", 400, 0);
     asset.activeOutput = output;
     asset.blackboard = {{1200, "alpha", "Alpha", PinType::Float, 1.0},
-                        {1201, "color", "Color", PinType::Color, std::array<double, 4>{.21, .37, .53, 1}},
+                        {1201, "color", "Color", PinType::Color, ce::fixed_array<double, 4>{.21, .37, .53, 1}},
                         {1202, "rough", "Roughness", PinType::Float, .42},
                         {1203, "metal", "Metallic", PinType::Float, .65},
-                        {1205, "normal", "Normal", PinType::Vector, std::array<double, 3>{0, 0, 1}}};
+                        {1205, "normal", "Normal", PinType::Vector, ce::fixed_array<double, 3>{0, 0, 1}}};
     const auto connect = [&](Id from, const char* fromName, Id to, const char* toName) {
         Check(asset.graph
                   .Connect(Pin(asset.graph, from, fromName, Direction::Output),
@@ -129,7 +129,7 @@ VerifiedProduct ShadowDecalProduct(const std::filesystem::path& root, bool layer
         asset.graph.SetSocketValue(pin, value);
         Check(asset.graph.FindPin(pin)->value == LXSocketValue{value}, name);
     }
-    std::vector<LXMaterialDiagnostic> diagnostics;
+    ce::dynamic_array<LXMaterialDiagnostic> diagnostics;
     const auto program = GenerateMaterialSlang(asset, &diagnostics);
     Check(bool(program), "Shadow/Decal generation");
     return CookedScene(*program, layered ? "shadow-decal-layered" : "shadow-decal-core", backend);

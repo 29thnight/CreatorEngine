@@ -6,7 +6,7 @@ own::shared_owner<const Generation> ForwardTransportProduct(const std::filesyste
     const auto output = asset.CreateNode("ShaderNodeOutputMaterial", 400, 0);
     asset.activeOutput = output;
     asset.blackboard = {{2001, "alpha", "Alpha", PinType::Float, 1.0},
-                        {2002, "color", "Color", PinType::Color, std::array<double, 4>{.7, .2, .1, 1}}};
+                        {2002, "color", "Color", PinType::Color, ce::fixed_array<double, 4>{.7, .2, .1, 1}}};
     const auto connect = [&](Id from, const char* source, Id to, const char* target) {
         Check(asset.graph
                   .Connect(Pin(asset.graph, from, source, Direction::Output),
@@ -34,14 +34,14 @@ own::shared_owner<const Generation> ForwardTransportProduct(const std::filesyste
         set("Transmission Weight", kind == 2 ? 1.0 : 0.0);
         if (kind == 0)
         {
-            set("Base Color", std::array<double, 4>{0, 0, 0, 1});
+            set("Base Color", ce::fixed_array<double, 4>{0, 0, 0, 1});
             set("Specular IOR Level", 0.0);
             set("Emission Strength", 1.0);
         }
         if (kind == 1)
         {
             set("Subsurface Weight", .8);
-            set("Subsurface Radius", std::array<double, 3>{.2, .12, .08});
+            set("Subsurface Radius", ce::fixed_array<double, 3>{.2, .12, .08});
             set("Subsurface Scale", .2);
         }
         connect(surface, "BSDF", output, "Surface");
@@ -55,11 +55,11 @@ own::shared_owner<const Generation> ForwardTransportProduct(const std::filesyste
             Check(asset.graph.FindPin(pin)->value == value, name);
         };
         set("Density", 2.0);
-        set("Color", std::array<double, 4>{0, 0, 0, 1});
-        set("Absorption Color", std::array<double, 4>{0, 0, 0, 1});
+        set("Color", ce::fixed_array<double, 4>{0, 0, 0, 1});
+        set("Absorption Color", ce::fixed_array<double, 4>{0, 0, 0, 1});
         connect(volume, "Volume", output, "Volume");
     }
-    std::vector<LXMaterialDiagnostic> diagnostics;
+    ce::dynamic_array<LXMaterialDiagnostic> diagnostics;
     const auto program = GenerateMaterialSlang(asset, &diagnostics);
     Check(bool(program), "Transport material generation");
     VerifiedProduct product;
@@ -70,7 +70,7 @@ own::shared_owner<const Generation> ForwardTransportProduct(const std::filesyste
     const bool compiled = CompileSceneProduct(*program, root / "Dynamic_CPP/Assets/Shaders/DefaultPassShader", source,
                                               {}, product, error, guid);
     Check(compiled, "Transport sealed product " + error);
-    std::vector<std::uint8_t> bytes;
+    ce::dynamic_array<std::uint8_t> bytes;
     CookedProgram restored;
     const bool restoredOk =
         WriteCookedProgram(product, {}, bytes, error) && ReadCookedProgram(bytes, {}, restored, error);
@@ -116,11 +116,11 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
     light.position = math::vector4(0, 0, 0, 0);
     light.direction = math::vector4(0, 0, 1, 0);
     light.color = math::color(.1f, .09f, .08f, 1);
-    const std::vector lights{light};
+    const ce::dynamic_array<EnhancedLight> lights{light};
     context.lights = &lights;
     auto divided = light;
     divided.color = math::color(.1f / 65, .09f / 65, .08f / 65, 1);
-    const std::vector<EnhancedLight> manyLights(65, divided);
+    const ce::dynamic_array<EnhancedLight> manyLights(65, divided);
     const bool initialized = tiles.Initialize(context, error);
     Check(initialized, "Transport light tiles " + error);
     (&ce::paths::get_state())->asset_authoring_enabled = false;
@@ -184,10 +184,10 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             std::cout << "LX_FORWARD_TRANSPORT_BEGIN fixture=" << fixture << std::endl;
             Drain drain{device};
             context.frameId = 9000 + policy * 24 + fixture;
-            std::vector<EnhancedDrawItem> graphDraws;
+            ce::dynamic_array<EnhancedDrawItem> graphDraws;
             const bool medium = fixture >= 15 && fixture < 23;
             context.lights = fixture == 23 ? &manyLights : &lights;
-            const auto instance = [&](unsigned kind, double alpha, std::array<double, 4> color) {
+            const auto instance = [&](unsigned kind, double alpha, ce::fixed_array<double, 4> color) {
                 own::shared_owner<const Instance> value;
                 InstanceDescription description{generations[kind]->assetId, {}, {}};
                 if (kind != 3)
@@ -200,7 +200,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
                 Check(built, "Transport instance " + error);
                 return value;
             };
-            const auto add = [&](unsigned kind, float depth, float alpha, std::array<double, 4> color) {
+            const auto add = [&](unsigned kind, float depth, float alpha, ce::fixed_array<double, 4> color) {
                 auto draw = geometry.draw;
                 draw.geometryKey = 9100 + kind;
                 draw.worldMatrix[3, 2] = depth;
@@ -221,9 +221,9 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
                     : fixture == 1 ? 0
                                    : 4,
                     depths[fixture], 1,
-                    fixture == 0   ? std::array<double, 4>{.7, .2, .1, 1}
-                    : fixture == 1 ? std::array<double, 4>{.1, .6, .2, 1}
-                                   : std::array<double, 4>{.2, .1, .7, 1});
+                    fixture == 0   ? ce::fixed_array<double, 4>{.7, .2, .1, 1}
+                    : fixture == 1 ? ce::fixed_array<double, 4>{.1, .6, .2, 1}
+                                   : ce::fixed_array<double, 4>{.2, .1, .7, 1});
             }
             else if (fixture == 23)
             {
@@ -276,7 +276,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             {
                 std::reverse(graphDraws.begin(), graphDraws.end());
             }
-            const std::vector<EnhancedDrawItem> empty;
+            const ce::dynamic_array<EnhancedDrawItem> empty;
             context.draws = &empty;
             own::shared_owner<const SceneViewInput> input;
             SceneInputBudget inputBudget;
@@ -366,7 +366,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
                                        target, h.index == color.index ? background.data() : white);
                                }
                            });
-            color = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, color, ao, {});
+            color = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : ce::fixed_array<RGHandle,2>{}}, color, ao, {});
             const auto composed = host.DeclareVolume(*graph, color, outputs.depth, {});
             tiles.SetDepth(outputs.depth);
             tiles.Declare(*graph, context);

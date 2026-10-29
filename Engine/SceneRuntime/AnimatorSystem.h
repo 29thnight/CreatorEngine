@@ -222,8 +222,10 @@ struct AnimInstance final
             auto* records = page.get();
             freeControllerSlots.reserve((controllerPages.size() + 1) * kControllerSlotPageSize);
             controllerPages.push_back(std::move(page));
-            for (std::size_t slot = kControllerSlotPageSize; slot > 0; --slot)
-                freeControllerSlots.push_back(records + slot - 1);
+            for (std::size_t pageIndex = kControllerSlotPageSize; pageIndex > 0; --pageIndex)
+            {
+                freeControllerSlots.push_back(records + pageIndex - 1);
+            }
         }
 
         ControllerSlot* record = freeControllerSlots.back();

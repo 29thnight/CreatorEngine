@@ -108,7 +108,7 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             if (fixture == 6)
                 rectangles[1] = {5, 5, 11, 11, -.25f, .125f};
             std::array<Geometry, 4> geometry;
-            std::vector<EnhancedDrawItem> draws;
+            ce::dynamic_array<EnhancedDrawItem> draws;
             context.frameId = 12000 + frames;
             context.sceneEpoch = 70;
             for (unsigned n = 0; n < geometry.size(); ++n)

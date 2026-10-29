@@ -257,7 +257,7 @@ VerifiedProduct Product(const std::filesystem::path& root, bool layered, bool fo
         const auto second = asset.CreateNode("LXTextureSample", -400, 0);
         const auto constant = asset.CreateNode("ShaderNodeTexImage", -400, 100);
         const auto vector = asset.CreateNode("LXParameterVector", -600, 100);
-        asset.blackboard.push_back({903, "uv", "Constant UV", PinType::Vector, std::array<double, 3>{.23, .37, 0}});
+        asset.blackboard.push_back({903, "uv", "Constant UV", PinType::Vector, ce::fixed_array<double, 3>{.23, .37, 0}});
         Check(asset.graph.SetProperty(vector, "parameter", "903"), "Independent Vector input");
         Check(asset.graph.SetSocketValue(Pin(asset.graph, second, "Texture", Direction::Input),
                                          std::string("44444444-4444-4444-8444-444444444444")) &&
@@ -291,7 +291,7 @@ VerifiedProduct Product(const std::filesystem::path& root, bool layered, bool fo
             << "guid: " << (layered ? "33333333-3333-4333-8333-333333333333" : "11111111-1111-4111-8111-111111111111")
             << '\n';
     }
-    std::vector<LXMaterialDiagnostic> diagnostics;
+    ce::dynamic_array<LXMaterialDiagnostic> diagnostics;
     const auto program = GenerateMaterialSlang(asset, &diagnostics);
     Check(!!program, "Generate spatial material");
     const auto file = root / "Build/Obj/MaterialProductProbe" /
@@ -322,7 +322,7 @@ VerifiedProduct Product(const std::filesystem::path& root, bool layered, bool fo
     Check(!VerifySurfaceProduct(*program, wrong, targets, options, {}, result, diagnostics) &&
               result.program.semanticKey == key,
           "Reject different host and retain product");
-    std::vector<std::uint8_t> bytes;
+    ce::dynamic_array<std::uint8_t> bytes;
     std::string error;
     CookedProgram cooked;
     Check(WriteCookedProgram(result, {}, bytes, error) && ReadCookedProgram(bytes, {}, cooked, error) &&
@@ -539,7 +539,7 @@ bool SealScene(const SceneInputView& view, std::span<const EnhancedDrawItem> dra
                own::shared_owner<const SceneViewInput>& result, std::string& error, const SceneViewInput* previous = nullptr)
 {
     ce::profile_scope fixtureProfile{ce::marker<"GeometryScaleFixtureSeal">()};
-    std::vector<EnhancedDrawItem> cooked(draws.begin(), draws.end());
+    ce::dynamic_array<EnhancedDrawItem> cooked(draws.begin(), draws.end());
     for (auto& draw : cooked)
         Check(cookedMeshes.Resolve(draw.modelMeshView, draw.modelMeshView, error), "Fixture meshlet cooking " + error);
     auto pins = own::make_shared<assets::ModelAssetGenerationPins>();
@@ -1451,7 +1451,7 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
     selectionCamera.nearPlane = .1f; selectionCamera.farPlane = 100.f;
     const math::vector3 selectionDirection{0, -1, 0};
     const auto receivers = shadow_math::ReceiverCascades(selectionCamera, selectionDirection, 200, .15f);
-    std::vector<EnhancedDrawItem> selectedDraws;
+    ce::dynamic_array<EnhancedDrawItem> selectedDraws;
     for (unsigned i = 0; i < 4100; ++i)
     {
         auto candidate = geometry.draw;
@@ -2371,7 +2371,7 @@ VerifiedProduct CookedScene(const LX::LXMaterialProgram& program, const std::str
     const bool compiled = CompileSceneProduct(program, paths->shader_source_path / "DefaultPassShader",
                                               paths->cache_root / (name + ".slang"), {}, product, error, {}, backend);
     Check(compiled, "Cook Scene product " + name + ": " + error);
-    std::vector<uint8_t> bytes;
+    ce::dynamic_array<uint8_t> bytes;
     CookedProgram restored;
     Check(WriteCookedProgram(product, {}, bytes, error), "Scene product serialization " + name + ": " + error);
     const bool reloaded = ReadCookedProgram(bytes, {}, restored, error);
@@ -2418,7 +2418,7 @@ own::shared_owner<const Instance> SceneCooked(const own::shared_owner<const Inst
     Check(compiled, "Cook Scene product " + error);
     // Exercise the same strict generated-stage contract as a cooked asset load,
     // rather than feeding the just-compiled in-memory product straight to rendering.
-    std::vector<uint8_t> bytes;
+    ce::dynamic_array<uint8_t> bytes;
     CookedProgram restored;
     Check(WriteCookedProgram(product, {}, bytes, error), "Scene cooked serialization " + error);
     const bool reloaded = ReadCookedProgram(bytes, {}, restored, error);
@@ -2620,7 +2620,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
         Check(device.BeginFrame(error), "Graph-only target frame begin");
         SceneSurfaceTargets graphTargets;
         EnhancedShadowPass graphShadow;
-        std::vector<EnhancedDrawItem> graphCasters(coldDraws.begin(), coldDraws.end());
+        ce::dynamic_array<EnhancedDrawItem> graphCasters(coldDraws.begin(), coldDraws.end());
         const auto previousCasters = context.shadowDraws;
         context.shadowDraws = &graphCasters;
         Check(graphShadow.PrepareGraphFrame(context, error), "Graph-only cascade preparation");
@@ -2683,11 +2683,11 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     Check(BuildInstance(instances[0]->generation, maskedDescription, loadExisting, maskedCore, error),
           "Scene masked alpha override");
     auto changedDescription = instances[0]->description;
-    std::erase_if(changedDescription.parameters, [](const auto& item) { return item.id == 900; });
+    ce::erase_if(changedDescription.parameters, [](const auto& item) { return item.id == 900; });
     changedDescription.parameters.push_back({900, 1.7});
     if (expanded == 3)
     {
-        changedDescription.parameters = {{903, std::array<double, 3>{.73, .82, 0}}};
+        changedDescription.parameters = {{903, ce::fixed_array<double, 3>{.73, .82, 0}}};
     }
     own::shared_owner<const Instance> changedCore;
     Check(BuildInstance(instances[0]->generation, changedDescription, loadExisting, changedCore, error),
@@ -2821,7 +2821,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             light.direction =
                 math::vector4(float(-lightDirection[0]), float(-lightDirection[1]), float(-lightDirection[2]), 0);
             light.color = math::color(1, 1, 1, 1);
-            std::vector<EnhancedLight> lights{light};
+            ce::dynamic_array<EnhancedLight> lights{light};
             context.lights = &lights;
             SceneInputView view{context.frameId, context.sceneEpoch, 71, 1, context.width, context.height, camera};
             if (temporalAudit && step > 0) {
@@ -2830,7 +2830,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 if (fixture == 3) ++view.viewId;
             }
             std::array<EnhancedDrawItem, 2> graphDraws{core.draw, layered.draw};
-            std::vector<EnhancedDrawItem> lxDraws(graphDraws.begin(), graphDraws.end());
+            ce::dynamic_array<EnhancedDrawItem> lxDraws(graphDraws.begin(), graphDraws.end());
             context.draws = &lxDraws;
             if (fixture == 4)
                 std::swap(graphDraws[0], graphDraws[1]);
@@ -3058,7 +3058,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     true);
             }
 #endif
-            const auto sceneLighting = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
+            const auto sceneLighting = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : ce::fixed_array<RGHandle,2>{}}, lighting, ao, {});
             std::array<RHIReadback, 11> pointReadbacks;
             RHIReadback sampleReadback;
             if (inspectPoint)
@@ -3160,7 +3160,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 bool rejected = false;
                 try
                 {
-                    host.DeclareColor(otherGraph ? unrelated : *graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(otherGraph ? unrelated : *graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
+                    host.DeclareColor(otherGraph ? unrelated : *graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(otherGraph ? unrelated : *graph) : ce::fixed_array<RGHandle,2>{}}, lighting, ao, {});
                 }
                 catch (const std::runtime_error&)
                 {
@@ -4544,7 +4544,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         namespace ck = experiment::cooked;
         std::ifstream manifest(cookedRoot / "Derived/asset-manifest.cemf", std::ios::binary);
         const std::vector<char> bytes{std::istreambuf_iterator<char>(manifest), {}};
-        std::vector<ck::AssetManifestIssue> issues;
+        ce::dynamic_array<ck::AssetManifestIssue> issues;
         const auto catalog = ck::CookedAssetCatalog::Load(
             {reinterpret_cast<const std::byte*>(bytes.data()), bytes.size()}, cookedRoot, issues);
         Check(issues.empty() && catalog.CountOfKind(ck::CookedAssetKind::MaterialProgram) == 2,
@@ -4720,7 +4720,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         SceneShaderSet rejected; std::string rejection;
         Check(!LoadSceneShaders(obsolete, RHIShaderBinary::Dxil, rejected, rejection), "Previous visibility payload ABI must be recooked");
         auto description = first->description;
-        std::erase_if(description.parameters, [](const auto& value) { return value.id == 900; });
+        ce::erase_if(description.parameters, [](const auto& value) { return value.id == 900; });
         description.parameters.push_back({900, 1.9});
         own::shared_owner<const Instance> second;
         std::string error;
@@ -5275,11 +5275,11 @@ namespace
         Check(bool(first), "Packet plan construction failed");
         Check(first->scratchWords == 7 && first->argumentWords == 39 && first->levels.size() == 1,
               "Packet plan scan/slice dimensions changed");
-        Check(first->values[0] == std::array<uint32_t, 4>{0, 1, 0, 0} &&
-                  first->values[1] == std::array<uint32_t, 4>{1, 2, 65, 0} &&
-                  first->values[2] == std::array<uint32_t, 4>{3, 10, 600, 0},
+        Check(first->values[0] == ce::fixed_array<uint32_t, 4>{0, 1, 0, 0} &&
+                  first->values[1] == ce::fixed_array<uint32_t, 4>{1, 2, 65, 0} &&
+                  first->values[2] == ce::fixed_array<uint32_t, 4>{3, 10, 600, 0},
               "Packet plan zero/clamped bucket ranges changed");
-        Check(first->selectors.back() == std::array<uint32_t, 4>{2, 8, 576, 0}, "Packet plan slice selector changed");
+        Check(first->selectors.back() == ce::fixed_array<uint32_t, 4>{2, 8, 576, 0}, "Packet plan slice selector changed");
         Check(material_graph_test::SamePinnedObject(cache.Acquire(600, 8, 64, capacities, error), first) && cache.Hits() == 1,
               "Identical packet shape did not reuse its immutable plan");
         auto changed = capacities;
@@ -5304,7 +5304,7 @@ namespace
             Check(bool(cache.Acquire(index, 8, 64, capacities, error)), "Packet plan eviction failed");
         }
         Check(cache.Bytes() <= PacketDispatchPlanCache::ByteLimit &&
-                  first->selectors.back() == std::array<uint32_t, 4>{2, 8, 576, 0},
+                  first->selectors.back() == ce::fixed_array<uint32_t, 4>{2, 8, 576, 0},
               "Plan eviction invalidated a retained frame owner");
         const auto rebuilt = cache.Acquire(600, 8, 64, capacities, error);
         Check(!material_graph_test::SamePinnedObject(rebuilt, first) && rebuilt->values == first->values && rebuilt->selectors == first->selectors,

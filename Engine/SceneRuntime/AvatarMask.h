@@ -12,7 +12,7 @@ class [[reflgen::reflect, reflgen::public_methods]] AvatarMask
 public:
 	AvatarMask() = default;
 	~AvatarMask();
-	//ÇØ´ç¾Æ¹ÙÅ¸°¡ ÇØ´ç º» »ç¿ëÁßÀÎÁö
+	//í•´ë‹¹ì•„ë°”íƒ€ê°€ í•´ë‹¹ ë³¸ ì‚¬ìš©ì¤‘ì¸ì§€
 	bool IsBoneEnabled(BoneRegion region);
 	void UseOnlyUpper() { useAll = false; useUpper = true;  useLower = false; }
 	void UseOnlyLower() { useAll = false; useUpper = false; useLower = true; }

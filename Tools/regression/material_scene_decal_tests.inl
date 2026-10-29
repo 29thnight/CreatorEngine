@@ -45,12 +45,12 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     camera.view = camera.projection = camera.inverseView = camera.inverseProjection = math::matrix4x4::identity();
     camera.eyePosition = math::vector3(0, 0, 2);
     context.camera = &camera;
-    std::vector<EnhancedDrawItem> legacy;
+    ce::dynamic_array<EnhancedDrawItem> legacy;
     context.draws = &legacy;
     EnhancedLight light{};
     light.direction = {0, 0, -1, 0};
     light.color = {2, 1, .5f, 1};
-    const std::vector<EnhancedLight> lights{light};
+    const ce::dynamic_array<EnhancedLight> lights{light};
     context.lights = &lights;
     Check(decal.Initialize(context, error),
           "Actual Decal Scene passes " + error);
@@ -106,8 +106,8 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                                                                 : nullptr;
                     item.occRoughMetal = fixture == 2 || fixture == 3 || fixture == 6 ? (orm ? &*orm.borrow() : nullptr) : nullptr;
                     item.normal = fixture == 4 ? (normal ? &*normal.borrow() : nullptr) : nullptr;
-                    decal.SetDecals(fixture >= 1 && fixture <= 6 ? std::vector{item}
-                                                                 : std::vector<EnhancedDecalPass::Item>{});
+                    decal.SetDecals(fixture >= 1 && fixture <= 6 ? ce::dynamic_array<EnhancedDecalPass::Item>{item}
+                                                                 : ce::dynamic_array<EnhancedDecalPass::Item>{});
                     Check(decal.PrepareFrame(context, error),
                           "Decal preparation " + error);
                     const bool versioned = true; // All Scene fixtures use the production RG2 wiring.
@@ -183,7 +183,7 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
 
 
                     lighting = SceneHost::DeclareHdrTarget(*graph, context);
-                    const SceneColorInputs packetCommands{meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}};
+                    const SceneColorInputs packetCommands{meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : ce::fixed_array<RGHandle,2>{}};
                     if(decal.HasPreparedDecals())for(unsigned fault=0;fault<2;++fault) {
                         auto bad=outputs;
                         if(fault==0)bad.decalBaseline[1]={};
@@ -192,7 +192,7 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                         try{host.DeclareColor(*graph,bad,packetCommands,lighting,ambient,{});}catch(const std::runtime_error&){rejected=true;}
                         Check(rejected,"Incomplete or aliased Decal packet rejected before Color declaration");++failures;
                     }
-                    const auto color = lighting = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ambient, {});
+                    const auto color = lighting = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : ce::fixed_array<RGHandle,2>{}}, lighting, ambient, {});
                     std::array<RHIReadback, 9> readbacks;
                     const auto copyTexture = [&](unsigned index, RGHandle texture, RHIFormat format) {
                         Check(device.CreateReadback(16, 16, format, 1, readbacks[index], error),
@@ -285,7 +285,7 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                               << " workers=" << workers << std::endl;
                     const auto actual = render(fixture, {id, {}, {}}, 1);
                     const bool changes = fixture <= 3 || fixture == 6;
-                    std::array<double, 4> color{.21, .37, .53, 1};
+                    ce::fixed_array<double, 4> color{.21, .37, .53, 1};
                     double roughness = .42, metallic = .65, occlusion = 1;
                     for (unsigned c = 0; c < 3; ++c)
                     {

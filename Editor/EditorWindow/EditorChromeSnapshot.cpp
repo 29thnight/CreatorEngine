@@ -228,7 +228,7 @@ namespace editor
         audit.font_scale_dpi = snapshot.font_scale_dpi;
         audit.window_dpi_scale = snapshot.window_dpi_scale;
         audit.viewport_dpi_scale = snapshot.viewport_dpi_scale;
-        const auto near = [](float a, float b) { return std::abs(a - b) < 0.0001f; };
+        const auto approximatelyEqual = [](float a, float b) { return std::abs(a - b) < 0.0001f; };
         // ★ `!os_viewports_enabled` 를 조건에서 걷었다. 그 줄은 멀티뷰포트가 꺼져
         //   있던 시절을 기술한 것이라, 켜는 순간 세 값이 전부 같아도(실측 window
         //   1.500 · viewport 1.500 · font 1.500) 판정만 거짓이 됐다. 등식은 메인
@@ -237,8 +237,8 @@ namespace editor
         audit.os_viewports_enabled = snapshot.os_viewports_enabled;
         audit.dpi_matches = snapshot.dpi_scaling_enabled && snapshot.per_monitor_dpi_aware &&
             snapshot.window_dpi_scale > 0.f &&
-            near(snapshot.font_scale_dpi, snapshot.window_dpi_scale) &&
-            near(snapshot.viewport_dpi_scale, snapshot.window_dpi_scale);
+            approximatelyEqual(snapshot.font_scale_dpi, snapshot.window_dpi_scale) &&
+            approximatelyEqual(snapshot.viewport_dpi_scale, snapshot.window_dpi_scale);
         audit.theme_mapping_matches = snapshot.theme_mapping_matches && !snapshot.theme_tokens.empty();
         audit.geometry_matches = snapshot.geometry_matches;
 

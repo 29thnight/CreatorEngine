@@ -12,7 +12,7 @@ public:
 		return m_eventName == other.m_eventName &&
 			m_scriptName == other.m_scriptName &&
 			m_funName == other.m_funName &&
-			std::abs(key - other.key) < 0.0001f; //¿ÀÂ÷
+			std::abs(key - other.key) < 0.0001f; //ì˜¤ì°¨
 	}
 
 	std::string m_eventName  = "NoneE";
@@ -20,5 +20,5 @@ public:
 	std::string m_funName    = "NoneF";
 	float key = 0;
 	
-	int  frameKey = 1; //¾Ö´Ï¸ÞÀÌ¼Ç ÇÁ·¹ÀÓ int°ª
+	int  frameKey = 1; //ì• ë‹ˆë©”ì´ì…˜ í”„ë ˆìž„ intê°’
 };

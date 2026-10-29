@@ -40,7 +40,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
     camera.eyePosition = math::vector3(0, 0, 2);
     camera.forward = math::vector3(0, 0, -1);
     context.camera = &camera;
-    std::vector<EnhancedLight> lights;
+    ce::dynamic_array<EnhancedLight> lights;
     context.lights = &lights;
     const bool initialized = tiles.Initialize(context, error);
     Check(initialized, "Light tile initialization " + error);
@@ -82,7 +82,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         context.frameId = 12000 + fixture;
         lights.assign(fixture == 10 || fixture == 11 ? 65 : 1, light);
         camera.forward = math::vector3(0, 0, fixture == 7 ? 1.f : -1.f);
-        std::vector<EnhancedDrawItem> graphDraws;
+        ce::dynamic_array<EnhancedDrawItem> graphDraws;
         for (unsigned i = 0; i < 4; ++i)
         {
             if (fixture < 4 && fixture != i) continue;
@@ -104,7 +104,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
             graphDraws.push_back(std::move(draw));
         }
         if (fixture == 6 || fixture == 13) std::reverse(graphDraws.begin(), graphDraws.end());
-        const std::vector<EnhancedDrawItem> empty;
+        const ce::dynamic_array<EnhancedDrawItem> empty;
         context.draws = &empty;
         SceneInputView view{context.frameId, context.sceneEpoch, 99, 1, 16, 16, camera};
         own::shared_owner<const SceneViewInput> input;
@@ -180,11 +180,11 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
                     execution.encoder->ClearRenderTargets(target, h.index == color.index ? background.data() : white);
                 }
             });
-        const auto opaque = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, color, ao, {});
+        const auto opaque = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : ce::fixed_array<RGHandle,2>{}}, color, ao, {});
         if (fixture == 0) {
             bool rejected = false;
             try { host.DeclareColor(*graph, outputs, {meteorLayerWork.layer,
-                host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, opaque, ao, {}); }
+                host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : ce::fixed_array<RGHandle,2>{}}, opaque, ao, {}); }
             catch (const std::runtime_error&) { rejected = true; }
             Check(rejected, "Effect color output rejects duplicate shading before declaring resources");
         }

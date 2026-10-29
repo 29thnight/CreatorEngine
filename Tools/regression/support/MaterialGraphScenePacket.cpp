@@ -163,13 +163,13 @@ namespace material_graph
                                "completed validation.");
         }
         const auto& product = evaluation.instance->generation->cooked.product;
-        std::vector<std::uint8_t> validated;
+        ce::dynamic_array<std::uint8_t> validated;
         if (!WriteCookedProgram(product, budget, validated, error))
         {
             return false;
         }
         auto candidate = own::make_shared<SceneMaterialPacket>();
-        std::vector<LX::LXMaterialDiagnostic> diagnostics;
+        ce::dynamic_array<LX::LXMaterialDiagnostic> diagnostics;
         if (!SelectRoute(product.program, capabilities, budget, candidate->selection, diagnostics))
         {
             return Fail(error,

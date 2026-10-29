@@ -2,6 +2,7 @@
 #include "../Containers/ContainerAPI.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "Prefab.h"
+#include "SceneManager.h"
 #include "EntityAuthoringRead.h" // D3-a-2: 저작 읽기 어댑터
 #include "../Utility_Framework/Authoring/AuthoringDocumentAccess.h"
 #include "../Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-5b

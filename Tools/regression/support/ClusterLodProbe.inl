@@ -5,7 +5,7 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                    ProbePool& pool, const own::shared_owner<const Instance>& sourceMaterial, bool streamingTest = false,
                    bool skinnedTest = false, unsigned visibilityAuditMode = 0)
 {
-    device.captureSkinViewConstants = skinnedTest;
+    device.captureSkinViewConstants = skinnedTest || std::getenv("CREATOR_CLUSTER_VIEW_AUDIT") != nullptr;
     const auto material = SceneCooked(sourceMaterial);
     std::string error;
     auto geometry = MakeGeometry(false, false);
@@ -61,7 +61,7 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                         &p, 12);
         }
     }
-    std::vector<uint32_t> indices;
+    ce::dynamic_array<uint32_t> indices;
     for (uint32_t y = 0; y + 1 < side; ++y)
     {
         for (uint32_t x = 0; x + 1 < side; ++x)
@@ -176,7 +176,7 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
         Check(experiment::cooked::ComputeSkinBindingDigest(skeleton, artifact.requiredSkinBindingSha256, error),
               "Skinned LOD binding digest " + error);
     }
-    std::vector<std::byte> encoded;
+    ce::dynamic_array<std::byte> encoded;
     const bool wrote = experiment::cooked::WriteModelGeometryArtifact(artifact, encoded, error);
     Check(wrote, "Hierarchy artifact write " + error);
     experiment::cooked::ModelGeometryArtifact decoded;
@@ -253,7 +253,7 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     unsigned frames{}, pixelChecks{}, transitionChecks{}, mixedFrames{}, sharedQueueReads{}, fallbackFrames{},
         evictionFrames{};
     std::uint64_t sealedQueueJobs{}, publishedQueueJobs{};
-    std::vector<uint32_t> previousResident;
+    ce::dynamic_array<uint32_t> previousResident;
     std::vector<float> thresholds;
     for (const auto& g : chain.groups)
     {
@@ -347,14 +347,14 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             tc.valid = true;
             tc.orthographicProjection = step < 6;
             tc.aspectRatio = 1;
-            tc.viewMatrix = std::bit_cast<std::array<float, 16>>(camera.view);
-            tc.projectionMatrix = tc.cameraViewToClip = std::bit_cast<std::array<float, 16>>(camera.projection);
+            tc.viewMatrix = std::bit_cast<ce::fixed_array<float, 16>>(camera.view);
+            tc.projectionMatrix = tc.cameraViewToClip = std::bit_cast<ce::fixed_array<float, 16>>(camera.projection);
             const auto inverse = *math::try_inverse(camera.projection);
             const auto previousProjection = step ? oldProjection : camera.projection;
-            tc.clipToCameraView = std::bit_cast<std::array<float, 16>>(inverse);
-            tc.clipToPreviousClip = std::bit_cast<std::array<float, 16>>(inverse * previousProjection);
+            tc.clipToCameraView = std::bit_cast<ce::fixed_array<float, 16>>(inverse);
+            tc.clipToPreviousClip = std::bit_cast<ce::fixed_array<float, 16>>(inverse * previousProjection);
             tc.previousClipToClip =
-                std::bit_cast<std::array<float, 16>>(*math::try_inverse(previousProjection) * camera.projection);
+                std::bit_cast<ce::fixed_array<float, 16>>(*math::try_inverse(previousProjection) * camera.projection);
             tc.position = {0, 0, -2};
             tc.up = {0, 1, 0};
             tc.right = {1, 0, 0};
@@ -610,7 +610,7 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             SceneColorInputs commands{host.DeclareLayerWork(*graph, final.blendedList).layer, {}};
             commands.material = host.MaterialWork()->GraphInputs(*graph);
             host.DeclareColor(*graph, output, commands, SceneHost::DeclareHdrTarget(*graph, context), ao, shadowOutput);
-            std::array<RGHandle, 5> temporal;
+            ce::fixed_array<RGHandle, 5> temporal;
             std::vector<EnhancedRenderGraph::RGPassUsage> clear;
             const std::array formats{RHIFormat::RG16Float, RHIFormat::R16Float, RHIFormat::R16Float,
                                      RHIFormat::R16Float, RHIFormat::D32Float};
@@ -1086,15 +1086,30 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                                 std::cerr << "SKIN_PRIMITIVE_DIAGNOSTIC address=" << address << " record=" << record
                                           << " cluster=" << descriptor.clusterId << " triangle=" << triangle
                                           << " vertices=";
+                                ce::fixed_array<math::vector3, 3> failureVertices;
                                 for (unsigned corner = 0; corner < 3; ++corner)
                                 {
                                     const auto local =
                                         payload.triangleIndices[original.triangleOffset + triangle * 3 + corner];
                                     const auto vertex = payload.vertexRemap[original.vertexOffset + local];
                                     const auto& point = positions[vertex];
+                                    failureVertices[corner] = point;
                                     std::cerr << vertex << '[' << point.x << ',' << point.y << ',' << point.z << ']';
                                 }
                                 std::cerr << '\n';
+                                const auto pa = project(failureVertices[0], draw.worldMatrix, camera.projection);
+                                const auto pb = project(failureVertices[1], draw.worldMatrix, camera.projection);
+                                const auto pc = project(failureVertices[2], draw.worldMatrix, camera.projection);
+                                const double ax = pa[0] / pa[3], ay = pa[1] / pa[3];
+                                const double bx = pb[0] / pb[3], by = pb[1] / pb[3];
+                                const double cx = pc[0] / pc[3], cy = pc[1] / pc[3];
+                                const double denominator = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
+                                const double u = ((by - cy) * (nx - cx) + (cx - bx) * (ny - cy)) / denominator;
+                                const double v = ((cy - ay) * (nx - cx) + (ax - cx) * (ny - cy)) / denominator;
+                                const double w = 1.0 - u - v;
+                                const double primitiveDepth = u * pa[2] / pa[3] + v * pb[2] / pb[3] + w * pc[2] / pc[3];
+                                std::cerr << "SKIN_PRIMITIVE_PIXEL barycentric=" << u << ',' << v << ',' << w
+                                          << " projectedDepth=" << primitiveDepth << '\n';
                             }
                         }
                         std::cerr << "SKIN_DEPTH_DIAGNOSTIC frame=" << frames << " step=" << step
@@ -1153,7 +1168,7 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
         const auto floorPages = physical->GetStats().physicalBytes / RHISparseTileBytes;
         Check(physical->GetStats().slabs == 1, "Idle-scene fixture starts at the product pool floor");
         auto extra = physical->Create((floorPages + 1) * RHISparseTileBytes, error);
-        std::map<uint32_t, uint32_t> demand;
+        ce::engine_ordered_map<uint32_t, uint32_t> demand;
         for (uint32_t page = 0; page <= floorPages; ++page)
         {
             demand.emplace(page, 0);

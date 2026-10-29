@@ -88,6 +88,11 @@
   <ItemGroup>
     <ClCompile Include="AssetPacker.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Engine\EngineDiagnostics\EngineDiagnostics.vcxproj">
+      <Project>{b7d3f2a9-5c14-4e86-9d3b-7f2a45c8e1b6}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>

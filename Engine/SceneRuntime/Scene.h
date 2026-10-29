@@ -17,7 +17,7 @@ import Creator.Core.Layers;
 #else
 import Creator.Core.Ownership;
 #endif
-#include "LightProperty.h"
+#include "../RenderEngine/Interfaces/LightProperty.h"
 #include "SceneGC.h"
 #include "GameObjectType.h"
 #include "GameObjectIndex.h"

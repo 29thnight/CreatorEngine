@@ -77,7 +77,7 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
                     std::memcpy(fixed.vertices.data() + vertex * fixed.draw.modelMeshView.vertexStride + 8, &z, 4);
                 }
             }
-            std::vector<EnhancedDrawItem> draws;
+            ce::dynamic_array<EnhancedDrawItem> draws;
             if (c.staticPresent)
             {
                 draws.push_back(fixed.draw);

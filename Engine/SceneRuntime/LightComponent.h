@@ -5,7 +5,6 @@
 #include "LightProperty.h"
 #include "Component.h"
 #include "IRenderable.h"
-#include "SceneManager.h"
 #include "Entity.h"
 #include "Scene.h"
 #include "../RenderEngine/DataSystem.h"

@@ -1,4 +1,5 @@
 #include "LightComponent.h"
+#include "SceneManager.h"
 #include "RenderScene.h"
 #include "LightSystem.h"
 

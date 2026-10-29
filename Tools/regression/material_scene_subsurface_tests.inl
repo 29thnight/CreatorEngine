@@ -21,7 +21,7 @@ VerifiedProduct SubsurfaceProduct(const std::filesystem::path& root)
         Check(asset.graph.FindPin(pin)->value == value, name);
     };
     set("Subsurface Weight", .8);
-    set("Subsurface Radius", std::array<double, 3>{.25, .12, 0});
+    set("Subsurface Radius", ce::fixed_array<double, 3>{.25, .12, 0});
     set("Subsurface IOR", 1.4);
     set("Subsurface Anisotropy", .2);
     set("Roughness", .5);
@@ -37,7 +37,7 @@ VerifiedProduct SubsurfaceProduct(const std::filesystem::path& root)
     connect(scale, "Value", surface, "Subsurface Scale");
     connect(metal, "Value", surface, "Metallic");
     connect(surface, "BSDF", output, "Surface");
-    std::vector<LXMaterialDiagnostic> diagnostics;
+    ce::dynamic_array<LXMaterialDiagnostic> diagnostics;
     const auto program = GenerateMaterialSlang(asset, &diagnostics);
     Check(program && (program->features & 0x1000u), "SSS graph feature extraction");
     const auto product = CookedScene(*program, "subsurface-product");
@@ -187,13 +187,13 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             }
             Check(uuid::try_parse("33333333-3333-8333-8333-333333333333", legacy.draw.modelMeshView.handle.meshId),
                   "Legacy SSS occluder identity");
-            std::vector<EnhancedDrawItem> oldDraws{legacy.draw};
+            ce::dynamic_array<EnhancedDrawItem> oldDraws{legacy.draw};
             context.draws = &oldDraws;
             EnhancedLight light;
             light.position = math::vector4(.2f, .1f, 1.5f, 1);
             light.color = math::color(3, 2, 1, 1);
             light.attenuation = math::vector4(1, 0, 1, 10);
-            std::vector<EnhancedLight> lights{light};
+            ce::dynamic_array<EnhancedLight> lights{light};
             context.lights = &lights;
             const std::array draws{a.draw, b.draw};
             SceneInputView view{context.frameId, context.sceneEpoch, 91, 1, 24, 24, camera};
@@ -262,7 +262,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             };
             copyTexture(0, lighting, RHIFormat::RGBA16Float);
             copyTexture(1, outputs.depth, RHIFormat::D32Float);
-            lighting = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, {});
+            lighting = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : ce::fixed_array<RGHandle,2>{}}, lighting, ao, {});
             copyTexture(2, lighting, RHIFormat::RGBA16Float);
             copyTexture(3, outputs.depth, RHIFormat::D32Float);
             copyTexture(4, outputs.bitmask, RHIFormat::R32Uint);

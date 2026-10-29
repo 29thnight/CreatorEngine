@@ -13,13 +13,13 @@ import Creator.Core.Ownership;
 
 #define MAX_TERRAIN_LAYERS 16
 
-// ÇâÈÄ terrain pass°¡ ±×´ë·Î constant buffer¿¡ ¿Ã¸± CPU Á¤º»ÀÌ´Ù.
-// HLSL ¹è¿­ÀÇ ¿ø¼Ò stride°¡ float4(16¹ÙÀÌÆ®)ÀÌ¹Ç·Î ÇØ´ç layoutÀ» °íÁ¤ÇÑ´Ù.
+// í–¥í›„ terrain passê°€ ê·¸ëŒ€ë¡œ constant bufferì— ì˜¬ë¦´ CPU ì •ë³¸ì´ë‹¤.
+// HLSL ë°°ì—´ì˜ ì›ì†Œ strideê°€ float4(16ë°”ì´íŠ¸)ì´ë¯€ë¡œ í•´ë‹¹ layoutì„ ê³ ì •í•œë‹¤.
 cbuffer [[reflgen::runtime]] TerrainLayerBuffer
 {
     int useLayer{};
     int numLayers{};
-    int padding1{}; // 16¹ÙÀÌÆ® Á¤·ÄÀ» À§ÇÑ ÆĞµù
+    int padding1{}; // 16ë°”ì´íŠ¸ ì •ë ¬ì„ ìœ„í•œ íŒ¨ë”©
     int padding2{};
     math::vector4 layerTilling[MAX_TERRAIN_LAYERS]{};
 };
@@ -35,7 +35,7 @@ static_assert(offsetof(TerrainLayerBuffer, padding2) == 12u);
 static_assert(offsetof(TerrainLayerBuffer, layerTilling) == 16u);
 
 //-----------------------------------------------------------------------------
-// TerrainBrush / TerrainLayer Á¤ÀÇ (º¯°æ ¾øÀ½)
+// TerrainBrush / TerrainLayer ì •ì˜ (ë³€ê²½ ì—†ìŒ)
 //-----------------------------------------------------------------------------
 
 class Texture;
@@ -51,17 +51,17 @@ struct [[reflgen::runtime]] TerrainBrush
     enum class Mode { Raise, Lower, Flatten, PaintLayer, FoliageMode } m_mode;
 	enum class FoliageMode { Paint, Erase } m_foliageMode;
     math::vector2 m_center{};
-	bool m_isEditMode{ false }; // ÆíÁı ¸ğµå ¿©ºÎ
+	bool m_isEditMode{ false }; // í¸ì§‘ ëª¨ë“œ ì—¬ë¶€
     float m_radius{ 1.0f };
     float m_strength{ 1.0f };
     float m_flatTargetHeight{ 0.0f };
     uint32_t m_layerID{ 0 };
-	uint32_t m_maskID{ 0xFFFFFFFF }; // ±âº»Àº -1 ¸¶½ºÅ© ID (Ãß°¡µÈ °æ¿ì¿¡¸¸ »ç¿ë)
+	uint32_t m_maskID{ 0xFFFFFFFF }; // ê¸°ë³¸ì€ -1 ë§ˆìŠ¤í¬ ID (ì¶”ê°€ëœ ê²½ìš°ì—ë§Œ ì‚¬ìš©)
     uint32_t m_foliageTypeID{ 0 };
-	int m_foliageDensity{ 10 }; // ½Ä»ı ¹Ğµµ
+	int m_foliageDensity{ 10 }; // ì‹ìƒ ë°€ë„
 
-	ce::dynamic_array<BrushMask> m_masks; // ºê·¯½Ã ¸¶½ºÅ©µé
-    ce::dynamic_array<std::string> m_maskNames{}; // ¸¶½ºÅ© ÀÌ¸§µé
+	ce::dynamic_array<BrushMask> m_masks; // ë¸ŒëŸ¬ì‹œ ë§ˆìŠ¤í¬ë“¤
+    ce::dynamic_array<std::string> m_maskNames{}; // ë§ˆìŠ¤í¬ ì´ë¦„ë“¤
 
     void SetBrushMode(Mode mode) { m_mode = mode; }
 

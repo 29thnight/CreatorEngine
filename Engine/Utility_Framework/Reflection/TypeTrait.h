@@ -38,7 +38,7 @@ constexpr uint64_t fnv1a_64(std::string_view s) {
 inline GUID GenerateGUID()
 {
 	GUID guid;
-	HRESULT hr = CoCreateGuid(&guid);
+	CoCreateGuid(&guid);
 	return guid;
 }
 

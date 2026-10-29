@@ -7,7 +7,7 @@ VerifiedProduct VolumeProduct(const std::filesystem::path& root, bool surface,
     asset.activeOutput = output;
     asset.blackboard = {{1011, "density", "Density", PinType::Float, 1.0},
                         {1012, "emission", "Emission", PinType::Float, 0.0},
-                        {1013, "color", "Color", PinType::Color, std::array<double, 4>{0, 0, 0, 1}}};
+                        {1013, "color", "Color", PinType::Color, ce::fixed_array<double, 4>{0, 0, 0, 1}}};
     const auto connect = [&](Id from, const char* fromName, Id to, const char* toName) {
         Check(asset.graph
                   .Connect(Pin(asset.graph, from, fromName, Direction::Output),
@@ -23,7 +23,7 @@ VerifiedProduct VolumeProduct(const std::filesystem::path& root, bool surface,
         connect(parameter, "Value", volume, names[i]);
     }
     asset.graph.SetSocketValue(Pin(asset.graph, volume, "Emission Color", Direction::Input),
-                               std::array<double, 4>{.7, .4, .2, 1});
+                               ce::fixed_array<double, 4>{.7, .4, .2, 1});
     asset.graph.SetSocketValue(Pin(asset.graph, volume, "Anisotropy", Direction::Input), .4);
     connect(volume, "Volume", output, "Volume");
     if (surface)
@@ -35,10 +35,10 @@ VerifiedProduct VolumeProduct(const std::filesystem::path& root, bool surface,
             asset.graph.SetSocketValue(Pin(asset.graph, bsdf, name, Direction::Input), value);
         }
         asset.graph.SetSocketValue(Pin(asset.graph, bsdf, "Base Color", Direction::Input),
-                                   std::array<double, 4>{1, 1, 1, 1});
+                                   ce::fixed_array<double, 4>{1, 1, 1, 1});
         connect(bsdf, "BSDF", output, "Surface");
     }
-    std::vector<LXMaterialDiagnostic> diagnostics;
+    ce::dynamic_array<LXMaterialDiagnostic> diagnostics;
     const auto program = GenerateMaterialSlang(asset, &diagnostics);
     Check(program && program->volume && program->slang.find("LX_MATERIAL_VOLUME_HOMOGENEOUS 1") != std::string::npos,
           "Uniform Volume classification");
@@ -117,7 +117,7 @@ void VolumeReflectionContracts()
     RHIShaderReflection volume{RHIShaderStage::Compute, {uniform}};
     const RHIShaderReflection* stages[]{&surface, &volume};
     RHIShaderReflection merged;
-    std::vector<LXMaterialDiagnostic> diagnostics;
+    ce::dynamic_array<LXMaterialDiagnostic> diagnostics;
     Check(MergeMaterialReflections(stages, merged, diagnostics) && merged.resources.size() == 2,
           "Stage union retains Surface-only resources");
     const auto accepted = merged;
@@ -264,7 +264,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                           {graphId,
                            {{1011, density * scale},
                             {1012, emission},
-                            {1013, std::array<double, 4>{color, color, color, 1}}},
+                            {1013, ce::fixed_array<double, 4>{color, color, color, 1}}},
                            {}},
                           [&](const experiment::AssetId&, LXColorSpace, std::string&) { return image; }, value, error),
                       "Volume instance " + error);
@@ -318,7 +318,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             occluder.draw.materialGraphInstance = background;
             occluder.draw.materialGraphSlot = 74;
             const bool hasOccluder = fixture == 0 || fixture == 3;
-            std::vector<EnhancedLight> lights;
+            ce::dynamic_array<EnhancedLight> lights;
             if (fixture == 6 || fixture == 10)
             {
                 EnhancedLight light{};
@@ -328,7 +328,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 lights.push_back(light);
             }
             context.lights = &lights;
-            std::vector draws{volume.draw, backdrop.draw};
+            ce::dynamic_array<EnhancedDrawItem> draws{volume.draw, backdrop.draw};
             if (hasOccluder) draws.push_back(occluder.draw);
             if (fixture == 3)
             {
@@ -453,7 +453,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
 
 
             lighting = SceneHost::DeclareHdrTarget(*graph, context);
-            lighting = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : std::array<RGHandle,2>{}}, lighting, ao, shadowMap);
+            lighting = host.DeclareColor(*graph, outputs, {meteorLayerWork.layer, host.MaterialWork() ? host.MaterialWork()->GraphInputs(*graph) : ce::fixed_array<RGHandle,2>{}}, lighting, ao, shadowMap);
             std::array<RHIReadback, 8> readbacks;
             const auto copy = [&](unsigned i, RGHandle handle, RHIFormat format) {
                 Check(device.CreateReadback(16, 16, format, 1, readbacks[i], error), "Volume readback");

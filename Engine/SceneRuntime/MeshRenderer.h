@@ -8,7 +8,7 @@ import Creator.Core.Ownership;
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Component.h"
 #include "Entity.h"
-#include "LightMapping.h"
+#include "../RenderEngine/Interfaces/LightMapping.h"
 #include "../RenderEngine/AssetDepot/AssetRequest.h"
 #include <mathematics/bounds.hpp>
 

@@ -26,7 +26,7 @@ void RunAtomicReduction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
         unsigned barriers=0;
         for(unsigned p : {1u,2u}) for(const auto& b:snap.passes[ids[p].index].barriers) if(b.uav) ++barriers;
         Check(barriers==1,"Only initialization UAV barrier; no sibling barrier");
-        std::vector<EnhancedRenderGraph::QueueHint> hints;
+        ce::dynamic_array<EnhancedRenderGraph::QueueHint> hints;
         for(auto id:ids) hints.push_back({id,true,1000,true}); // synthetic eligibility, not a measurement
         EnhancedRenderGraph::QueueSchedule queues;
         Check(graph.BuildQueueSchedule({true,true,false,true},hints,0,queues,error) && !queues.usesCompute,

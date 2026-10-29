@@ -33,6 +33,7 @@ import Creator.AppBackend.WinAPI;
 #include "DataSystem.h"
 #include "../Utility_Framework/Runtime/RuntimeSettings.h"
 #include "PrefabUtility.h"
+#include "../SceneRuntime/SceneManager.h"
 #include "TagManager.h"
 #include "../Utility_Framework/Reflection/ReflectionRegister.h"
 #include "ComponentFactory.h"

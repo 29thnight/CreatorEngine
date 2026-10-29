@@ -4,8 +4,9 @@
 #include "Object.h"
 #include "Entity.h"
 #include "../Utility_Framework/Reflection/ReflectionYml.h"
-#include "SceneManager.h"
 #include "ComponentFactory.h"
+
+class Scene;
 
 class [[reflgen::reflect, reflgen::public_methods]] Prefab : public Object
 {
