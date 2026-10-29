@@ -8,8 +8,13 @@ open CreatorEngine
 [<AutoOpen>]
 module ActionMapViewMembers =
     let private method_6085b3318c = NativeMethodSpec("ActionMap", "AddAction", false, [|  |], [|  |])
+    let private method_b01a2f2762 = NativeMethodSpec("ActionMap", "AddButtonAction", false, [| "std::basic_string<char>"; "unsigned long long"; "InputType"; "unsigned long long"; "KeyState"; "ce::func_detail::owning_func<void, false, true, false, 48, 8, ce::heap_allocator>" |], [| "value"; "value"; "value"; "value"; "value"; "value" |])
+    let private method_807376a31c = NativeMethodSpec("ActionMap", "AddValueAction", false, [| "std::basic_string<char>"; "unsigned long long"; "InputValueType"; "InputType"; "ce::dynamic_array<unsigned long long>"; "ce::func_detail::owning_func<void, false, true, false, 48, 8, ce::heap_allocator, float>" |], [| "value"; "value"; "value"; "value"; "value"; "value" |])
+    let private method_7f93bca0c4 = NativeMethodSpec("ActionMap", "AddValueAction", false, [| "std::basic_string<char>"; "unsigned long long"; "InputValueType"; "InputType"; "ce::dynamic_array<unsigned long long>"; "ce::func_detail::owning_func<void, false, true, false, 48, 8, ce::heap_allocator, math::vector2>" |], [| "value"; "value"; "value"; "value"; "value"; "value" |])
     let private method_20e51df874 = NativeMethodSpec("ActionMap", "CheckAction", false, [|  |], [|  |])
+    let private method_1af7be19db = NativeMethodSpec("ActionMap", "CheckAction", false, [| "int"; "std::basic_string_view<char>"; "ce::func_detail::owning_func<void, false, true, false, 48, 8, ce::heap_allocator, const std::basic_string<char> &>" |], [| "value"; "value"; "const_reference" |])
     let private method_9362182643 = NativeMethodSpec("ActionMap", "DeleteAction", false, [| "std::basic_string<char>" |], [| "const_reference" |])
+    let private method_857d874652 = NativeMethodSpec("ActionMap", "FindAction", false, [| "std::basic_string<char>" |], [| "const_reference" |])
 
     type ActionMapView with
         /// Typed native value codec for collection construction and explicit value arguments.
@@ -39,21 +44,27 @@ module ActionMapViewMembers =
             let value = this.Borrow(method_6085b3318c, arguments)
             (NativeCodecs.Reference(NativeCodecs.View((fun value -> InputActionView(value))))).Decode(value)
 
-        /// Unavailable native method: argument 5: native callbacks require an explicit rooted callback ABI
-        member _.``AddButtonAction_b01a2f_b01a2f_Unavailable`` =
-            NativeUnavailableMember("method", "ActionMap", "AddButtonAction", "void (std::string, size_t, InputType, size_t, KeyState, ce::owned_func<void ()>)", "argument 5: native callbacks require an explicit rooted callback ABI")
+        /// Native void (std::string, size_t, InputType, size_t, KeyState, ce::owned_func<void ()>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AddButtonAction``(``name``: string, ``_playerindex``: uint64, ``_inputType``: NativeEnumValue<InputTypeTag>, ``_key``: uint64, ``_state``: NativeEnumValue<KeyStateTag>, ``_action``: NativeCallback<unit>) : unit =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``name``)); NativeCallArgument.FromJson((NativeCodecs.UInt64).Encode(``_playerindex``)); NativeCallArgument.FromJson((NativeCodecs.Enum<InputTypeTag>("InputType")).Encode(``_inputType``)); NativeCallArgument.FromJson((NativeCodecs.UInt64).Encode(``_key``)); NativeCallArgument.FromJson((NativeCodecs.Enum<KeyStateTag>("KeyState")).Encode(``_state``)); NativeCallArgument.FromCallback(``_action``.Token) |]
+            let response = this.InvokeBound(method_b01a2f2762, arguments, discardResult = true)
+            ()
 
         /// Unavailable native method: argument 5: raw pointer has no bounded, retained record borrow contract
-        member _.``AddButtonAction_4fed83_4fed83_Unavailable`` =
+        member _.``AddButtonAction_4fed83_Unavailable`` =
             NativeUnavailableMember("method", "ActionMap", "AddButtonAction", "void (std::string, size_t, InputType, size_t, KeyState, void (*)())", "argument 5: raw pointer has no bounded, retained record borrow contract")
 
-        /// Unavailable native method: argument 5: native callbacks require an explicit rooted callback ABI
-        member _.``AddValueAction_807376_807376_Unavailable`` =
-            NativeUnavailableMember("method", "ActionMap", "AddValueAction", "void (std::string, size_t, InputValueType, InputType, ce::dynamic_array<size_t>, ce::owned_func<void (float)>)", "argument 5: native callbacks require an explicit rooted callback ABI")
+        /// Native void (std::string, size_t, InputValueType, InputType, ce::dynamic_array<size_t>, ce::owned_func<void (float)>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AddValueAction``(``name``: string, ``_playerindex``: uint64, ``_inputValueType``: NativeEnumValue<InputValueTypeTag>, ``_inputType``: NativeEnumValue<InputTypeTag>, ``_keys``: NativeArray<uint64>, ``_action``: NativeCallback<single>) : unit =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``name``)); NativeCallArgument.FromJson((NativeCodecs.UInt64).Encode(``_playerindex``)); NativeCallArgument.FromJson((NativeCodecs.Enum<InputValueTypeTag>("InputValueType")).Encode(``_inputValueType``)); NativeCallArgument.FromJson((NativeCodecs.Enum<InputTypeTag>("InputType")).Encode(``_inputType``)); NativeCallArgument.FromJson((NativeCodecs.Array(NativeCodecs.UInt64)).Encode(``_keys``)); NativeCallArgument.FromCallback(``_action``.Token) |]
+            let response = this.InvokeBound(method_807376a31c, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 5: native callbacks require an explicit rooted callback ABI
-        member _.``AddValueAction_7f93bc_7f93bc_Unavailable`` =
-            NativeUnavailableMember("method", "ActionMap", "AddValueAction", "void (std::string, size_t, InputValueType, InputType, ce::dynamic_array<size_t>, ce::owned_func<void (math::vector2)>)", "argument 5: native callbacks require an explicit rooted callback ABI")
+        /// Native void (std::string, size_t, InputValueType, InputType, ce::dynamic_array<size_t>, ce::owned_func<void (math::vector2)>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AddValueAction``(``name``: string, ``_playerindex``: uint64, ``_inputValueType``: NativeEnumValue<InputValueTypeTag>, ``_inputType``: NativeEnumValue<InputTypeTag>, ``_keys``: NativeArray<uint64>, ``_action``: NativeCallback<Float2>) : unit =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``name``)); NativeCallArgument.FromJson((NativeCodecs.UInt64).Encode(``_playerindex``)); NativeCallArgument.FromJson((NativeCodecs.Enum<InputValueTypeTag>("InputValueType")).Encode(``_inputValueType``)); NativeCallArgument.FromJson((NativeCodecs.Enum<InputTypeTag>("InputType")).Encode(``_inputType``)); NativeCallArgument.FromJson((NativeCodecs.Array(NativeCodecs.UInt64)).Encode(``_keys``)); NativeCallArgument.FromCallback(``_action``.Token) |]
+            let response = this.InvokeBound(method_7f93bca0c4, arguments, discardResult = true)
+            ()
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``CheckAction``() : unit =
@@ -61,9 +72,11 @@ module ActionMapViewMembers =
             let response = this.Invoke(method_20e51df874, arguments)
             ()
 
-        /// Unavailable native method: argument 2: native callbacks require an explicit rooted callback ABI
-        member _.``CheckAction_1af7be_Unavailable`` =
-            NativeUnavailableMember("method", "ActionMap", "CheckAction", "void (int, std::string_view, const ce::owned_func<void (const std::string &)> &)", "argument 2: native callbacks require an explicit rooted callback ABI")
+        /// Native void (int, std::string_view, const ce::owned_func<void (const std::string &)> &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``CheckAction``(``playerIndex``: int, ``scriptName``: string, ``onFired``: NativeCallback<string>) : unit =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``playerIndex``)); NativeCallArgument.FromJson((NativeCodecs.String).Encode(``scriptName``)); NativeCallArgument.FromCallback(``onFired``.Token) |]
+            let response = this.InvokeBound(method_1af7be19db, arguments, discardResult = true)
+            ()
 
         /// Native void (const std::string &); invoke uses the runtime's exact overload metadata.
         member this.``DeleteAction``(``name``: string) : unit =
@@ -71,6 +84,8 @@ module ActionMapViewMembers =
             let response = this.Invoke(method_9362182643, arguments)
             ()
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``FindAction_Unavailable`` =
-            NativeUnavailableMember("method", "ActionMap", "FindAction", "InputAction *(const std::string &)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native InputAction *(const std::string &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``FindAction``(``name``: string) : NativeReference<InputActionView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``name``)) |]
+            let response = this.InvokeBound(method_857d874652, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> InputActionView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))

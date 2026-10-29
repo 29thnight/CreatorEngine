@@ -53,9 +53,17 @@ module experiment_ModelMetadataViewMembers =
             fields.["cookedPath"] <- (NativeCodecs.String).Encode(value)
             experiment_ModelMetadataView(NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(fields)))
 
-        /// Unavailable native field: native type has no declared runtime value schema or explicit typed codec: std::chrono::time_point<std::filesystem::_File_time_clock>
-        member _.``sourceWriteTime_Unavailable`` =
-            NativeUnavailableMember("field", "experiment::ModelMetadata", "sourceWriteTime", "std::chrono::time_point<std::filesystem::_File_time_clock>", "native type has no declared runtime value schema or explicit typed codec: std::chrono::time_point<std::filesystem::_File_time_clock>")
+        /// Native field experiment::ModelMetadata::sourceWriteTime.
+        member this.``sourceWriteTime``
+            with get () : int64 = this.Field("sourceWriteTime", "sourceWriteTime").Read(NativeCodecs.Int64)
+            and set (value: int64) = this.Field("sourceWriteTime", "sourceWriteTime").Write(NativeCodecs.Int64, value)
+
+        /// Return a new client snapshot; this does not mutate this view or a native object.
+        member this.``With_sourceWriteTime``(value: int64) =
+            let fields = System.Collections.Generic.Dictionary<string, JsonElement>(System.StringComparer.Ordinal)
+            for property in this.ReadJson().EnumerateObject() do fields.[property.Name] <- property.Value.Clone()
+            fields.["sourceWriteTime"] <- (NativeCodecs.Int64).Encode(value)
+            experiment_ModelMetadataView(NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(fields)))
 
         /// Native field experiment::ModelMetadata::payloadKind.
         member this.``payloadKind``

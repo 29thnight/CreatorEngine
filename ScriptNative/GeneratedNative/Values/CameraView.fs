@@ -13,7 +13,9 @@ module CameraViewMembers =
     let private method_c35935de02 = NativeMethodSpec("Camera", "CalculateProjection", true, [|  |], [|  |])
     let private method_8b6fe81ab6 = NativeMethodSpec("Camera", "CalculateProjectionForAspect", true, [| "float" |], [| "value" |])
     let private method_2eac7f8b16 = NativeMethodSpec("Camera", "CalculateView", true, [|  |], [|  |])
+    let private method_a80c162683 = NativeMethodSpec("Camera", "CaptureFrameSnapshot", true, [| "float" |], [| "value" |])
     let private method_cea8d57c17 = NativeMethodSpec("Camera", "ConvertScreenToWorld", true, [| "math::vector2"; "float" |], [| "value"; "value" |])
+    let private method_9f5e77ed0c = NativeMethodSpec("Camera", "GetScreenSize", true, [|  |], [|  |])
     let private method_0017cdb639 = NativeMethodSpec("Camera", "MoveToTarget", false, [| "math::vector3" |], [| "value" |])
     let private method_a59a64cd1e = NativeMethodSpec("Camera", "NotifyCameraCut", false, [|  |], [|  |])
     let private method_0ea84dfdfe = NativeMethodSpec("Camera", "RayCast", true, [| "math::vector2" |], [| "value" |])
@@ -101,9 +103,11 @@ module CameraViewMembers =
             let response = this.Invoke(method_2eac7f8b16, arguments)
             (NativeCodecs.View((fun value -> math_matrix4x4View(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: FrameCameraSnapshot
-        member _.``CaptureFrameSnapshot_Unavailable`` =
-            NativeUnavailableMember("method", "Camera", "CaptureFrameSnapshot", "FrameCameraSnapshot (float) const", "return value: native type has no declared runtime value schema or explicit typed codec: FrameCameraSnapshot")
+        /// Native FrameCameraSnapshot (float) const; invoke uses the runtime's exact overload metadata.
+        member this.``CaptureFrameSnapshot``(``aspectRatio``: single) : FrameCameraSnapshotView =
+            let arguments = [| (NativeCodecs.Single).Encode(``aspectRatio``) |]
+            let response = this.Invoke(method_a80c162683, arguments)
+            (NativeCodecs.View((fun value -> FrameCameraSnapshotView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native math::vector3 (math::vector2, float) const; invoke uses the runtime's exact overload metadata.
         member this.``ConvertScreenToWorld``(``screenPosition``: math_vector2View, ``depth``: single) : math_vector3View =
@@ -111,9 +115,11 @@ module CameraViewMembers =
             let response = this.Invoke(method_cea8d57c17, arguments)
             (NativeCodecs.View((fun value -> math_vector3View(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: Core::Sizef
-        member _.``GetScreenSize_Unavailable`` =
-            NativeUnavailableMember("method", "Camera", "GetScreenSize", "Core::Sizef () const", "return value: native type has no declared runtime value schema or explicit typed codec: Core::Sizef")
+        /// Native Core::Sizef () const; invoke uses the runtime's exact overload metadata.
+        member this.``GetScreenSize``() : Core_SizefView =
+            let arguments = [|  |]
+            let response = this.Invoke(method_9f5e77ed0c, arguments)
+            (NativeCodecs.View((fun value -> Core_SizefView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (math::vector3); invoke uses the runtime's exact overload metadata.
         member this.``MoveToTarget``(``targetPosition``: math_vector3View) : unit =

@@ -8,7 +8,6 @@ open CreatorEngine
 [<AutoOpen>]
 module AssetEntryViewMembers =
     let private method_66ba330d18 = NativeMethodSpec("AssetEntry", "Clear", false, [|  |], [|  |])
-    let private method_9596f4a4c2 = NativeMethodSpec("AssetEntry", "operator=", false, [| "AssetEntry" |], [| "rvalue_reference" |])
     let private method_40796bea6a = NativeMethodSpec("AssetEntry", "operator=", false, [| "AssetEntry" |], [| "const_reference" |])
 
     type AssetEntryView with
@@ -55,11 +54,9 @@ module AssetEntryViewMembers =
             let response = this.Invoke(method_66ba330d18, arguments)
             ()
 
-        /// Native AssetEntry &(AssetEntry &&) noexcept; invoke uses the runtime's exact overload metadata.
-        member this.``operator=_9596f4``(``argument0``: AssetEntryView) : AssetEntryView =
-            let arguments = [| (NativeCodecs.View((fun value -> AssetEntryView(value)))).Encode(``argument0``) |]
-            let response = this.Invoke(method_9596f4a4c2, arguments)
-            (NativeCodecs.View((fun value -> AssetEntryView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
+        /// Unavailable native method: argument 0: native ownership transfer requires an explicit consuming API
+        member _.``operator=_9596f4_9596f4_Unavailable`` =
+            NativeUnavailableMember("method", "AssetEntry", "operator=", "AssetEntry &(AssetEntry &&) noexcept", "argument 0: native ownership transfer requires an explicit consuming API")
 
         /// Native AssetEntry &(const AssetEntry &); invoke uses the runtime's exact overload metadata.
         member this.``operator=_40796b``(``argument0``: AssetEntryView) : AssetEntryView =

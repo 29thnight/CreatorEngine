@@ -17,21 +17,16 @@ module FSM_FSMStateViewMembers =
         /// Typed native value codec for collection construction and explicit value arguments.
         static member Codec : NativeCodec<FSM_FSMStateView> = NativeCodecs.View(fun source -> FSM_FSMStateView(source))
 
-        /// Construct an explicit read-only native wire snapshot for value arguments.
-        static member FromJson(value: JsonElement) = FSM_FSMStateView(NativeTypeView.FromSnapshot(value))
-
-        /// Native void (BlackBoard &); invoke uses the runtime's exact overload metadata.
-        member this.``Enter``(``bb``: byref<BlackBoardView>) : unit =
-            let arguments = [| (NativeCodecs.View((fun value -> BlackBoardView(value)))).Encode(``bb``) |]
-            let response = this.Invoke(method_aeea4c9fb5, arguments)
-            ``bb`` <- (NativeCodecs.View((fun value -> BlackBoardView(value)))).Decode(NativeTypeView.FromSnapshot(response.Arguments.[0]))
+        /// Native void (BlackBoard &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``Enter``(``bb``: BlackBoardView) : unit =
+            let arguments = [| ``bb``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_aeea4c9fb5, arguments, discardResult = true)
             ()
 
-        /// Native void (BlackBoard &); invoke uses the runtime's exact overload metadata.
-        member this.``Exit``(``bb``: byref<BlackBoardView>) : unit =
-            let arguments = [| (NativeCodecs.View((fun value -> BlackBoardView(value)))).Encode(``bb``) |]
-            let response = this.Invoke(method_2b128d3032, arguments)
-            ``bb`` <- (NativeCodecs.View((fun value -> BlackBoardView(value)))).Decode(NativeTypeView.FromSnapshot(response.Arguments.[0]))
+        /// Native void (BlackBoard &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``Exit``(``bb``: BlackBoardView) : unit =
+            let arguments = [| ``bb``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_2b128d3032, arguments, discardResult = true)
             ()
 
         /// Native const std::string &() const; borrow uses the runtime's exact overload metadata.
@@ -46,9 +41,8 @@ module FSM_FSMStateViewMembers =
             let response = this.Invoke(method_da56cc3ddb, arguments)
             ()
 
-        /// Native void (BlackBoard &, float); invoke uses the runtime's exact overload metadata.
-        member this.``Update``(``bb``: byref<BlackBoardView>, ``deltaTime``: single) : unit =
-            let arguments = [| (NativeCodecs.View((fun value -> BlackBoardView(value)))).Encode(``bb``); (NativeCodecs.Single).Encode(``deltaTime``) |]
-            let response = this.Invoke(method_6a7b267795, arguments)
-            ``bb`` <- (NativeCodecs.View((fun value -> BlackBoardView(value)))).Decode(NativeTypeView.FromSnapshot(response.Arguments.[0]))
+        /// Native void (BlackBoard &, float); invoke_bound uses the runtime's exact overload metadata.
+        member this.``Update``(``bb``: BlackBoardView, ``deltaTime``: single) : unit =
+            let arguments = [| ``bb``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.Single).Encode(``deltaTime``)) |]
+            let response = this.InvokeBound(method_6a7b267795, arguments, discardResult = true)
             ()

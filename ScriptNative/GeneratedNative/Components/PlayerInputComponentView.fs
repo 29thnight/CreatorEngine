@@ -9,6 +9,7 @@ open CreatorEngine
 module PlayerInputComponentViewMembers =
     let private method_41a77071cf = NativeMethodSpec("PlayerInputComponent", "OnAddedToScene", false, [|  |], [|  |])
     let private method_bb376f6b2d = NativeMethodSpec("PlayerInputComponent", "OnRemovingFromScene", false, [|  |], [|  |])
+    let private method_080bc3dbec = NativeMethodSpec("PlayerInputComponent", "SetActionMap", false, [| "ActionMap *" |], [| "value" |])
     let private method_cbcd4fd656 = NativeMethodSpec("PlayerInputComponent", "SetActionMap", false, [| "std::basic_string<char>" |], [| "value" |])
     let private method_346f29ce69 = NativeMethodSpec("PlayerInputComponent", "SetControllerVibration", false, [| "float"; "float" |], [| "value"; "value" |])
     let private method_9df83bd607 = NativeMethodSpec("PlayerInputComponent", "SetControllerVibration", false, [| "float"; "float"; "float"; "float"; "float" |], [| "value"; "value"; "value"; "value"; "value" |])
@@ -51,9 +52,11 @@ module PlayerInputComponentViewMembers =
             let response = this.Invoke(method_bb376f6b2d, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``SetActionMap_080bc3_Unavailable`` =
-            NativeUnavailableMember("method", "PlayerInputComponent", "SetActionMap", "void (ActionMap *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (ActionMap *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``SetActionMap``(``_actionMap``: NativeReference<ActionMapView>) : unit =
+            let arguments = [| ``_actionMap``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_080bc3dbec, arguments, discardResult = true)
+            ()
 
         /// Native void (std::string); invoke uses the runtime's exact overload metadata.
         member this.``SetActionMap``(``mapName``: string) : unit =

@@ -17,6 +17,8 @@ module MeshViewMembers =
     let private method_78ce8ebb76 = NativeMethodSpec("Mesh", "GetModelName", true, [|  |], [|  |])
     let private method_a1842f357f = NativeMethodSpec("Mesh", "GetName", true, [|  |], [|  |])
     let private method_9d2aad63a2 = NativeMethodSpec("Mesh", "GetStride", false, [|  |], [|  |])
+    let private method_e0b45a8288 = NativeMethodSpec("Mesh", "GetVertices", false, [|  |], [|  |])
+    let private method_66be405987 = NativeMethodSpec("Mesh", "GetVertices", true, [|  |], [|  |])
     let private method_f2d7325c67 = NativeMethodSpec("Mesh", "HasLODs", true, [|  |], [|  |])
     let private method_f7eaa9259a = NativeMethodSpec("Mesh", "RecalculateBounds", false, [|  |], [|  |])
     let private method_234b989e73 = NativeMethodSpec("Mesh", "operator==", true, [| "Mesh" |], [| "const_reference" |])
@@ -115,13 +117,17 @@ module MeshViewMembers =
             let response = this.Invoke(method_9d2aad63a2, arguments)
             (NativeCodecs.UInt32).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: sequence element: native type has no declared runtime value schema or explicit typed codec: Vertex
-        member _.``GetVertices_e0b45a_Unavailable`` =
-            NativeUnavailableMember("method", "Mesh", "GetVertices", "const ce::dynamic_array<Vertex> &()", "return value: sequence element: native type has no declared runtime value schema or explicit typed codec: Vertex")
+        /// Native const ce::dynamic_array<Vertex> &(); borrow uses the runtime's exact overload metadata.
+        member this.``GetVertices``() : NativeArray<VertexView> =
+            let arguments = [|  |]
+            let value = this.Borrow(method_e0b45a8288, arguments)
+            (NativeCodecs.Array(NativeCodecs.View((fun value -> VertexView(value))))).Decode(value)
 
-        /// Unavailable native method: return value: sequence element: native type has no declared runtime value schema or explicit typed codec: Vertex
-        member _.``GetVertices_Const_66be40_Unavailable`` =
-            NativeUnavailableMember("method", "Mesh", "GetVertices", "ce::dynamic_array<Vertex> () const", "return value: sequence element: native type has no declared runtime value schema or explicit typed codec: Vertex")
+        /// Native ce::dynamic_array<Vertex> () const; invoke uses the runtime's exact overload metadata.
+        member this.``GetVertices_Const``() : NativeArray<VertexView> =
+            let arguments = [|  |]
+            let response = this.Invoke(method_66be405987, arguments)
+            (NativeCodecs.Array(NativeCodecs.View((fun value -> VertexView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native bool () const; invoke uses the runtime's exact overload metadata.
         member this.``HasLODs``() : bool =

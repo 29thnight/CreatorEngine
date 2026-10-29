@@ -7,6 +7,7 @@ open CreatorEngine
 
 [<AutoOpen>]
 module AniTransitionViewMembers =
+    let private method_195d887d3c = NativeMethodSpec("AniTransition", "AddConditionDefault", false, [| "std::basic_string<char>"; "ConditionType"; "ValueType" |], [| "value"; "value"; "value" |])
     let private method_64c1b53867 = NativeMethodSpec("AniTransition", "CheckTransiton", false, [| "bool" |], [| "value" |])
     let private method_0233e9259f = NativeMethodSpec("AniTransition", "DeleteCondition", false, [| "int" |], [| "value" |])
     let private method_559c322a77 = NativeMethodSpec("AniTransition", "GetBlendTime", false, [|  |], [|  |])
@@ -14,7 +15,9 @@ module AniTransitionViewMembers =
     let private method_8440038a27 = NativeMethodSpec("AniTransition", "GetCurState", false, [|  |], [|  |])
     let private method_143c314def = NativeMethodSpec("AniTransition", "GetExitTime", false, [|  |], [|  |])
     let private method_c9d90e0501 = NativeMethodSpec("AniTransition", "GetNextState", false, [|  |], [|  |])
+    let private method_2f467c300d = NativeMethodSpec("AniTransition", "SetCurState", false, [| "AnimationState *" |], [| "value" |])
     let private method_f5ce3bcb0a = NativeMethodSpec("AniTransition", "SetCurState", false, [| "std::basic_string<char>" |], [| "value" |])
+    let private method_41262d5187 = NativeMethodSpec("AniTransition", "SetNextState", false, [| "AnimationState *" |], [| "value" |])
     let private method_553040894a = NativeMethodSpec("AniTransition", "SetNextState", false, [| "std::basic_string<char>" |], [| "value" |])
 
     type AniTransitionView with
@@ -99,9 +102,11 @@ module AniTransitionViewMembers =
             fields.["hasExitTime"] <- (NativeCodecs.Bool).Encode(value)
             AniTransitionView(NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(fields)))
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``AddConditionDefault_Unavailable`` =
-            NativeUnavailableMember("method", "AniTransition", "AddConditionDefault", "TransCondition *(std::string, ConditionType, ValueType)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native TransCondition *(std::string, ConditionType, ValueType); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AddConditionDefault``(``ownerValueName``: string, ``cType``: NativeEnumValue<ConditionTypeTag>, ``vType``: NativeEnumValue<ValueTypeTag>) : NativeReference<TransConditionView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``ownerValueName``)); NativeCallArgument.FromJson((NativeCodecs.Enum<ConditionTypeTag>("ConditionType")).Encode(``cType``)); NativeCallArgument.FromJson((NativeCodecs.Enum<ValueTypeTag>("ValueType")).Encode(``vType``)) |]
+            let response = this.InvokeBound(method_195d887d3c, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> TransConditionView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native bool (bool); invoke uses the runtime's exact overload metadata.
         member this.``CheckTransiton``(``isBlend``: bool) : bool =
@@ -145,9 +150,11 @@ module AniTransitionViewMembers =
             let response = this.Invoke(method_c9d90e0501, arguments)
             (NativeCodecs.String).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``SetCurState_2f467c_Unavailable`` =
-            NativeUnavailableMember("method", "AniTransition", "SetCurState", "void (AnimationState *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (AnimationState *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``SetCurState``(``_curState``: NativeReference<AnimationStateView>) : unit =
+            let arguments = [| ``_curState``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_2f467c300d, arguments, discardResult = true)
+            ()
 
         /// Native void (std::string); invoke uses the runtime's exact overload metadata.
         member this.``SetCurState``(``_curStateName``: string) : unit =
@@ -155,9 +162,11 @@ module AniTransitionViewMembers =
             let response = this.Invoke(method_f5ce3bcb0a, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``SetNextState_41262d_Unavailable`` =
-            NativeUnavailableMember("method", "AniTransition", "SetNextState", "void (AnimationState *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (AnimationState *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``SetNextState``(``_nextStat``: NativeReference<AnimationStateView>) : unit =
+            let arguments = [| ``_nextStat``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_41262d5187, arguments, discardResult = true)
+            ()
 
         /// Native void (std::string); invoke uses the runtime's exact overload metadata.
         member this.``SetNextState``(``_nextStateName``: string) : unit =

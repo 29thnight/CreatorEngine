@@ -9,6 +9,7 @@ open CreatorEngine
 module AvatarMaskViewMembers =
     let private method_b53c9b89b2 = NativeMethodSpec("AvatarMask", "IsBoneEnabled", false, [| "BoneRegion" |], [| "value" |])
     let private method_6e5ea2cc7f = NativeMethodSpec("AvatarMask", "IsBoneEnabled", false, [| "std::basic_string<char>" |], [| "const_reference" |])
+    let private method_60c388b2cb = NativeMethodSpec("AvatarMask", "ReCreateMask", false, [| "AvatarMask *" |], [| "value" |])
     let private method_6494044695 = NativeMethodSpec("AvatarMask", "UseOnlyLower", false, [|  |], [|  |])
     let private method_1bdba247eb = NativeMethodSpec("AvatarMask", "UseOnlyUpper", false, [|  |], [|  |])
 
@@ -82,9 +83,11 @@ module AvatarMaskViewMembers =
             let response = this.Invoke(method_6e5ea2cc7f, arguments)
             (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``ReCreateMask_Unavailable`` =
-            NativeUnavailableMember("method", "AvatarMask", "ReCreateMask", "void (AvatarMask *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (AvatarMask *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``ReCreateMask``(``_otherMask``: NativeReference<AvatarMaskView>) : unit =
+            let arguments = [| ``_otherMask``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_60c388b2cb, arguments, discardResult = true)
+            ()
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``UseOnlyLower``() : unit =

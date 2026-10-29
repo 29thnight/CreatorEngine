@@ -7,9 +7,12 @@ open CreatorEngine
 
 [<AutoOpen>]
 module ImageComponentViewMembers =
+    let private method_bad8fd7ad0 = NativeMethodSpec("ImageComponent", "DeserializeTexture", false, [| "own::shared_owner<const Texture>" |], [| "const_reference" |])
     let private method_f1648c3153 = NativeMethodSpec("ImageComponent", "GetTexturePaths", true, [|  |], [|  |])
     let private method_a23c8515c8 = NativeMethodSpec("ImageComponent", "GetTextures", true, [|  |], [|  |])
+    let private method_f96f30c8dd = NativeMethodSpec("ImageComponent", "Load", false, [| "own::shared_owner<const Texture>" |], [| "const_reference" |])
     let private method_9441a31aec = NativeMethodSpec("ImageComponent", "RefreshTransformFromRect", false, [|  |], [|  |])
+    let private method_9711984024 = NativeMethodSpec("ImageComponent", "ReplaceTextureOwner", false, [| "const Texture *"; "own::shared_owner<const Texture>" |], [| "value"; "const_reference" |])
     let private method_8434256101 = NativeMethodSpec("ImageComponent", "ResetSize", false, [|  |], [|  |])
     let private method_43b4c75925 = NativeMethodSpec("ImageComponent", "SetNativeSize", false, [|  |], [|  |])
     let private method_cbde05ed19 = NativeMethodSpec("ImageComponent", "SetTexture", false, [| "int" |], [| "value" |])
@@ -66,9 +69,11 @@ module ImageComponentViewMembers =
             with get () : bool = this.Field("useNativeTextureSize", "useNativeTextureSize").Read(NativeCodecs.Bool)
             and set (value: bool) = this.Field("useNativeTextureSize", "useNativeTextureSize").Write(NativeCodecs.Bool, value)
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``DeserializeTexture_Unavailable`` =
-            NativeUnavailableMember("method", "ImageComponent", "DeserializeTexture", "void (const own::shared_owner<const Texture> &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (const own::shared_owner<const Texture> &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``DeserializeTexture``(``ptr``: NativeReference<TextureView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_bad8fd7ad0, arguments, discardResult = true)
+            ()
 
         /// Native const ce::dynamic_array<std::string> &() const; borrow uses the runtime's exact overload metadata.
         member this.``GetTexturePaths``() : NativeArray<string> =
@@ -82,9 +87,11 @@ module ImageComponentViewMembers =
             let value = this.Borrow(method_a23c8515c8, arguments)
             (NativeCodecs.Array(NativeCodecs.Reference(NativeCodecs.View((fun value -> TextureView(value)))))).Decode(value)
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``Load_Unavailable`` =
-            NativeUnavailableMember("method", "ImageComponent", "Load", "void (const own::shared_owner<const Texture> &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (const own::shared_owner<const Texture> &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``Load``(``ptr``: NativeReference<TextureView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_f96f30c8dd, arguments, discardResult = true)
+            ()
 
         /// Unavailable native method: method is reserved for engine lifecycle, scheduling, or identity management
         member _.``OnAddedToScene_Unavailable`` =
@@ -112,9 +119,11 @@ module ImageComponentViewMembers =
             let response = this.Invoke(method_9441a31aec, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``ReplaceTextureOwner_Unavailable`` =
-            NativeUnavailableMember("method", "ImageComponent", "ReplaceTextureOwner", "bool (const Texture *, const own::shared_owner<const Texture> &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (const Texture *, const own::shared_owner<const Texture> &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``ReplaceTextureOwner``(``previous``: NativeReference<TextureView>, ``replacement``: NativeReference<TextureView>) : bool =
+            let arguments = [| ``previous``.AsNativeArgument(); ``replacement``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_9711984024, arguments)
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``ResetSize``() : unit =

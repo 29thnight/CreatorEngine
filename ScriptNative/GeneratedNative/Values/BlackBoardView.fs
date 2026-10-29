@@ -39,9 +39,6 @@ module BlackBoardViewMembers =
         /// Typed native value codec for collection construction and explicit value arguments.
         static member Codec : NativeCodec<BlackBoardView> = NativeCodecs.View(fun source -> BlackBoardView(source))
 
-        /// Construct an explicit read-only native wire snapshot for value arguments.
-        static member FromJson(value: JsonElement) = BlackBoardView(NativeTypeView.FromSnapshot(value))
-
         /// Native void (const std::string &, const BlackBoardType &); invoke uses the runtime's exact overload metadata.
         member this.``AddKey``(``key``: string, ``type``: NativeEnumValue<BlackBoardTypeTag>) : unit =
             let arguments = [| (NativeCodecs.String).Encode(``key``); (NativeCodecs.Enum<BlackBoardTypeTag>("BlackBoardType")).Encode(``type``) |]

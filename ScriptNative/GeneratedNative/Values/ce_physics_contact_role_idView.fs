@@ -7,6 +7,8 @@ open CreatorEngine
 
 [<AutoOpen>]
 module ce_physics_contact_role_idViewMembers =
+    let private method_ed4b107950 = NativeMethodSpec("ce::physics::contact_role_id", "operator<=>", true, [| "ce::physics::contact_role_id" |], [| "const_reference" |])
+
     type ce_physics_contact_role_idView with
         /// Typed native value codec for collection construction and explicit value arguments.
         static member Codec : NativeCodec<ce_physics_contact_role_idView> = NativeCodecs.View(fun source -> ce_physics_contact_role_idView(source))
@@ -53,6 +55,8 @@ module ce_physics_contact_role_idViewMembers =
         /// Native field ce::physics::contact_role_id::d.
         member this.``d`` : NativeArray<byte> = this.Field("d", "d").Read(NativeCodecs.Array(NativeCodecs.UInt8))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: std::strong_ordering
-        member _.``operator<=>_Unavailable`` =
-            NativeUnavailableMember("method", "ce::physics::contact_role_id", "operator<=>", "std::strong_ordering (const contact_role_id &) const", "return value: native type has no declared runtime value schema or explicit typed codec: std::strong_ordering")
+        /// Native std::strong_ordering (const contact_role_id &) const; invoke uses the runtime's exact overload metadata.
+        member this.``operator<=>``(``argument0``: ce_physics_contact_role_idView) : int =
+            let arguments = [| (NativeCodecs.View((fun value -> ce_physics_contact_role_idView(value)))).Encode(``argument0``) |]
+            let response = this.Invoke(method_ed4b107950, arguments)
+            (NativeCodecs.Int32).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))

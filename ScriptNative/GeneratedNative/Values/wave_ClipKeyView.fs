@@ -20,6 +20,22 @@ module wave_ClipKeyViewMembers =
         /// Construct an explicit read-only native wire snapshot for value arguments.
         static member FromJson(value: JsonElement) = wave_ClipKeyView(NativeTypeView.FromSnapshot(value))
 
+        /// Preserve a legacy clip name even when its text happens to be a GUID.
+        static member CreateText(text: string) =
+            if isNull text then nullArg (nameof text)
+            let fields = System.Collections.Generic.Dictionary<string, JsonElement>(System.StringComparer.Ordinal)
+            fields.Add("text", JsonSerializer.SerializeToElement(text))
+            fields.Add("isGuid", JsonSerializer.SerializeToElement(false))
+            wave_ClipKeyView(NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(fields)))
+
+        /// Construct an asset identity without conflating it with a legacy clip name.
+        static member CreateGuid(guid: System.Guid) =
+            if guid = System.Guid.Empty then invalidArg (nameof guid) "A clip asset GUID must be nonzero."
+            let fields = System.Collections.Generic.Dictionary<string, JsonElement>(System.StringComparer.Ordinal)
+            fields.Add("text", JsonSerializer.SerializeToElement(guid.ToString("D")))
+            fields.Add("isGuid", JsonSerializer.SerializeToElement(true))
+            wave_ClipKeyView(NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(fields)))
+
         /// Native bool () const noexcept; invoke uses the runtime's exact overload metadata.
         member this.``IsEmpty``() : bool =
             let arguments = [|  |]

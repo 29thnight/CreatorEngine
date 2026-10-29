@@ -65,9 +65,8 @@ module material_graph_InstanceViewMembers =
             fields.["editorPlacementStartMs"] <- (NativeCodecs.Double).Encode(value)
             material_graph_InstanceView(NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(fields)))
 
-        /// Unavailable native field: owner pointee: native type has no declared runtime value schema or explicit typed codec: std::atomic<bool>
-        member _.``editorPreviewSubmitted_Unavailable`` =
-            NativeUnavailableMember("field", "material_graph::Instance", "editorPreviewSubmitted", "std::shared_ptr<std::atomic<bool>>", "owner pointee: native type has no declared runtime value schema or explicit typed codec: std::atomic<bool>")
+        /// Native field material_graph::Instance::editorPreviewSubmitted.
+        member this.``editorPreviewSubmitted`` : NativeReference<bool> = this.Field("editorPreviewSubmitted", "editorPreviewSubmitted").Read(NativeCodecs.Reference(NativeCodecs.Bool))
 
         /// Native field material_graph::Instance::generation.
         member this.``generation`` : NativeReference<material_graph_GenerationView> = this.Field("generation", "generation").Read(NativeCodecs.Reference(NativeCodecs.View((fun value -> material_graph_GenerationView(value)))))

@@ -15,6 +15,7 @@ module SpriteRendererViewMembers =
     let private method_666338aa03 = NativeMethodSpec("SpriteRenderer", "SetBillboardAxis", false, [| "math::vector3" |], [| "const_reference" |])
     let private method_65f7af0095 = NativeMethodSpec("SpriteRenderer", "SetBillboardType", false, [| "BillboardType" |], [| "value" |])
     let private method_5cdef9c8d3 = NativeMethodSpec("SpriteRenderer", "SetEnableDepth", false, [| "bool" |], [| "value" |])
+    let private method_569490dcac = NativeMethodSpec("SpriteRenderer", "SetSprite", false, [| "own::shared_owner<const Texture>" |], [| "const_reference" |])
 
     type SpriteRendererView with
         /// Typed native value codec for collection construction and explicit value arguments.
@@ -117,6 +118,8 @@ module SpriteRendererViewMembers =
             let response = this.Invoke(method_5cdef9c8d3, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``SetSprite_Unavailable`` =
-            NativeUnavailableMember("method", "SpriteRenderer", "SetSprite", "void (const own::shared_owner<const Texture> &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (const own::shared_owner<const Texture> &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``SetSprite``(``ptr``: NativeReference<TextureView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_569490dcac, arguments, discardResult = true)
+            ()

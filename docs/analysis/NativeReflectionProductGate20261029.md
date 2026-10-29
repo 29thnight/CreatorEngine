@@ -10,7 +10,7 @@
 |---|---|---|
 | 네이티브 서비스/F# 계약 fixture | `SCRIPT_REFLECTION_OK checks=702 types=63 api=49 bridge=C#-free`; CTest 6/6 성공 | 실제 서비스 코드, FSM 자식 저장소·Animator 출력 어댑터와 fixture 타입을 실행; Editor/Player 실행 아님 |
 | 네이티브 콜백 fixture | `NATIVE_REFLECTION_CALLBACKS_OK checks=129 signatures=5` | 콜백 계약 실행; GPU·오디오 제품 실행 아님 |
-| `NativeReflectionProduct.Compile.fsproj` | API 49 Windows codegen 실행 `40800052310`에서 실제 엔진 헤더로 생성한 F# 바인딩과 제품 프로브 컴파일 성공 | 컴파일만 수행; Editor/Player 실행 아님 |
+| `NativeReflectionProduct.Compile.fsproj` | API 49 Windows codegen 실행 `40806497136`에서 실제 엔진 헤더로 생성한 F# 바인딩과 제품 프로브 컴파일 성공; 오류 0개, 기존 `ScriptNative` 경고 63개 | 컴파일만 수행; Editor/Player 실행 아님 |
 | `verify-native-reflection-product-results.ps1` | PowerShell 7.4.7에서 결과 소비자·네이티브 파일 검증 35개 검사와 제품 실행 스크립트 구문 검사 성공 | 합성 결과·파일의 거부 검사 |
 | 계약·제품 workflow | YAML 및 PowerShell 블록 구문 검사 성공 | 제품 workflow 미실행 |
 | 새 codegen·release workflow | YAML 2개, PowerShell 블록 3개, bash 블록 2개, Python 블록 3개 구문 검사 성공 | 게시·호스트 동작을 구문 검사에서 실행하지 않음 |
@@ -20,7 +20,21 @@
 
 초기 제품 프로브의 로컬 컴파일은 Linux에서 `-std=c++20 -D__stdcall= -D__cdecl=`로 생성한 API 선언을 사용했다. Windows 호출 규약 검증은 별도의 Windows 계약 게이트가 맡는다. F# 프로브 자체에는 경고를 오류로 처리하며, 이 초기 빌드에서 참조하는 기존 `ScriptNative` 프로젝트의 경고 63개는 그대로 보고됐다.
 
-작업 브랜치의 커밋 `8b0e585a5aff5edaf9271e926ff4621d2ed9cba7`에 대한 [Windows codegen 실행 40802933859](https://github.com/29thnight/CreatorEngine/actions/runs/40802933859)이 성공했다. 실제 Windows 엔진 헤더로 생성한 RenderEngine·SceneRuntime 등록 코드, ScriptReflectionBindings·ScriptReflectionCallbacks와 StateMachineComponent.cpp의 다섯 object를 컴파일했으며, F# 생성 파일 369개와 제품 프로브도 컴파일했다. 이 실행 이후 추가한 BlackBoard native-only 인자 정책, Animator 출력 저장소, Terrain bounded getter와 BehaviorTreeComponent.cpp의 컴파일은 후속 Windows 실행에서 검증한다. Editor/Player 실행과 구분한다.
+작업 브랜치의 커밋 `d4dfa637f16a9c1dfd5df5485ac88092f6e23d70`에 대한 [Windows codegen 실행 40806497136](https://github.com/29thnight/CreatorEngine/actions/runs/40806497136)이 성공했다. 실제 Windows 엔진 헤더로 생성한 RenderEngine·SceneRuntime 등록 코드, ScriptReflectionBindings·ScriptReflectionCallbacks, StateMachineComponent.cpp와 BehaviorTreeComponent.cpp의 여섯 object를 컴파일했다. 생성 파일 369개에 대해 일치 검사를 통과했으며, 해당 F# 바인딩과 제품 프로브도 컴파일했다. BlackBoard native-only 인자 정책, Animator 출력 저장소, Terrain의 bounded getter를 포함한 최종 소스의 Windows 생성·컴파일 증거다. Editor/Player 실행과 구분한다.
+
+## 최종 Windows 생성물의 API 범위
+
+위 실행의 생성물을 그대로 반영한 [`coverage.json`](../../ScriptNative/GeneratedNative/coverage.json)은 컴포넌트 27개, 네이티브 선언 328개와 수동 런타임 스키마 35개, 레코드 뷰 363개, enum 88개를 기록한다. F# 소스 365개가 컴파일 목록과 중복·누락 없이 일치한다. `native-surface.json`의 SHA-256은 `6a6cc0d153db14fc4476dddb04b4b76b7057ccf0043ddfdf02262b49f9824813`이며 coverage의 원본 해시와 같다.
+
+| 멤버 | 타입 지정 접근 | 명시적 unavailable | 전체 |
+|---|---:|---:|---:|
+| 필드 | 1,794 | 3 | 1,797 |
+| 메서드 | 1,048 | 154 | 1,202 |
+| 합계 | 2,842 | 157 | 2,999 |
+
+기존 생성물의 멤버 2,712개와 원시 선언은 모두 보존됐고 멤버 287개가 추가됐다. 기존 unavailable 202개가 typed로 전환됐다. 소유권 이동 대입 연산자인 `AssetEntry::operator=(AssetEntry&&)`와 `TextureImage::operator=(TextureImage&&)` 두 개는 명시적 unavailable로 바뀌었다. 컴포넌트 자체 필드 162개는 모두 typed다. 컴포넌트 자체 메서드는 486개 중 374개가 typed이며, 나머지는 엔진 내부용 110개, 원시 `Terrain.GetHeightMap()`과 authoring용 `UIComponent.LoadLegacyNavigation()`이다. Terrain의 읽기 접근에는 실제 저장소 크기로 제한된 `GetHeightSamples()`가 제공된다.
+
+전체 unavailable 157개는 엔진 내부 API 138개, 포인터·원시 버퍼 7개, 소유권 이동 3개, type descriptor API 3개, authoring 노드 API 3개, 계층 변경 RAII scope 1개, 자산 내부 IO 콜백 2개다. 각 멤버는 사유가 있는 `NativeUnavailableMember`로 생성된다. typed 집계는 생성된 타입 지정 인터페이스의 수이며, 모든 멤버를 실제 Editor/Player에서 실행했다는 뜻이 아니다. 런타임 descriptor의 읽기·쓰기·호출 가능 여부와 세대·소유권 검사는 호출 시에도 적용된다.
 
 ## 실제 제품 게이트가 요구하는 증거
 

@@ -7,56 +7,139 @@ open CreatorEngine
 
 [<AutoOpen>]
 module SceneViewMembers =
+    let private method_49f299f8f8 = NativeMethodSpec("Scene", "AddCanvas", false, [| "Entity *" |], [| "value" |])
+    let private method_b4e3a01678 = NativeMethodSpec("Scene", "AddEntity", false, [| "gc::root_ref<Entity>" |], [| "value" |])
     let private method_42ef45bf58 = NativeMethodSpec("Scene", "AddLight", false, [|  |], [|  |])
     let private method_64ca3c5f25 = NativeMethodSpec("Scene", "AddRootEntity", false, [| "std::basic_string_view<char>" |], [| "value" |])
+    let private method_142b0450f9 = NativeMethodSpec("Scene", "AddSelectedEntity", false, [| "Entity *" |], [| "value" |])
     let private method_84865b0f2e = NativeMethodSpec("Scene", "AllDestroyMark", false, [| "bool" |], [| "value" |])
     let private method_498186cd3b = NativeMethodSpec("Scene", "AllUIUpdateWorldMatrix", false, [|  |], [|  |])
     let private method_15494dd365 = NativeMethodSpec("Scene", "AllUpdateWorldMatrix", false, [| "TransformSyncPoint" |], [| "value" |])
+    let private method_388e37ce21 = NativeMethodSpec("Scene", "ApplyWorldWriteBatch", false, [| "std::span<const TransformWorldWrite>"; "TransformWriteReason" |], [| "value"; "value" |])
     let private method_0c374c35ce = NativeMethodSpec("Scene", "ArmReentrancyStress", false, [| "Scene::StressKind"; "int" |], [| "value"; "value" |])
+    let private method_18a6258be0 = NativeMethodSpec("Scene", "AssignLayer", false, [| "Entity"; "ce::layers::layer_id" |], [| "mutable_reference"; "value" |])
+    let private method_cb62a27715 = NativeMethodSpec("Scene", "AttachExistingEntity", false, [| "gc::root_ref<Entity>"; "int" |], [| "value"; "value" |])
+    let private method_72d09f5168 = NativeMethodSpec("Scene", "AttachExistingEntityHierarchy", false, [| "ce::dynamic_array<DetachedEntityTransfer>" |], [| "mutable_reference" |])
     let private method_64a025a51e = NativeMethodSpec("Scene", "BeginIncrementalConstruction", false, [|  |], [|  |])
+    let private method_8bceac3d63 = NativeMethodSpec("Scene", "Cameras", false, [|  |], [|  |])
+    let private method_0399a6d3ab = NativeMethodSpec("Scene", "Cameras", true, [|  |], [|  |])
     let private method_003a1876a7 = NativeMethodSpec("Scene", "CaptureSelectionForSimulation", false, [|  |], [|  |])
     let private method_afa1ad22dc = NativeMethodSpec("Scene", "ClearSelectedEntities", false, [|  |], [|  |])
+    let private method_9bad2964fe = NativeMethodSpec("Scene", "CollectDecalComponent", false, [| "DecalComponent *" |], [| "value" |])
+    let private method_d4c345bedd = NativeMethodSpec("Scene", "CollectFoliageComponent", false, [| "FoliageComponent *" |], [| "value" |])
+    let private method_1b652f91df = NativeMethodSpec("Scene", "CollectImageComponent", false, [| "ImageComponent *" |], [| "value" |])
+    let private method_e3bda49f80 = NativeMethodSpec("Scene", "CollectLightComponent", false, [| "LightComponent *" |], [| "value" |])
+    let private method_fa79a0cc64 = NativeMethodSpec("Scene", "CollectMeshRenderer", false, [| "MeshRenderer *" |], [| "value" |])
+    let private method_e72a45ca3e = NativeMethodSpec("Scene", "CollectSpriteRenderer", false, [| "SpriteRenderer *" |], [| "value" |])
+    let private method_7d6cf7d6ac = NativeMethodSpec("Scene", "CollectSpriteSheetComponent", false, [| "SpriteSheetComponent *" |], [| "value" |])
+    let private method_90ef77700d = NativeMethodSpec("Scene", "CollectTerrainComponent", false, [| "TerrainComponent *" |], [| "value" |])
+    let private method_c70dcbaa60 = NativeMethodSpec("Scene", "CollectTextComponent", false, [| "TextComponent *" |], [| "value" |])
     let private method_849e39663f = NativeMethodSpec("Scene", "CommitRenderProxies", false, [|  |], [|  |])
     let private method_1311e55825 = NativeMethodSpec("Scene", "CountHierarchyStoreMismatches", true, [|  |], [|  |])
+    let private method_d8eade0a76 = NativeMethodSpec("Scene", "CreateEntity", false, [| "std::basic_string_view<char>"; "GameObjectType"; "int" |], [| "value"; "value"; "value" |])
+    let private method_bd4540d7de = NativeMethodSpec("Scene", "DestroyEntity", false, [| "Entity *" |], [| "value" |])
     let private method_d65d0d5162 = NativeMethodSpec("Scene", "DestroyEntity", false, [| "int" |], [| "value" |])
     let private method_5566113980 = NativeMethodSpec("Scene", "DestroyLight", false, [|  |], [|  |])
+    let private method_a99ad5b419 = NativeMethodSpec("Scene", "DetachEntityHierarchy", false, [| "Entity *"; "ce::dynamic_array<DetachedEntityTransfer>" |], [| "value"; "mutable_reference" |])
     let private method_d7730a5ecb = NativeMethodSpec("Scene", "DrainPendingLifecycle", false, [|  |], [|  |])
     let private method_e28d81ce28 = NativeMethodSpec("Scene", "EndFramePass", false, [|  |], [|  |])
     let private method_f01141fc02 = NativeMethodSpec("Scene", "EndIncrementalConstruction", false, [|  |], [|  |])
     let private method_19e62173c5 = NativeMethodSpec("Scene", "EnsureLightSlot", false, [| "unsigned long long" |], [| "value" |])
+    let private method_930b33cd28 = NativeMethodSpec("Scene", "EnsureResolved", false, [| "EntityHandle" |], [| "value" |])
+    let private method_333a42afa8 = NativeMethodSpec("Scene", "FindCanvasName", false, [| "std::basic_string_view<char>" |], [| "value" |])
     let private method_65e941a714 = NativeMethodSpec("Scene", "FixedUpdate", false, [| "float"; "bool" |], [| "value"; "value" |])
     let private method_660bce263e = NativeMethodSpec("Scene", "FlushPendingDestroy", false, [|  |], [|  |])
+    let private method_df3a457d16 = NativeMethodSpec("Scene", "GetCanvasMap", false, [|  |], [|  |])
+    let private method_c05031812e = NativeMethodSpec("Scene", "GetCanvases", false, [|  |], [|  |])
+    let private method_3b4d4cafe4 = NativeMethodSpec("Scene", "GetEntity", false, [| "int" |], [| "value" |])
+    let private method_175deec5c0 = NativeMethodSpec("Scene", "GetEntity", false, [| "std::basic_string_view<char>" |], [| "value" |])
     let private method_0adf427700 = NativeMethodSpec("Scene", "GetEntityRaw", true, [| "int" |], [| "value" |])
+    let private method_76d8993402 = NativeMethodSpec("Scene", "GetExecutionGraphCompileMetrics", true, [|  |], [|  |])
+    let private method_5dba568b47 = NativeMethodSpec("Scene", "GetExecutionGraphRelationDiagnostics", true, [| "EntityHandle" |], [| "value" |])
+    let private method_a05ae10cc0 = NativeMethodSpec("Scene", "GetHierarchyIntegrityMetrics", true, [|  |], [|  |])
+    let private method_5f64f16bcf = NativeMethodSpec("Scene", "GetHierarchyStore", true, [|  |], [|  |])
+    let private method_d992f6023a = NativeMethodSpec("Scene", "GetLastFrameTopologyMutations", true, [|  |], [|  |])
+    let private method_99a1fc4041 = NativeMethodSpec("Scene", "GetLastSpatialPullMetrics", true, [|  |], [|  |])
+    let private method_a72dc765e2 = NativeMethodSpec("Scene", "GetLastSpatialResolveMetrics", true, [|  |], [|  |])
+    let private method_2c299464b2 = NativeMethodSpec("Scene", "GetLastTransformUpdateMetrics", true, [| "TransformSyncPoint" |], [| "value" |])
+    let private method_bbea52cf97 = NativeMethodSpec("Scene", "GetRegistryCounts", true, [|  |], [|  |])
+    let private method_28529a8e65 = NativeMethodSpec("Scene", "GetRenderProxyCommitMetrics", true, [|  |], [|  |])
     let private method_5605155a2e = NativeMethodSpec("Scene", "GetRootEntity", false, [|  |], [|  |])
     let private method_965098c26b = NativeMethodSpec("Scene", "GetSceneId", true, [|  |], [|  |])
     let private method_f3a2c4db55 = NativeMethodSpec("Scene", "GetSceneName", true, [|  |], [|  |])
     let private method_1185190297 = NativeMethodSpec("Scene", "GetSelectedEntity", false, [|  |], [|  |])
+    let private method_2bb79990a1 = NativeMethodSpec("Scene", "GetSubscriptionCounts", true, [|  |], [|  |])
+    let private method_830e674e51 = NativeMethodSpec("Scene", "GetTopologyMutationTotals", true, [|  |], [|  |])
     let private method_7cc9e81be8 = NativeMethodSpec("Scene", "GetTopologyVersion", true, [|  |], [|  |])
     let private method_7e77f98ea7 = NativeMethodSpec("Scene", "GetTransformDiagnosticFrameCount", true, [|  |], [|  |])
+    let private method_bcb77a9a44 = NativeMethodSpec("Scene", "GetTransformDiagnosticTopologyMutations", true, [|  |], [|  |])
+    let private method_b4be33097c = NativeMethodSpec("Scene", "GetTransformStore", false, [|  |], [|  |])
+    let private method_fb325bafa5 = NativeMethodSpec("Scene", "GetTransformStore", true, [|  |], [|  |])
+    let private method_57dea694dc = NativeMethodSpec("Scene", "GetTransformWriteMetrics", true, [|  |], [|  |])
+    let private method_b779dcce99 = NativeMethodSpec("Scene", "HandleOf", true, [| "int" |], [| "value" |])
     let private method_080f267ada = NativeMethodSpec("Scene", "InternalPauseUpdateForUI", false, [|  |], [|  |])
     let private method_8db513bd96 = NativeMethodSpec("Scene", "LateUpdate", false, [| "float" |], [| "value" |])
+    let private method_2f5f0323bc = NativeMethodSpec("Scene", "LayerMembers", true, [| "ce::layers::layer_id" |], [| "value" |])
+    let private method_ca4d10e4b5 = NativeMethodSpec("Scene", "LayoutUISubtree", false, [| "Entity *" |], [| "value" |])
+    let private method_7deb4e19a7 = NativeMethodSpec("Scene", "LoadEntity", false, [| "unsigned long long"; "std::basic_string_view<char>"; "GameObjectType"; "int" |], [| "value"; "value"; "value"; "value" |])
     let private method_ef9ffdc8b1 = NativeMethodSpec("Scene", "MarkSpatialTransformsDirty", false, [|  |], [|  |])
     let private method_156c85dae8 = NativeMethodSpec("Scene", "MarkUILayoutDirty", false, [|  |], [|  |])
+    let private method_13c644cbdd = NativeMethodSpec("Scene", "OverlapPhysics", false, [| "std::variant<ce::physics::box_geometry, ce::physics::sphere_geometry, ce::physics::capsule_geometry, ce::physics::cooked_geometry>"; "ce::physics::pose"; "std::span<ce::physics::query_hit>"; "ce::physics::query_filter" |], [| "const_reference"; "const_reference"; "value"; "const_reference" |])
+    let private method_dafbab8f68 = NativeMethodSpec("Scene", "PhysicsRenderMatrix", true, [| "EntityHandle" |], [| "value" |])
+    let private method_971e424ba9 = NativeMethodSpec("Scene", "PhysicsSimulation", true, [|  |], [|  |])
+    let private method_ea59cc49de = NativeMethodSpec("Scene", "PrepareAnimatedBoneRead", false, [| "Entity" |], [| "mutable_reference" |])
     let private method_1f4fb4bc5f = NativeMethodSpec("Scene", "PreparePhysicsSceneExit", false, [|  |], [|  |])
+    let private method_b26ce11b1b = NativeMethodSpec("Scene", "PreparedTextureImagePins", true, [|  |], [|  |])
+    let private method_5bd96737eb = NativeMethodSpec("Scene", "ProtectTransientDiagnosticRoot", false, [| "EntityHandle" |], [| "value" |])
+    let private method_9fa3ed6d58 = NativeMethodSpec("Scene", "PublishAnimatorPose", false, [| "Animator" |], [| "mutable_reference" |])
+    let private method_9eb5eb0e02 = NativeMethodSpec("Scene", "PublishLocalWrite", false, [| "EntityHandle"; "TransformWriteReason" |], [| "value"; "value" |])
+    let private method_654cd422cf = NativeMethodSpec("Scene", "PublishLocalWriteBatch", false, [| "std::span<const EntityHandle>"; "TransformWriteReason" |], [| "value"; "value" |])
+    let private method_c57806331e = NativeMethodSpec("Scene", "PublishRenderProxyDirty", false, [| "EntityHandle"; "ProxyDirty" |], [| "value"; "value" |])
+    let private method_874d1d2e21 = NativeMethodSpec("Scene", "QueryPhysicsBatch", false, [| "std::span<const ce::physics::query_request>"; "std::span<std::expected<ce::physics::query_result, ce::physics::error>>" |], [| "value"; "value" |])
     let private method_b11cff37e2 = NativeMethodSpec("Scene", "RaycastPhysics", false, [| "math::vector3"; "math::vector3"; "float"; "std::span<ce::physics::query_hit>"; "ce::physics::query_filter" |], [| "value"; "value"; "value"; "value"; "const_reference" |])
+    let private method_6467b46560 = NativeMethodSpec("Scene", "ReadCollisionGeometryStatistics", true, [|  |], [|  |])
     let private method_3c73190906 = NativeMethodSpec("Scene", "RecordExecutionGraphMembershipChanged", false, [|  |], [|  |])
     let private method_299075090a = NativeMethodSpec("Scene", "RegisterCharacterMovement", false, [| "CharacterMovementComponent" |], [| "mutable_reference" |])
+    let private method_9e0262e521 = NativeMethodSpec("Scene", "RegisterComponent", false, [| "Component *" |], [| "value" |])
     let private method_4da57a7f29 = NativeMethodSpec("Scene", "RegisterPhysicsBody", false, [| "PhysicsBodyComponent" |], [| "mutable_reference" |])
+    let private method_8740faba6f = NativeMethodSpec("Scene", "RemoveCanvas", false, [| "Entity *" |], [| "value" |])
     let private method_6f21e68381 = NativeMethodSpec("Scene", "RemoveLight", false, [| "unsigned long long" |], [| "value" |])
+    let private method_6ce1e677bb = NativeMethodSpec("Scene", "RemoveSelectedEntity", false, [| "Entity *" |], [| "value" |])
+    let private method_c5e52c24da = NativeMethodSpec("Scene", "RenameEntity", false, [| "Entity"; "std::basic_string_view<char>" |], [| "mutable_reference"; "value" |])
     let private method_836169b9c0 = NativeMethodSpec("Scene", "RenderProxyComponentCount", true, [|  |], [|  |])
+    let private method_00365b7c11 = NativeMethodSpec("Scene", "ReorderChildren", false, [| "EntityHandle"; "std::span<const EntityHandle>" |], [| "value"; "value" |])
+    let private method_447bf3b19e = NativeMethodSpec("Scene", "Reparent", false, [| "EntityHandle"; "EntityHandle" |], [| "value"; "value" |])
     let private method_925ca1126f = NativeMethodSpec("Scene", "ResetRenderProxyCommitMetrics", false, [|  |], [|  |])
     let private method_a87a676937 = NativeMethodSpec("Scene", "ResetSelectedEntity", false, [|  |], [|  |])
     let private method_37f2f86552 = NativeMethodSpec("Scene", "ResetTransformDiagnostics", false, [|  |], [|  |])
     let private method_d02196f487 = NativeMethodSpec("Scene", "ResetTransformWriteDiagnostics", false, [|  |], [|  |])
+    let private method_ba476bf691 = NativeMethodSpec("Scene", "Resolve", true, [| "EntityHandle" |], [| "value" |])
     let private method_adf71f9f65 = NativeMethodSpec("Scene", "ResolvePhysicsBody", true, [| "ce::physics::handle<ce::physics::body_tag>" |], [| "value" |])
     let private method_b3d1dec2c4 = NativeMethodSpec("Scene", "ResolveSpatialTransforms", false, [|  |], [|  |])
+    let private method_8962ae84d5 = NativeMethodSpec("Scene", "Schedule", false, [|  |], [|  |])
     let private method_44cdfd997d = NativeMethodSpec("Scene", "SetSimulationInterpolation", false, [| "double" |], [| "value" |])
     let private method_b201fd56ff = NativeMethodSpec("Scene", "SimulationInterpolation", true, [|  |], [|  |])
+    let private method_7321c838c8 = NativeMethodSpec("Scene", "Sounds", false, [|  |], [|  |])
+    let private method_05ed5b317c = NativeMethodSpec("Scene", "Sounds", true, [|  |], [|  |])
     let private method_a844888b75 = NativeMethodSpec("Scene", "StartPhysicsSimulation", false, [|  |], [|  |])
     let private method_cd5388aee6 = NativeMethodSpec("Scene", "StopPhysicsSimulation", false, [|  |], [|  |])
     let private method_df4f10409a = NativeMethodSpec("Scene", "SyncDerivedState", false, [| "TransformSyncPoint" |], [| "value" |])
     let private method_a4d1862504 = NativeMethodSpec("Scene", "TryFireReentrancyStressMidTraversal", false, [| "const char *"; "const char *" |], [| "value"; "value" |])
+    let private method_31bd19885a = NativeMethodSpec("Scene", "TryGetEntity", false, [| "int" |], [| "value" |])
+    let private method_c94e7dc1c3 = NativeMethodSpec("Scene", "TryGetLastAnimatorPoseMetrics", true, [| "Animator"; "AnimatorPoseUploadMetrics" |], [| "const_reference"; "mutable_reference" |])
+    let private method_087f98d2a6 = NativeMethodSpec("Scene", "Tweens", false, [|  |], [|  |])
+    let private method_a82712bad2 = NativeMethodSpec("Scene", "Tweens", true, [|  |], [|  |])
+    let private method_54f27afc17 = NativeMethodSpec("Scene", "UnCollectDecalComponent", false, [| "DecalComponent *" |], [| "value" |])
+    let private method_6e130d6eac = NativeMethodSpec("Scene", "UnCollectFoliageComponent", false, [| "FoliageComponent *" |], [| "value" |])
+    let private method_76f8020628 = NativeMethodSpec("Scene", "UnCollectImageComponent", false, [| "ImageComponent *" |], [| "value" |])
+    let private method_c735f7eca5 = NativeMethodSpec("Scene", "UnCollectLightComponent", false, [| "LightComponent *" |], [| "value" |])
+    let private method_a07ee6ec44 = NativeMethodSpec("Scene", "UnCollectMeshRenderer", false, [| "MeshRenderer *" |], [| "value" |])
+    let private method_f51e559227 = NativeMethodSpec("Scene", "UnCollectSpriteRenderer", false, [| "SpriteRenderer *" |], [| "value" |])
+    let private method_e337af2c67 = NativeMethodSpec("Scene", "UnCollectSpriteSheetComponent", false, [| "SpriteSheetComponent *" |], [| "value" |])
+    let private method_0de9edb4b8 = NativeMethodSpec("Scene", "UnCollectTerrainComponent", false, [| "TerrainComponent *" |], [| "value" |])
+    let private method_63cd5c386f = NativeMethodSpec("Scene", "UnCollectTextComponent", false, [| "TextComponent *" |], [| "value" |])
     let private method_97963b1977 = NativeMethodSpec("Scene", "UnregisterCharacterMovement", false, [| "CharacterMovementComponent" |], [| "mutable_reference" |])
+    let private method_ac82ffb3d8 = NativeMethodSpec("Scene", "UnregisterComponent", false, [| "Component *" |], [| "value" |])
     let private method_9440e7aa96 = NativeMethodSpec("Scene", "UnregisterPhysicsBody", false, [| "PhysicsBodyComponent" |], [| "mutable_reference" |])
     let private method_142d73059f = NativeMethodSpec("Scene", "Update", false, [| "float" |], [| "value" |])
     let private method_213333ac16 = NativeMethodSpec("Scene", "UpdateRenderData", false, [|  |], [|  |])
@@ -99,13 +182,17 @@ module SceneViewMembers =
         /// Native field Scene::m_requiredLoadAssetsBundle.
         member this.``m_requiredLoadAssetsBundle`` : AssetBundleView = this.Field("m_requiredLoadAssetsBundle", "m_requiredLoadAssetsBundle").Read(NativeCodecs.View((fun value -> AssetBundleView(value))))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``AddCanvas_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "AddCanvas", "void (Entity *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Entity *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AddCanvas``(``canvas``: NativeReference<EntityView>) : unit =
+            let arguments = [| ``canvas``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_49f299f8f8, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``AddEntity_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "AddEntity", "Entity *(gc::root_ref<Entity>)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native Entity *(gc::root_ref<Entity>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AddEntity``(``entity``: NativeReference<EntityView>) : NativeReference<EntityView> =
+            let arguments = [| ``entity``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_b4e3a01678, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native size_t (); invoke uses the runtime's exact overload metadata.
         member this.``AddLight``() : uint64 =
@@ -119,9 +206,11 @@ module SceneViewMembers =
             let response = this.Invoke(method_64ca3c5f25, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``AddSelectedEntity_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "AddSelectedEntity", "void (Entity *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Entity *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AddSelectedEntity``(``entity``: NativeReference<EntityView>) : unit =
+            let arguments = [| ``entity``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_142b0450f9, arguments, discardResult = true)
+            ()
 
         /// Native void (bool); invoke uses the runtime's exact overload metadata.
         member this.``AllDestroyMark``(``includePersistent``: bool) : unit =
@@ -141,9 +230,11 @@ module SceneViewMembers =
             let response = this.Invoke(method_15494dd365, arguments)
             ()
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: TransformBulkWriteMetrics
-        member _.``ApplyWorldWriteBatch_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "ApplyWorldWriteBatch", "TransformBulkWriteMetrics (std::span<const TransformWorldWrite>, TransformWriteReason)", "return value: native type has no declared runtime value schema or explicit typed codec: TransformBulkWriteMetrics")
+        /// Native TransformBulkWriteMetrics (std::span<const TransformWorldWrite>, TransformWriteReason); invoke uses the runtime's exact overload metadata.
+        member this.``ApplyWorldWriteBatch``(``writes``: NativeArray<TransformWorldWriteView>, ``reason``: NativeEnumValue<TransformWriteReasonTag>) : TransformBulkWriteMetricsView =
+            let arguments = [| (NativeCodecs.Array(NativeCodecs.View((fun value -> TransformWorldWriteView(value))))).Encode(``writes``); (NativeCodecs.Enum<TransformWriteReasonTag>("TransformWriteReason")).Encode(``reason``) |]
+            let response = this.Invoke(method_388e37ce21, arguments)
+            (NativeCodecs.View((fun value -> TransformBulkWriteMetricsView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (StressKind, int); invoke uses the runtime's exact overload metadata.
         member this.``ArmReentrancyStress``(``kind``: NativeEnumValue<Scene_StressKindTag>, ``count``: int) : unit =
@@ -151,17 +242,23 @@ module SceneViewMembers =
             let response = this.Invoke(method_0c374c35ce, arguments)
             ()
 
-        /// Unavailable native method: return value: expected value/error: native type has no declared runtime value schema or explicit typed codec: ce::layers::error
-        member _.``AssignLayer_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "AssignLayer", "ce::layers::result<void> (Entity &, ce::layers::layer_id)", "return value: expected value/error: native type has no declared runtime value schema or explicit typed codec: ce::layers::error")
+        /// Native ce::layers::result<void> (Entity &, ce::layers::layer_id); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AssignLayer``(``entity``: EntityView, ``layer``: ce_layers_layer_idView) : NativeExpected<unit, NativeEnumValue<ce_layers_errorTag>> =
+            let arguments = [| ``entity``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.View((fun value -> ce_layers_layer_idView(value)))).Encode(``layer``)) |]
+            let response = this.InvokeBound(method_18a6258be0, arguments)
+            (NativeCodecs.Expected(NativeCodecs.Unit, NativeCodecs.Enum<ce_layers_errorTag>("ce::layers::error"))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``AttachExistingEntity_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "AttachExistingEntity", "Entity::Index (gc::root_ref<Entity>, Entity::Index)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native Entity::Index (gc::root_ref<Entity>, Entity::Index); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AttachExistingEntity``(``entity``: NativeReference<EntityView>, ``parentIndex``: int) : int =
+            let arguments = [| ``entity``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``parentIndex``)) |]
+            let response = this.InvokeBound(method_cb62a27715, arguments)
+            (NativeCodecs.Int32).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: sequence element: native type has no declared runtime value schema or explicit typed codec: DetachedEntityTransfer
-        member _.``AttachExistingEntityHierarchy_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "AttachExistingEntityHierarchy", "ce::engine_node_map<Entity::Index, Entity::Index> (ce::dynamic_array<DetachedEntityTransfer> &)", "argument 0: sequence element: native type has no declared runtime value schema or explicit typed codec: DetachedEntityTransfer")
+        /// Native ce::engine_node_map<Entity::Index, Entity::Index> (ce::dynamic_array<DetachedEntityTransfer> &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AttachExistingEntityHierarchy``(``entities``: NativeArray<DetachedEntityTransferView>) : NativeMap<int, int> =
+            let arguments = [| ``entities``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_72d09f5168, arguments)
+            (NativeCodecs.Map(NativeCodecs.Int32, NativeCodecs.Int32)).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: Scene::HierarchyBulkBuildScope
         member _.``BeginHierarchyBulkBuild_Unavailable`` =
@@ -173,13 +270,17 @@ module SceneViewMembers =
             let response = this.Invoke(method_64a025a51e, arguments)
             ()
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: CameraSystem
-        member _.``Cameras_8bceac_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "Cameras", "CameraSystem &() noexcept", "return value: native type has no declared runtime value schema or explicit typed codec: CameraSystem")
+        /// Native CameraSystem &() noexcept; borrow uses the runtime's exact overload metadata.
+        member this.``Cameras``() : CameraSystemView =
+            let arguments = [|  |]
+            let value = this.Borrow(method_8bceac3d63, arguments)
+            (NativeCodecs.View((fun value -> CameraSystemView(value)))).Decode(value)
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: CameraSystem
-        member _.``Cameras_Const_0399a6_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "Cameras", "const CameraSystem &() const noexcept", "return value: native type has no declared runtime value schema or explicit typed codec: CameraSystem")
+        /// Native const CameraSystem &() const noexcept; borrow uses the runtime's exact overload metadata.
+        member this.``Cameras_Const``() : CameraSystemView =
+            let arguments = [|  |]
+            let value = this.Borrow(method_0399a6d3ab, arguments)
+            (NativeCodecs.View((fun value -> CameraSystemView(value)))).Decode(value)
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``CaptureSelectionForSimulation``() : unit =
@@ -193,41 +294,59 @@ module SceneViewMembers =
             let response = this.Invoke(method_afa1ad22dc, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``CollectDecalComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "CollectDecalComponent", "void (DecalComponent *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (DecalComponent *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``CollectDecalComponent``(``ptr``: NativeReference<DecalComponentView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_9bad2964fe, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``CollectFoliageComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "CollectFoliageComponent", "void (FoliageComponent *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (FoliageComponent *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``CollectFoliageComponent``(``ptr``: NativeReference<FoliageComponentView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_d4c345bedd, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``CollectImageComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "CollectImageComponent", "void (ImageComponent *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (ImageComponent *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``CollectImageComponent``(``ptr``: NativeReference<ImageComponentView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_1b652f91df, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``CollectLightComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "CollectLightComponent", "void (LightComponent *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (LightComponent *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``CollectLightComponent``(``ptr``: NativeReference<LightComponentView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_e3bda49f80, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``CollectMeshRenderer_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "CollectMeshRenderer", "void (MeshRenderer *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (MeshRenderer *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``CollectMeshRenderer``(``ptr``: NativeReference<MeshRendererView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_fa79a0cc64, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``CollectSpriteRenderer_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "CollectSpriteRenderer", "void (SpriteRenderer *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (SpriteRenderer *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``CollectSpriteRenderer``(``ptr``: NativeReference<SpriteRendererView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_e72a45ca3e, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``CollectSpriteSheetComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "CollectSpriteSheetComponent", "void (SpriteSheetComponent *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (SpriteSheetComponent *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``CollectSpriteSheetComponent``(``ptr``: NativeReference<SpriteSheetComponentView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_7d6cf7d6ac, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``CollectTerrainComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "CollectTerrainComponent", "void (TerrainComponent *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (TerrainComponent *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``CollectTerrainComponent``(``ptr``: NativeReference<TerrainComponentView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_90ef77700d, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``CollectTextComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "CollectTextComponent", "void (TextComponent *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (TextComponent *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``CollectTextComponent``(``ptr``: NativeReference<TextComponentView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_c70dcbaa60, arguments, discardResult = true)
+            ()
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``CommitRenderProxies``() : unit =
@@ -241,13 +360,17 @@ module SceneViewMembers =
             let response = this.Invoke(method_1311e55825, arguments)
             (NativeCodecs.UInt64).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``CreateEntity_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "CreateEntity", "Entity *(std::string_view, GameObjectType, Entity::Index)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native Entity *(std::string_view, GameObjectType, Entity::Index); invoke_bound uses the runtime's exact overload metadata.
+        member this.``CreateEntity``(``name``: string, ``type``: NativeEnumValue<GameObjectTypeTag>, ``parentIndex``: int) : NativeReference<EntityView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``name``)); NativeCallArgument.FromJson((NativeCodecs.Enum<GameObjectTypeTag>("GameObjectType")).Encode(``type``)); NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``parentIndex``)) |]
+            let response = this.InvokeBound(method_d8eade0a76, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``DestroyEntity_bd4540_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "DestroyEntity", "void (Entity *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Entity *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``DestroyEntity``(``entity``: NativeReference<EntityView>) : unit =
+            let arguments = [| ``entity``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_bd4540d7de, arguments, discardResult = true)
+            ()
 
         /// Native void (Entity::Index); invoke uses the runtime's exact overload metadata.
         member this.``DestroyEntity``(``index``: int) : unit =
@@ -261,9 +384,11 @@ module SceneViewMembers =
             let response = this.Invoke(method_5566113980, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``DetachEntityHierarchy_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "DetachEntityHierarchy", "void (Entity *, ce::dynamic_array<DetachedEntityTransfer> &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Entity *, ce::dynamic_array<DetachedEntityTransfer> &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``DetachEntityHierarchy``(``root``: NativeReference<EntityView>, ``detached``: NativeArray<DetachedEntityTransferView>) : unit =
+            let arguments = [| ``root``.AsNativeArgument(); ``detached``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_a99ad5b419, arguments, discardResult = true)
+            ()
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``DrainPendingLifecycle``() : unit =
@@ -289,13 +414,17 @@ module SceneViewMembers =
             let response = this.Invoke(method_19e62173c5, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle
-        member _.``EnsureResolved_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "EnsureResolved", "bool (EntityHandle)", "argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle")
+        /// Native bool (EntityHandle); invoke uses the runtime's exact overload metadata.
+        member this.``EnsureResolved``(``target``: EntityHandleView) : bool =
+            let arguments = [| (NativeCodecs.View((fun value -> EntityHandleView(value)))).Encode(``target``) |]
+            let response = this.Invoke(method_930b33cd28, arguments)
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``FindCanvasName_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "FindCanvasName", "Entity *(std::string_view)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native Entity *(std::string_view); invoke_bound uses the runtime's exact overload metadata.
+        member this.``FindCanvasName``(``name``: string) : NativeReference<EntityView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``name``)) |]
+            let response = this.InvokeBound(method_333a42afa8, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (float, bool); invoke uses the runtime's exact overload metadata.
         member this.``FixedUpdate``(``deltaSecond``: single, ``singleStep``: bool) : unit =
@@ -309,21 +438,29 @@ module SceneViewMembers =
             let response = this.Invoke(method_660bce263e, arguments)
             ()
 
-        /// Unavailable native method: return value: map key/value: native type has no declared runtime value schema or explicit typed codec: EntityHandle
-        member _.``GetCanvasMap_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetCanvasMap", "ce::engine_node_map<std::string, EntityHandle> &()", "return value: map key/value: native type has no declared runtime value schema or explicit typed codec: EntityHandle")
+        /// Native ce::engine_node_map<std::string, EntityHandle> &(); borrow uses the runtime's exact overload metadata.
+        member this.``GetCanvasMap``() : NativeMap<string, EntityHandleView> =
+            let arguments = [|  |]
+            let value = this.Borrow(method_df3a457d16, arguments)
+            (NativeCodecs.Map(NativeCodecs.String, NativeCodecs.View((fun value -> EntityHandleView(value))))).Decode(value)
 
-        /// Unavailable native method: return value: sequence element: native type has no declared runtime value schema or explicit typed codec: EntityHandle
-        member _.``GetCanvases_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetCanvases", "ce::dynamic_array<EntityHandle> &()", "return value: sequence element: native type has no declared runtime value schema or explicit typed codec: EntityHandle")
+        /// Native ce::dynamic_array<EntityHandle> &(); borrow uses the runtime's exact overload metadata.
+        member this.``GetCanvases``() : NativeArray<EntityHandleView> =
+            let arguments = [|  |]
+            let value = this.Borrow(method_c05031812e, arguments)
+            (NativeCodecs.Array(NativeCodecs.View((fun value -> EntityHandleView(value))))).Decode(value)
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``GetEntity_3b4d4c_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetEntity", "Entity *(Entity::Index)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native Entity *(Entity::Index); invoke_bound uses the runtime's exact overload metadata.
+        member this.``GetEntity``(``index``: int) : NativeReference<EntityView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``index``)) |]
+            let response = this.InvokeBound(method_3b4d4cafe4, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``GetEntity_175dee_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetEntity", "Entity *(std::string_view)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native Entity *(std::string_view); invoke_bound uses the runtime's exact overload metadata.
+        member this.``GetEntity``(``name``: string) : NativeReference<EntityView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``name``)) |]
+            let response = this.InvokeBound(method_175deec5c0, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native Entity *(Entity::Index) const; borrow uses the runtime's exact overload metadata.
         member this.``GetEntityRaw``(``index``: int) : NativeReference<EntityView> =
@@ -331,45 +468,65 @@ module SceneViewMembers =
             let value = this.Borrow(method_0adf427700, arguments)
             (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(value)
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: ExecutionGraphCompileMetrics
-        member _.``GetExecutionGraphCompileMetrics_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetExecutionGraphCompileMetrics", "const ExecutionGraphCompileMetrics &() const", "return value: native type has no declared runtime value schema or explicit typed codec: ExecutionGraphCompileMetrics")
+        /// Native const ExecutionGraphCompileMetrics &() const; borrow uses the runtime's exact overload metadata.
+        member this.``GetExecutionGraphCompileMetrics``() : ExecutionGraphCompileMetricsView =
+            let arguments = [|  |]
+            let value = this.Borrow(method_76d8993402, arguments)
+            (NativeCodecs.View((fun value -> ExecutionGraphCompileMetricsView(value)))).Decode(value)
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: ExecutionGraphRelationDiagnostics
-        member _.``GetExecutionGraphRelationDiagnostics_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetExecutionGraphRelationDiagnostics", "ExecutionGraphRelationDiagnostics (EntityHandle) const", "return value: native type has no declared runtime value schema or explicit typed codec: ExecutionGraphRelationDiagnostics")
+        /// Native ExecutionGraphRelationDiagnostics (EntityHandle) const; invoke uses the runtime's exact overload metadata.
+        member this.``GetExecutionGraphRelationDiagnostics``(``entity``: EntityHandleView) : ExecutionGraphRelationDiagnosticsView =
+            let arguments = [| (NativeCodecs.View((fun value -> EntityHandleView(value)))).Encode(``entity``) |]
+            let response = this.Invoke(method_5dba568b47, arguments)
+            (NativeCodecs.View((fun value -> ExecutionGraphRelationDiagnosticsView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: HierarchyIntegrityMetrics
-        member _.``GetHierarchyIntegrityMetrics_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetHierarchyIntegrityMetrics", "HierarchyIntegrityMetrics () const", "return value: native type has no declared runtime value schema or explicit typed codec: HierarchyIntegrityMetrics")
+        /// Native HierarchyIntegrityMetrics () const; invoke uses the runtime's exact overload metadata.
+        member this.``GetHierarchyIntegrityMetrics``() : HierarchyIntegrityMetricsView =
+            let arguments = [|  |]
+            let response = this.Invoke(method_a05ae10cc0, arguments)
+            (NativeCodecs.View((fun value -> HierarchyIntegrityMetricsView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: HierarchyStore
-        member _.``GetHierarchyStore_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetHierarchyStore", "const HierarchyStore &() const", "return value: native type has no declared runtime value schema or explicit typed codec: HierarchyStore")
+        /// Native const HierarchyStore &() const; borrow uses the runtime's exact overload metadata.
+        member this.``GetHierarchyStore``() : HierarchyStoreView =
+            let arguments = [|  |]
+            let value = this.Borrow(method_5f64f16bcf, arguments)
+            (NativeCodecs.View((fun value -> HierarchyStoreView(value)))).Decode(value)
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: TransformTopologyMutationCounters
-        member _.``GetLastFrameTopologyMutations_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetLastFrameTopologyMutations", "const TransformTopologyMutationCounters &() const", "return value: native type has no declared runtime value schema or explicit typed codec: TransformTopologyMutationCounters")
+        /// Native const TransformTopologyMutationCounters &() const; borrow uses the runtime's exact overload metadata.
+        member this.``GetLastFrameTopologyMutations``() : TransformTopologyMutationCountersView =
+            let arguments = [|  |]
+            let value = this.Borrow(method_d992f6023a, arguments)
+            (NativeCodecs.View((fun value -> TransformTopologyMutationCountersView(value)))).Decode(value)
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: SpatialPullMetrics
-        member _.``GetLastSpatialPullMetrics_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetLastSpatialPullMetrics", "const SpatialPullMetrics &() const", "return value: native type has no declared runtime value schema or explicit typed codec: SpatialPullMetrics")
+        /// Native const SpatialPullMetrics &() const; borrow uses the runtime's exact overload metadata.
+        member this.``GetLastSpatialPullMetrics``() : SpatialPullMetricsView =
+            let arguments = [|  |]
+            let value = this.Borrow(method_99a1fc4041, arguments)
+            (NativeCodecs.View((fun value -> SpatialPullMetricsView(value)))).Decode(value)
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: SpatialResolveMetrics
-        member _.``GetLastSpatialResolveMetrics_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetLastSpatialResolveMetrics", "const SpatialResolveMetrics &() const", "return value: native type has no declared runtime value schema or explicit typed codec: SpatialResolveMetrics")
+        /// Native const SpatialResolveMetrics &() const; borrow uses the runtime's exact overload metadata.
+        member this.``GetLastSpatialResolveMetrics``() : SpatialResolveMetricsView =
+            let arguments = [|  |]
+            let value = this.Borrow(method_a72dc765e2, arguments)
+            (NativeCodecs.View((fun value -> SpatialResolveMetricsView(value)))).Decode(value)
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: TransformUpdateMetrics
-        member _.``GetLastTransformUpdateMetrics_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetLastTransformUpdateMetrics", "const TransformUpdateMetrics &(TransformSyncPoint) const", "return value: native type has no declared runtime value schema or explicit typed codec: TransformUpdateMetrics")
+        /// Native const TransformUpdateMetrics &(TransformSyncPoint) const; borrow uses the runtime's exact overload metadata.
+        member this.``GetLastTransformUpdateMetrics``(``syncPoint``: NativeEnumValue<TransformSyncPointTag>) : TransformUpdateMetricsView =
+            let arguments = [| (NativeCodecs.Enum<TransformSyncPointTag>("TransformSyncPoint")).Encode(``syncPoint``) |]
+            let value = this.Borrow(method_2c299464b2, arguments)
+            (NativeCodecs.View((fun value -> TransformUpdateMetricsView(value)))).Decode(value)
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: Scene::RegistryCounts
-        member _.``GetRegistryCounts_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetRegistryCounts", "RegistryCounts () const", "return value: native type has no declared runtime value schema or explicit typed codec: Scene::RegistryCounts")
+        /// Native RegistryCounts () const; invoke uses the runtime's exact overload metadata.
+        member this.``GetRegistryCounts``() : Scene_RegistryCountsView =
+            let arguments = [|  |]
+            let response = this.Invoke(method_bbea52cf97, arguments)
+            (NativeCodecs.View((fun value -> Scene_RegistryCountsView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: RenderProxyCommitMetrics
-        member _.``GetRenderProxyCommitMetrics_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetRenderProxyCommitMetrics", "RenderProxyCommitMetrics () const", "return value: native type has no declared runtime value schema or explicit typed codec: RenderProxyCommitMetrics")
+        /// Native RenderProxyCommitMetrics () const; invoke uses the runtime's exact overload metadata.
+        member this.``GetRenderProxyCommitMetrics``() : RenderProxyCommitMetricsView =
+            let arguments = [|  |]
+            let response = this.Invoke(method_28529a8e65, arguments)
+            (NativeCodecs.View((fun value -> RenderProxyCommitMetricsView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native Entity *(); borrow uses the runtime's exact overload metadata.
         member this.``GetRootEntity``() : NativeReference<EntityView> =
@@ -395,13 +552,17 @@ module SceneViewMembers =
             let value = this.Borrow(method_1185190297, arguments)
             (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(value)
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: SystemSchedule::SubscriptionCounts
-        member _.``GetSubscriptionCounts_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetSubscriptionCounts", "SystemSchedule::SubscriptionCounts () const", "return value: native type has no declared runtime value schema or explicit typed codec: SystemSchedule::SubscriptionCounts")
+        /// Native SystemSchedule::SubscriptionCounts () const; invoke uses the runtime's exact overload metadata.
+        member this.``GetSubscriptionCounts``() : SystemSchedule_SubscriptionCountsView =
+            let arguments = [|  |]
+            let response = this.Invoke(method_2bb79990a1, arguments)
+            (NativeCodecs.View((fun value -> SystemSchedule_SubscriptionCountsView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: TransformTopologyMutationCounters
-        member _.``GetTopologyMutationTotals_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetTopologyMutationTotals", "TransformTopologyMutationCounters () const", "return value: native type has no declared runtime value schema or explicit typed codec: TransformTopologyMutationCounters")
+        /// Native TransformTopologyMutationCounters () const; invoke uses the runtime's exact overload metadata.
+        member this.``GetTopologyMutationTotals``() : TransformTopologyMutationCountersView =
+            let arguments = [|  |]
+            let response = this.Invoke(method_830e674e51, arguments)
+            (NativeCodecs.View((fun value -> TransformTopologyMutationCountersView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native uint64_t () const; invoke uses the runtime's exact overload metadata.
         member this.``GetTopologyVersion``() : uint64 =
@@ -415,25 +576,35 @@ module SceneViewMembers =
             let response = this.Invoke(method_7e77f98ea7, arguments)
             (NativeCodecs.UInt64).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: TransformTopologyMutationCounters
-        member _.``GetTransformDiagnosticTopologyMutations_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetTransformDiagnosticTopologyMutations", "TransformTopologyMutationCounters () const", "return value: native type has no declared runtime value schema or explicit typed codec: TransformTopologyMutationCounters")
+        /// Native TransformTopologyMutationCounters () const; invoke uses the runtime's exact overload metadata.
+        member this.``GetTransformDiagnosticTopologyMutations``() : TransformTopologyMutationCountersView =
+            let arguments = [|  |]
+            let response = this.Invoke(method_bcb77a9a44, arguments)
+            (NativeCodecs.View((fun value -> TransformTopologyMutationCountersView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: TransformStore
-        member _.``GetTransformStore_b4be33_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetTransformStore", "TransformStore &()", "return value: native type has no declared runtime value schema or explicit typed codec: TransformStore")
+        /// Native TransformStore &(); borrow uses the runtime's exact overload metadata.
+        member this.``GetTransformStore``() : TransformStoreView =
+            let arguments = [|  |]
+            let value = this.Borrow(method_b4be33097c, arguments)
+            (NativeCodecs.View((fun value -> TransformStoreView(value)))).Decode(value)
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: TransformStore
-        member _.``GetTransformStore_Const_fb325b_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetTransformStore", "const TransformStore &() const", "return value: native type has no declared runtime value schema or explicit typed codec: TransformStore")
+        /// Native const TransformStore &() const; borrow uses the runtime's exact overload metadata.
+        member this.``GetTransformStore_Const``() : TransformStoreView =
+            let arguments = [|  |]
+            let value = this.Borrow(method_fb325bafa5, arguments)
+            (NativeCodecs.View((fun value -> TransformStoreView(value)))).Decode(value)
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: TransformWriteMetrics
-        member _.``GetTransformWriteMetrics_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "GetTransformWriteMetrics", "TransformWriteMetrics () const", "return value: native type has no declared runtime value schema or explicit typed codec: TransformWriteMetrics")
+        /// Native TransformWriteMetrics () const; invoke uses the runtime's exact overload metadata.
+        member this.``GetTransformWriteMetrics``() : TransformWriteMetricsView =
+            let arguments = [|  |]
+            let response = this.Invoke(method_57dea694dc, arguments)
+            (NativeCodecs.View((fun value -> TransformWriteMetricsView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: EntityHandle
-        member _.``HandleOf_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "HandleOf", "EntityHandle (Entity::Index) const", "return value: native type has no declared runtime value schema or explicit typed codec: EntityHandle")
+        /// Native EntityHandle (Entity::Index) const; invoke uses the runtime's exact overload metadata.
+        member this.``HandleOf``(``index``: int) : EntityHandleView =
+            let arguments = [| (NativeCodecs.Int32).Encode(``index``) |]
+            let response = this.Invoke(method_b779dcce99, arguments)
+            (NativeCodecs.View((fun value -> EntityHandleView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``InternalPauseUpdateForUI``() : unit =
@@ -447,17 +618,23 @@ module SceneViewMembers =
             let response = this.Invoke(method_8db513bd96, arguments)
             ()
 
-        /// Unavailable native method: return value: expected value/error: sequence element: native type has no declared runtime value schema or explicit typed codec: EntityHandle
-        member _.``LayerMembers_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "LayerMembers", "ce::layers::result<std::span<const EntityHandle>> (ce::layers::layer_id) const", "return value: expected value/error: sequence element: native type has no declared runtime value schema or explicit typed codec: EntityHandle")
+        /// Native ce::layers::result<std::span<const EntityHandle>> (ce::layers::layer_id) const; invoke uses the runtime's exact overload metadata.
+        member this.``LayerMembers``(``layer``: ce_layers_layer_idView) : NativeExpected<NativeArray<EntityHandleView>, NativeEnumValue<ce_layers_errorTag>> =
+            let arguments = [| (NativeCodecs.View((fun value -> ce_layers_layer_idView(value)))).Encode(``layer``) |]
+            let response = this.Invoke(method_2f5f0323bc, arguments)
+            (NativeCodecs.Expected(NativeCodecs.Array(NativeCodecs.View((fun value -> EntityHandleView(value)))), NativeCodecs.Enum<ce_layers_errorTag>("ce::layers::error"))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``LayoutUISubtree_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "LayoutUISubtree", "void (Entity *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Entity *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``LayoutUISubtree``(``root``: NativeReference<EntityView>) : unit =
+            let arguments = [| ``root``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_ca4d10e4b5, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``LoadEntity_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "LoadEntity", "Entity *(size_t, std::string_view, GameObjectType, Entity::Index)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native Entity *(size_t, std::string_view, GameObjectType, Entity::Index); invoke_bound uses the runtime's exact overload metadata.
+        member this.``LoadEntity``(``instanceID``: uint64, ``name``: string, ``type``: NativeEnumValue<GameObjectTypeTag>, ``parentIndex``: int) : NativeReference<EntityView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.UInt64).Encode(``instanceID``)); NativeCallArgument.FromJson((NativeCodecs.String).Encode(``name``)); NativeCallArgument.FromJson((NativeCodecs.Enum<GameObjectTypeTag>("GameObjectType")).Encode(``type``)); NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``parentIndex``)) |]
+            let response = this.InvokeBound(method_7deb4e19a7, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``MarkSpatialTransformsDirty``() : unit =
@@ -475,21 +652,30 @@ module SceneViewMembers =
         member _.``OnBeforeSerialize_Unavailable`` =
             NativeUnavailableMember("method", "Scene", "OnBeforeSerialize", "void () const", "method is reserved for engine lifecycle, scheduling, or identity management")
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``OverlapPhysics_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "OverlapPhysics", "ce::physics::result<ce::physics::query_result> (const ce::physics::geometry &, const ce::physics::pose &, std::span<ce::physics::query_hit>, const ce::physics::query_filter &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native ce::physics::result<ce::physics::query_result> (const ce::physics::geometry &, const ce::physics::pose &, std::span<ce::physics::query_hit>, const ce::physics::query_filter &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``OverlapPhysics``(``geometry``: NativeVariant4<ce_physics_box_geometryView, ce_physics_sphere_geometryView, ce_physics_capsule_geometryView, ce_physics_cooked_geometryView>, ``pose``: ce_physics_poseView, ``output``: byref<NativeArray<ce_physics_query_hitView>>, ``filter``: ce_physics_query_filterView) : NativeExpected<ce_physics_query_resultView, ce_physics_errorView> =
+            let arguments = [| ``geometry``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.View((fun value -> ce_physics_poseView(value)))).Encode(``pose``)); NativeCallArgument.FromJson((NativeCodecs.Array(NativeCodecs.View((fun value -> ce_physics_query_hitView(value))))).Encode(``output``)); NativeCallArgument.FromJson((NativeCodecs.View((fun value -> ce_physics_query_filterView(value)))).Encode(``filter``)) |]
+            let response = this.InvokeBound(method_13c644cbdd, arguments)
+            ``output`` <- (NativeCodecs.Array(NativeCodecs.View((fun value -> ce_physics_query_hitView(value))))).Decode(NativeTypeView.FromSnapshot(response.Arguments.[2]))
+            (NativeCodecs.Expected(NativeCodecs.View((fun value -> ce_physics_query_resultView(value))), NativeCodecs.View((fun value -> ce_physics_errorView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle
-        member _.``PhysicsRenderMatrix_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "PhysicsRenderMatrix", "math::matrix4x4 (EntityHandle) const", "argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle")
+        /// Native math::matrix4x4 (EntityHandle) const; invoke uses the runtime's exact overload metadata.
+        member this.``PhysicsRenderMatrix``(``owner``: EntityHandleView) : math_matrix4x4View =
+            let arguments = [| (NativeCodecs.View((fun value -> EntityHandleView(value)))).Encode(``owner``) |]
+            let response = this.Invoke(method_dafbab8f68, arguments)
+            (NativeCodecs.View((fun value -> math_matrix4x4View(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: ScenePhysicsSimulation
-        member _.``PhysicsSimulation_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "PhysicsSimulation", "const ScenePhysicsSimulation &() const noexcept", "return value: native type has no declared runtime value schema or explicit typed codec: ScenePhysicsSimulation")
+        /// Native const ScenePhysicsSimulation &() const noexcept; borrow uses the runtime's exact overload metadata.
+        member this.``PhysicsSimulation``() : ScenePhysicsSimulationView =
+            let arguments = [|  |]
+            let value = this.Borrow(method_971e424ba9, arguments)
+            (NativeCodecs.View((fun value -> ScenePhysicsSimulationView(value)))).Decode(value)
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``PrepareAnimatedBoneRead_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "PrepareAnimatedBoneRead", "bool (Entity &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (Entity &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``PrepareAnimatedBoneRead``(``bone``: EntityView) : bool =
+            let arguments = [| ``bone``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_ea59cc49de, arguments)
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native ce::physics::result<void> (); invoke uses the runtime's exact overload metadata.
         member this.``PreparePhysicsSceneExit``() : NativeExpected<unit, ce_physics_errorView> =
@@ -497,37 +683,52 @@ module SceneViewMembers =
             let response = this.Invoke(method_1f4fb4bc5f, arguments)
             (NativeCodecs.Expected(NativeCodecs.Unit, NativeCodecs.View((fun value -> ce_physics_errorView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: owner pointee: native type has no declared runtime value schema or explicit typed codec: TextureFramePins
-        member _.``PreparedTextureImagePins_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "PreparedTextureImagePins", "own::shared_owner<TextureFramePins> () const", "return value: owner pointee: native type has no declared runtime value schema or explicit typed codec: TextureFramePins")
+        /// Native own::shared_owner<TextureFramePins> () const; borrow uses the runtime's exact overload metadata.
+        member this.``PreparedTextureImagePins``() : NativeReference<TextureFramePinsView> =
+            let arguments = [|  |]
+            let value = this.Borrow(method_b26ce11b1b, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> TextureFramePinsView(value))))).Decode(value)
 
-        /// Unavailable native method: argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle
-        member _.``ProtectTransientDiagnosticRoot_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "ProtectTransientDiagnosticRoot", "void (EntityHandle)", "argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle")
+        /// Native void (EntityHandle); invoke uses the runtime's exact overload metadata.
+        member this.``ProtectTransientDiagnosticRoot``(``root``: EntityHandleView) : unit =
+            let arguments = [| (NativeCodecs.View((fun value -> EntityHandleView(value)))).Encode(``root``) |]
+            let response = this.Invoke(method_5bd96737eb, arguments)
+            ()
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: AnimatorPoseUploadMetrics
-        member _.``PublishAnimatorPose_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "PublishAnimatorPose", "AnimatorPoseUploadMetrics (Animator &)", "return value: native type has no declared runtime value schema or explicit typed codec: AnimatorPoseUploadMetrics")
+        /// Native AnimatorPoseUploadMetrics (Animator &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``PublishAnimatorPose``(``animator``: AnimatorView) : AnimatorPoseUploadMetricsView =
+            let arguments = [| ``animator``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_9fa3ed6d58, arguments)
+            (NativeCodecs.View((fun value -> AnimatorPoseUploadMetricsView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle
-        member _.``PublishLocalWrite_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "PublishLocalWrite", "bool (EntityHandle, TransformWriteReason)", "argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle")
+        /// Native bool (EntityHandle, TransformWriteReason); invoke uses the runtime's exact overload metadata.
+        member this.``PublishLocalWrite``(``handle``: EntityHandleView, ``reason``: NativeEnumValue<TransformWriteReasonTag>) : bool =
+            let arguments = [| (NativeCodecs.View((fun value -> EntityHandleView(value)))).Encode(``handle``); (NativeCodecs.Enum<TransformWriteReasonTag>("TransformWriteReason")).Encode(``reason``) |]
+            let response = this.Invoke(method_9eb5eb0e02, arguments)
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: sequence element: native type has no declared runtime value schema or explicit typed codec: EntityHandle
-        member _.``PublishLocalWriteBatch_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "PublishLocalWriteBatch", "uint64_t (std::span<const EntityHandle>, TransformWriteReason)", "argument 0: sequence element: native type has no declared runtime value schema or explicit typed codec: EntityHandle")
+        /// Native uint64_t (std::span<const EntityHandle>, TransformWriteReason); invoke uses the runtime's exact overload metadata.
+        member this.``PublishLocalWriteBatch``(``handles``: NativeArray<EntityHandleView>, ``reason``: NativeEnumValue<TransformWriteReasonTag>) : uint64 =
+            let arguments = [| (NativeCodecs.Array(NativeCodecs.View((fun value -> EntityHandleView(value))))).Encode(``handles``); (NativeCodecs.Enum<TransformWriteReasonTag>("TransformWriteReason")).Encode(``reason``) |]
+            let response = this.Invoke(method_654cd422cf, arguments)
+            (NativeCodecs.UInt64).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Unavailable native method: method is reserved for engine lifecycle, scheduling, or identity management
         member _.``PublishRenderProxyDirty_2cea32_Unavailable`` =
             NativeUnavailableMember("method", "Scene", "PublishRenderProxyDirty", "bool (Component *, ProxyDirty)", "method is reserved for engine lifecycle, scheduling, or identity management")
 
-        /// Unavailable native method: argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle
-        member _.``PublishRenderProxyDirty_c57806_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "PublishRenderProxyDirty", "size_t (EntityHandle, ProxyDirty)", "argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle")
+        /// Native size_t (EntityHandle, ProxyDirty); invoke uses the runtime's exact overload metadata.
+        member this.``PublishRenderProxyDirty``(``owner``: EntityHandleView, ``dirty``: NativeEnumValue<ProxyDirtyTag>) : uint64 =
+            let arguments = [| (NativeCodecs.View((fun value -> EntityHandleView(value)))).Encode(``owner``); (NativeCodecs.Enum<ProxyDirtyTag>("ProxyDirty")).Encode(``dirty``) |]
+            let response = this.Invoke(method_c57806331e, arguments)
+            (NativeCodecs.UInt64).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``QueryPhysicsBatch_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "QueryPhysicsBatch", "ce::physics::result<void> (std::span<const ce::physics::query_request>, std::span<ce::physics::result<ce::physics::query_result>>)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native ce::physics::result<void> (std::span<const ce::physics::query_request>, std::span<ce::physics::result<ce::physics::query_result>>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``QueryPhysicsBatch``(``requests``: NativeArray<ce_physics_query_requestView>, ``results``: byref<NativeArray<NativeExpected<ce_physics_query_resultView, ce_physics_errorView>>>) : NativeExpected<unit, ce_physics_errorView> =
+            let arguments = [| ``requests``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.Array(NativeCodecs.Expected(NativeCodecs.View((fun value -> ce_physics_query_resultView(value))), NativeCodecs.View((fun value -> ce_physics_errorView(value)))))).Encode(``results``)) |]
+            let response = this.InvokeBound(method_874d1d2e21, arguments)
+            ``results`` <- (NativeCodecs.Array(NativeCodecs.Expected(NativeCodecs.View((fun value -> ce_physics_query_resultView(value))), NativeCodecs.View((fun value -> ce_physics_errorView(value)))))).Decode(NativeTypeView.FromSnapshot(response.Arguments.[1]))
+            (NativeCodecs.Expected(NativeCodecs.Unit, NativeCodecs.View((fun value -> ce_physics_errorView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native ce::physics::result<ce::physics::query_result> (math::vector3, math::vector3, float, std::span<ce::physics::query_hit>, const ce::physics::query_filter &); invoke uses the runtime's exact overload metadata.
         member this.``RaycastPhysics``(``origin``: math_vector3View, ``direction``: math_vector3View, ``distance``: single, ``output``: byref<NativeArray<ce_physics_query_hitView>>, ``filter``: ce_physics_query_filterView) : NativeExpected<ce_physics_query_resultView, ce_physics_errorView> =
@@ -536,9 +737,11 @@ module SceneViewMembers =
             ``output`` <- (NativeCodecs.Array(NativeCodecs.View((fun value -> ce_physics_query_hitView(value))))).Decode(NativeTypeView.FromSnapshot(response.Arguments.[3]))
             (NativeCodecs.Expected(NativeCodecs.View((fun value -> ce_physics_query_resultView(value))), NativeCodecs.View((fun value -> ce_physics_errorView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: expected value/error: native type has no declared runtime value schema or explicit typed codec: ce::physics::CollisionGeometryLibrary::statistics
-        member _.``ReadCollisionGeometryStatistics_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "ReadCollisionGeometryStatistics", "ce::physics::result<ce::physics::CollisionGeometryLibrary::statistics> () const", "return value: expected value/error: native type has no declared runtime value schema or explicit typed codec: ce::physics::CollisionGeometryLibrary::statistics")
+        /// Native ce::physics::result<ce::physics::CollisionGeometryLibrary::statistics> () const; invoke uses the runtime's exact overload metadata.
+        member this.``ReadCollisionGeometryStatistics``() : NativeExpected<ce_physics_CollisionGeometryLibrary_statisticsView, ce_physics_errorView> =
+            let arguments = [|  |]
+            let response = this.Invoke(method_6467b46560, arguments)
+            (NativeCodecs.Expected(NativeCodecs.View((fun value -> ce_physics_CollisionGeometryLibrary_statisticsView(value))), NativeCodecs.View((fun value -> ce_physics_errorView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``RecordExecutionGraphMembershipChanged``() : unit =
@@ -553,9 +756,11 @@ module SceneViewMembers =
             ``component`` <- (NativeCodecs.View((fun value -> CharacterMovementComponentView(value)))).Decode(NativeTypeView.FromSnapshot(response.Arguments.[0]))
             (NativeCodecs.Expected(NativeCodecs.Unit, NativeCodecs.View((fun value -> ce_physics_errorView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``RegisterComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "RegisterComponent", "void (Component *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Component *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``RegisterComponent``(``component``: NativeReference<ComponentView>) : unit =
+            let arguments = [| ``component``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_9e0262e521, arguments, discardResult = true)
+            ()
 
         /// Native ce::physics::result<void> (PhysicsBodyComponent &); invoke uses the runtime's exact overload metadata.
         member this.``RegisterPhysicsBody``(``component``: byref<PhysicsBodyComponentView>) : NativeExpected<unit, ce_physics_errorView> =
@@ -564,9 +769,11 @@ module SceneViewMembers =
             ``component`` <- (NativeCodecs.View((fun value -> PhysicsBodyComponentView(value)))).Decode(NativeTypeView.FromSnapshot(response.Arguments.[0]))
             (NativeCodecs.Expected(NativeCodecs.Unit, NativeCodecs.View((fun value -> ce_physics_errorView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``RemoveCanvas_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "RemoveCanvas", "void (Entity *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Entity *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``RemoveCanvas``(``canvas``: NativeReference<EntityView>) : unit =
+            let arguments = [| ``canvas``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_8740faba6f, arguments, discardResult = true)
+            ()
 
         /// Native void (size_t); invoke uses the runtime's exact overload metadata.
         member this.``RemoveLight``(``index``: uint64) : unit =
@@ -574,13 +781,17 @@ module SceneViewMembers =
             let response = this.Invoke(method_6f21e68381, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``RemoveSelectedEntity_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "RemoveSelectedEntity", "void (Entity *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Entity *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``RemoveSelectedEntity``(``entity``: NativeReference<EntityView>) : unit =
+            let arguments = [| ``entity``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_6ce1e677bb, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``RenameEntity_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "RenameEntity", "void (Entity &, std::string_view)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Entity &, std::string_view); invoke_bound uses the runtime's exact overload metadata.
+        member this.``RenameEntity``(``entity``: EntityView, ``name``: string) : unit =
+            let arguments = [| ``entity``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.String).Encode(``name``)) |]
+            let response = this.InvokeBound(method_c5e52c24da, arguments, discardResult = true)
+            ()
 
         /// Native size_t () const; invoke uses the runtime's exact overload metadata.
         member this.``RenderProxyComponentCount``() : uint64 =
@@ -588,13 +799,17 @@ module SceneViewMembers =
             let response = this.Invoke(method_836169b9c0, arguments)
             (NativeCodecs.UInt64).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle
-        member _.``ReorderChildren_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "ReorderChildren", "bool (EntityHandle, std::span<const EntityHandle>)", "argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle")
+        /// Native bool (EntityHandle, std::span<const EntityHandle>); invoke uses the runtime's exact overload metadata.
+        member this.``ReorderChildren``(``parent``: EntityHandleView, ``children``: NativeArray<EntityHandleView>) : bool =
+            let arguments = [| (NativeCodecs.View((fun value -> EntityHandleView(value)))).Encode(``parent``); (NativeCodecs.Array(NativeCodecs.View((fun value -> EntityHandleView(value))))).Encode(``children``) |]
+            let response = this.Invoke(method_00365b7c11, arguments)
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle
-        member _.``Reparent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "Reparent", "ReparentResult (EntityHandle, EntityHandle)", "argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle")
+        /// Native ReparentResult (EntityHandle, EntityHandle); invoke uses the runtime's exact overload metadata.
+        member this.``Reparent``(``child``: EntityHandleView, ``newParent``: EntityHandleView) : NativeEnumValue<ReparentResultTag> =
+            let arguments = [| (NativeCodecs.View((fun value -> EntityHandleView(value)))).Encode(``child``); (NativeCodecs.View((fun value -> EntityHandleView(value)))).Encode(``newParent``) |]
+            let response = this.Invoke(method_447bf3b19e, arguments)
+            (NativeCodecs.Enum<ReparentResultTag>("ReparentResult")).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``ResetRenderProxyCommitMetrics``() : unit =
@@ -620,9 +835,11 @@ module SceneViewMembers =
             let response = this.Invoke(method_d02196f487, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle
-        member _.``Resolve_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "Resolve", "Entity *(EntityHandle) const", "argument 0: native type has no declared runtime value schema or explicit typed codec: EntityHandle")
+        /// Native Entity *(EntityHandle) const; borrow uses the runtime's exact overload metadata.
+        member this.``Resolve``(``handle``: EntityHandleView) : NativeReference<EntityView> =
+            let arguments = [| (NativeCodecs.View((fun value -> EntityHandleView(value)))).Encode(``handle``) |]
+            let value = this.Borrow(method_ba476bf691, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(value)
 
         /// Native ce::physics::result<PhysicsBodyComponent *> (ce::physics::body_handle) const; invoke uses the runtime's exact overload metadata.
         member this.``ResolvePhysicsBody``(``body``: ce_physics_handle_ce_physics_body_tagView) : NativeExpected<NativeReference<PhysicsBodyComponentView>, ce_physics_errorView> =
@@ -636,13 +853,15 @@ module SceneViewMembers =
             let response = this.Invoke(method_b3d1dec2c4, arguments)
             (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: SystemSchedule
-        member _.``Schedule_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "Schedule", "SystemSchedule &()", "return value: native type has no declared runtime value schema or explicit typed codec: SystemSchedule")
+        /// Native SystemSchedule &(); borrow uses the runtime's exact overload metadata.
+        member this.``Schedule``() : SystemScheduleView =
+            let arguments = [|  |]
+            let value = this.Borrow(method_8962ae84d5, arguments)
+            (NativeCodecs.View((fun value -> SystemScheduleView(value)))).Decode(value)
 
-        /// Unavailable native method: argument 0: owner pointee: native type has no declared runtime value schema or explicit typed codec: TextureFramePins
+        /// Unavailable native method: method is reserved for engine lifecycle, scheduling, or identity management
         member _.``SetPreparedTextureImagePins_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "SetPreparedTextureImagePins", "void (own::shared_owner<TextureFramePins>)", "argument 0: owner pointee: native type has no declared runtime value schema or explicit typed codec: TextureFramePins")
+            NativeUnavailableMember("method", "Scene", "SetPreparedTextureImagePins", "void (own::shared_owner<TextureFramePins>)", "method is reserved for engine lifecycle, scheduling, or identity management")
 
         /// Native void (double); invoke uses the runtime's exact overload metadata.
         member this.``SetSimulationInterpolation``(``alpha``: double) : unit =
@@ -656,13 +875,17 @@ module SceneViewMembers =
             let response = this.Invoke(method_b201fd56ff, arguments)
             (NativeCodecs.Double).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: SoundSystem
-        member _.``Sounds_7321c8_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "Sounds", "SoundSystem &() noexcept", "return value: native type has no declared runtime value schema or explicit typed codec: SoundSystem")
+        /// Native SoundSystem &() noexcept; borrow uses the runtime's exact overload metadata.
+        member this.``Sounds``() : SoundSystemView =
+            let arguments = [|  |]
+            let value = this.Borrow(method_7321c838c8, arguments)
+            (NativeCodecs.View((fun value -> SoundSystemView(value)))).Decode(value)
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: SoundSystem
-        member _.``Sounds_Const_05ed5b_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "Sounds", "const SoundSystem &() const noexcept", "return value: native type has no declared runtime value schema or explicit typed codec: SoundSystem")
+        /// Native const SoundSystem &() const noexcept; borrow uses the runtime's exact overload metadata.
+        member this.``Sounds_Const``() : SoundSystemView =
+            let arguments = [|  |]
+            let value = this.Borrow(method_05ed5b317c, arguments)
+            (NativeCodecs.View((fun value -> SoundSystemView(value)))).Decode(value)
 
         /// Native ce::physics::result<void> (); invoke uses the runtime's exact overload metadata.
         member this.``StartPhysicsSimulation``() : NativeExpected<unit, ce_physics_errorView> =
@@ -682,9 +905,9 @@ module SceneViewMembers =
             let response = this.Invoke(method_df4f10409a, arguments)
             ()
 
-        /// Unavailable native method: return value: owner pointee: native type has no declared runtime value schema or explicit typed codec: TextureFramePins
+        /// Unavailable native method: method is reserved for engine lifecycle, scheduling, or identity management
         member _.``TakePreparedTextureImagePins_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "TakePreparedTextureImagePins", "own::shared_owner<TextureFramePins> ()", "return value: owner pointee: native type has no declared runtime value schema or explicit typed codec: TextureFramePins")
+            NativeUnavailableMember("method", "Scene", "TakePreparedTextureImagePins", "own::shared_owner<TextureFramePins> ()", "method is reserved for engine lifecycle, scheduling, or identity management")
 
         /// Native void (const char *, const char *); invoke uses the runtime's exact overload metadata.
         member this.``TryFireReentrancyStressMidTraversal``(``systemName``: string, ``loopLabel``: string) : unit =
@@ -692,57 +915,84 @@ module SceneViewMembers =
             let response = this.Invoke(method_a4d1862504, arguments)
             ()
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``TryGetEntity_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "TryGetEntity", "Entity *(Entity::Index)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native Entity *(Entity::Index); invoke_bound uses the runtime's exact overload metadata.
+        member this.``TryGetEntity``(``index``: int) : NativeReference<EntityView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``index``)) |]
+            let response = this.InvokeBound(method_31bd19885a, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``TryGetLastAnimatorPoseMetrics_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "TryGetLastAnimatorPoseMetrics", "bool (const Animator &, AnimatorPoseUploadMetrics &) const", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (const Animator &, AnimatorPoseUploadMetrics &) const; invoke_bound uses the runtime's exact overload metadata.
+        member this.``TryGetLastAnimatorPoseMetrics``(``animator``: AnimatorView, ``outMetrics``: byref<AnimatorPoseUploadMetricsView>) : bool =
+            let arguments = [| ``animator``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.View((fun value -> AnimatorPoseUploadMetricsView(value)))).Encode(``outMetrics``)) |]
+            let response = this.InvokeBound(method_c94e7dc1c3, arguments)
+            ``outMetrics`` <- (NativeCodecs.View((fun value -> AnimatorPoseUploadMetricsView(value)))).Decode(NativeTypeView.FromSnapshot(response.Arguments.[1]))
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: BasicTweenManager<Scene>
-        member _.``Tweens_087f98_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "Tweens", "TweenManager &() noexcept", "return value: native type has no declared runtime value schema or explicit typed codec: BasicTweenManager<Scene>")
+        /// Native TweenManager &() noexcept; borrow uses the runtime's exact overload metadata.
+        member this.``Tweens``() : BasicTweenManager_SceneView =
+            let arguments = [|  |]
+            let value = this.Borrow(method_087f98d2a6, arguments)
+            (NativeCodecs.View((fun value -> BasicTweenManager_SceneView(value)))).Decode(value)
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: BasicTweenManager<Scene>
-        member _.``Tweens_Const_a82712_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "Tweens", "const TweenManager &() const noexcept", "return value: native type has no declared runtime value schema or explicit typed codec: BasicTweenManager<Scene>")
+        /// Native const TweenManager &() const noexcept; borrow uses the runtime's exact overload metadata.
+        member this.``Tweens_Const``() : BasicTweenManager_SceneView =
+            let arguments = [|  |]
+            let value = this.Borrow(method_a82712bad2, arguments)
+            (NativeCodecs.View((fun value -> BasicTweenManager_SceneView(value)))).Decode(value)
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UnCollectDecalComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "UnCollectDecalComponent", "void (DecalComponent *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (DecalComponent *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UnCollectDecalComponent``(``ptr``: NativeReference<DecalComponentView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_54f27afc17, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UnCollectFoliageComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "UnCollectFoliageComponent", "void (FoliageComponent *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (FoliageComponent *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UnCollectFoliageComponent``(``ptr``: NativeReference<FoliageComponentView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_6e130d6eac, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UnCollectImageComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "UnCollectImageComponent", "void (ImageComponent *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (ImageComponent *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UnCollectImageComponent``(``ptr``: NativeReference<ImageComponentView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_76f8020628, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UnCollectLightComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "UnCollectLightComponent", "void (LightComponent *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (LightComponent *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UnCollectLightComponent``(``ptr``: NativeReference<LightComponentView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_c735f7eca5, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UnCollectMeshRenderer_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "UnCollectMeshRenderer", "void (MeshRenderer *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (MeshRenderer *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UnCollectMeshRenderer``(``ptr``: NativeReference<MeshRendererView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_a07ee6ec44, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UnCollectSpriteRenderer_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "UnCollectSpriteRenderer", "void (SpriteRenderer *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (SpriteRenderer *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UnCollectSpriteRenderer``(``ptr``: NativeReference<SpriteRendererView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_f51e559227, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UnCollectSpriteSheetComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "UnCollectSpriteSheetComponent", "void (SpriteSheetComponent *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (SpriteSheetComponent *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UnCollectSpriteSheetComponent``(``ptr``: NativeReference<SpriteSheetComponentView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_e337af2c67, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UnCollectTerrainComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "UnCollectTerrainComponent", "void (TerrainComponent *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (TerrainComponent *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UnCollectTerrainComponent``(``ptr``: NativeReference<TerrainComponentView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_0de9edb4b8, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UnCollectTextComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "UnCollectTextComponent", "void (TextComponent *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (TextComponent *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UnCollectTextComponent``(``ptr``: NativeReference<TextComponentView>) : unit =
+            let arguments = [| ``ptr``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_63cd5c386f, arguments, discardResult = true)
+            ()
 
         /// Native ce::physics::result<void> (CharacterMovementComponent &); invoke uses the runtime's exact overload metadata.
         member this.``UnregisterCharacterMovement``(``component``: byref<CharacterMovementComponentView>) : NativeExpected<unit, ce_physics_errorView> =
@@ -751,9 +1001,11 @@ module SceneViewMembers =
             ``component`` <- (NativeCodecs.View((fun value -> CharacterMovementComponentView(value)))).Decode(NativeTypeView.FromSnapshot(response.Arguments.[0]))
             (NativeCodecs.Expected(NativeCodecs.Unit, NativeCodecs.View((fun value -> ce_physics_errorView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UnregisterComponent_Unavailable`` =
-            NativeUnavailableMember("method", "Scene", "UnregisterComponent", "void (Component *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Component *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UnregisterComponent``(``component``: NativeReference<ComponentView>) : unit =
+            let arguments = [| ``component``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_ac82ffb3d8, arguments, discardResult = true)
+            ()
 
         /// Native ce::physics::result<void> (PhysicsBodyComponent &); invoke uses the runtime's exact overload metadata.
         member this.``UnregisterPhysicsBody``(``component``: byref<PhysicsBodyComponentView>) : NativeExpected<unit, ce_physics_errorView> =

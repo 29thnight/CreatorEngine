@@ -14,13 +14,11 @@ module wave_PlaybackRequestViewMembers =
         /// Construct an explicit read-only native wire snapshot for value arguments.
         static member FromJson(value: JsonElement) = wave_PlaybackRequestView(NativeTypeView.FromSnapshot(value))
 
-        /// Unavailable native field: native type has no declared runtime value schema or explicit typed codec: wave::SoundSource
-        member _.``source_Unavailable`` =
-            NativeUnavailableMember("field", "wave::PlaybackRequest", "source", "wave::SoundSource", "native type has no declared runtime value schema or explicit typed codec: wave::SoundSource")
+        /// Native field wave::PlaybackRequest::source.
+        member this.``source`` : wave_SoundSourceView = this.Field("source", "source").Read(NativeCodecs.View((fun value -> wave_SoundSourceView(value))))
 
-        /// Unavailable native field: native type has no declared runtime value schema or explicit typed codec: wave::PlayRequest
-        member _.``settings_Unavailable`` =
-            NativeUnavailableMember("field", "wave::PlaybackRequest", "settings", "wave::PlayRequest", "native type has no declared runtime value schema or explicit typed codec: wave::PlayRequest")
+        /// Native field wave::PlaybackRequest::settings.
+        member this.``settings`` : wave_PlayRequestView = this.Field("settings", "settings").Read(NativeCodecs.View((fun value -> wave_PlayRequestView(value))))
 
         /// Native field wave::PlaybackRequest::parameters.
         member this.``parameters`` : NativeMap<string, NativeVariant4<bool, int, single, string>> = this.Field("parameters", "parameters").Read(NativeCodecs.Map(NativeCodecs.String, NativeCodecs.Variant(NativeCodecs.Bool, NativeCodecs.Int32, NativeCodecs.Single, NativeCodecs.String)))

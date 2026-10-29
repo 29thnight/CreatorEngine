@@ -7,6 +7,9 @@ open CreatorEngine
 
 [<AutoOpen>]
 module FoliageTypeViewMembers =
+    let private method_a5e76e5f69 = NativeMethodSpec("FoliageType", "MaterialLink", true, [|  |], [|  |])
+    let private method_abceddf2b9 = NativeMethodSpec("FoliageType", "MeshLink", true, [|  |], [|  |])
+    let private method_a77355b807 = NativeMethodSpec("FoliageType", "ModelLink", true, [|  |], [|  |])
     let private method_28e29959b5 = NativeMethodSpec("FoliageType", "operator==", true, [| "FoliageType" |], [| "const_reference" |])
 
     type FoliageTypeView with
@@ -112,17 +115,23 @@ module FoliageTypeViewMembers =
             fields.["m_modelName"] <- (NativeCodecs.String).Encode(value)
             FoliageTypeView(NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(fields)))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: AssetDepot::AssetLink<Material>
-        member _.``MaterialLink_Unavailable`` =
-            NativeUnavailableMember("method", "FoliageType", "MaterialLink", "AssetDepot::AssetLink<Material> () const", "return value: native type has no declared runtime value schema or explicit typed codec: AssetDepot::AssetLink<Material>")
+        /// Native AssetDepot::AssetLink<Material> () const; invoke uses the runtime's exact overload metadata.
+        member this.``MaterialLink``() : AssetDepot_AssetLink_MaterialView =
+            let arguments = [|  |]
+            let response = this.Invoke(method_a5e76e5f69, arguments)
+            (NativeCodecs.View((fun value -> AssetDepot_AssetLink_MaterialView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: AssetDepot::AssetLink<assets::ModelMeshDescriptor>
-        member _.``MeshLink_Unavailable`` =
-            NativeUnavailableMember("method", "FoliageType", "MeshLink", "AssetDepot::AssetLink<assets::ModelMeshDescriptor> () const", "return value: native type has no declared runtime value schema or explicit typed codec: AssetDepot::AssetLink<assets::ModelMeshDescriptor>")
+        /// Native AssetDepot::AssetLink<assets::ModelMeshDescriptor> () const; invoke uses the runtime's exact overload metadata.
+        member this.``MeshLink``() : AssetDepot_AssetLink_assets_ModelMeshDescriptorView =
+            let arguments = [|  |]
+            let response = this.Invoke(method_abceddf2b9, arguments)
+            (NativeCodecs.View((fun value -> AssetDepot_AssetLink_assets_ModelMeshDescriptorView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: AssetDepot::AssetLink<assets::ModelAnimationDescriptor>
-        member _.``ModelLink_Unavailable`` =
-            NativeUnavailableMember("method", "FoliageType", "ModelLink", "AssetDepot::AssetLink<assets::ModelAnimationDescriptor> () const", "return value: native type has no declared runtime value schema or explicit typed codec: AssetDepot::AssetLink<assets::ModelAnimationDescriptor>")
+        /// Native AssetDepot::AssetLink<assets::ModelAnimationDescriptor> () const; invoke uses the runtime's exact overload metadata.
+        member this.``ModelLink``() : AssetDepot_AssetLink_assets_ModelAnimationDescriptorView =
+            let arguments = [|  |]
+            let response = this.Invoke(method_a77355b807, arguments)
+            (NativeCodecs.View((fun value -> AssetDepot_AssetLink_assets_ModelAnimationDescriptorView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native bool (const FoliageType &) const; invoke uses the runtime's exact overload metadata.
         member this.``operator==``(``other``: FoliageTypeView) : bool =

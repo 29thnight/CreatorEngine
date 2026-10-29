@@ -9,6 +9,8 @@ open CreatorEngine
 module experiment_MaterialInstanceViewMembers =
     let private method_5bca039047 = NativeMethodSpec("experiment::MaterialInstance", "AddKeywordOverride", false, [| "std::basic_string_view<char>" |], [| "value" |])
     let private method_b1840e016d = NativeMethodSpec("experiment::MaterialInstance", "Base", true, [|  |], [|  |])
+    let private method_a2d682145b = NativeMethodSpec("experiment::MaterialInstance", "BindPreparedTextureOwners", false, [| "std::span<const own::shared_owner<const Texture>>"; "std::basic_string<char>" |], [| "value"; "mutable_reference" |])
+    let private method_157ca756eb = NativeMethodSpec("experiment::MaterialInstance", "BuildEffectiveMaterial", true, [| "experiment::Material"; "std::basic_string<char>" |], [| "mutable_reference"; "mutable_reference" |])
     let private method_ddb382e35b = NativeMethodSpec("experiment::MaterialInstance", "ClearAllOverrides", false, [|  |], [|  |])
     let private method_ced852c09e = NativeMethodSpec("experiment::MaterialInstance", "ClearKeywordOverride", false, [| "std::basic_string_view<char>" |], [| "value" |])
     let private method_3be122f0f5 = NativeMethodSpec("experiment::MaterialInstance", "ClearKeywordSelectionOverrides", false, [|  |], [|  |])
@@ -38,13 +40,19 @@ module experiment_MaterialInstanceViewMembers =
             let value = this.Borrow(method_b1840e016d, arguments)
             (NativeCodecs.Reference(NativeCodecs.View((fun value -> experiment_MaterialView(value))))).Decode(value)
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``BindPreparedTextureOwners_Unavailable`` =
-            NativeUnavailableMember("method", "experiment::MaterialInstance", "BindPreparedTextureOwners", "bool (std::span<const own::shared_owner<const Texture>>, std::string &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (std::span<const own::shared_owner<const Texture>>, std::string &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``BindPreparedTextureOwners``(``textures``: NativeArray<NativeReference<TextureView>>, ``outError``: byref<string>) : bool =
+            let arguments = [| ``textures``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.String).Encode(``outError``)) |]
+            let response = this.InvokeBound(method_a2d682145b, arguments)
+            ``outError`` <- (NativeCodecs.String).Decode(NativeTypeView.FromSnapshot(response.Arguments.[1]))
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``BuildEffectiveMaterial_Unavailable`` =
-            NativeUnavailableMember("method", "experiment::MaterialInstance", "BuildEffectiveMaterial", "bool (Material &, std::string &) const", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (Material &, std::string &) const; invoke_bound uses the runtime's exact overload metadata.
+        member this.``BuildEffectiveMaterial``(``outMaterial``: experiment_MaterialView, ``outError``: byref<string>) : bool =
+            let arguments = [| ``outMaterial``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.String).Encode(``outError``)) |]
+            let response = this.InvokeBound(method_157ca756eb, arguments)
+            ``outError`` <- (NativeCodecs.String).Decode(NativeTypeView.FromSnapshot(response.Arguments.[1]))
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``ClearAllOverrides``() : unit =

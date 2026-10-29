@@ -11,6 +11,7 @@ module TerrainMaterialViewMembers =
     let private method_5f23de56d1 = NativeMethodSpec("TerrainMaterial", "GetRevision", true, [|  |], [|  |])
     let private method_1271ba7243 = NativeMethodSpec("TerrainMaterial", "GetSplatMasks", true, [|  |], [|  |])
     let private method_11c3f5e100 = NativeMethodSpec("TerrainMaterial", "Initialize", false, [| "unsigned int"; "unsigned int" |], [| "value"; "value" |])
+    let private method_2267c10983 = NativeMethodSpec("TerrainMaterial", "MateialDataUpdate", false, [| "int"; "int"; "ce::dynamic_array<TerrainLayer>"; "ce::dynamic_array<ce::dynamic_array<float>>" |], [| "value"; "value"; "mutable_reference"; "mutable_reference" |])
     let private method_e25d1816c6 = NativeMethodSpec("TerrainMaterial", "UpdateBuffer", false, [| "TerrainLayerBuffer" |], [| "const_reference" |])
     let private method_b943f1b3a9 = NativeMethodSpec("TerrainMaterial", "UpdateSplatMapPatch", false, [| "unsigned int"; "int"; "int"; "int"; "int"; "ce::dynamic_array<unsigned char>" |], [| "value"; "value"; "value"; "value"; "value"; "const_reference" |])
 
@@ -72,9 +73,12 @@ module TerrainMaterialViewMembers =
             let response = this.Invoke(method_11c3f5e100, arguments)
             ()
 
-        /// Unavailable native method: argument 2: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``MateialDataUpdate_Unavailable`` =
-            NativeUnavailableMember("method", "TerrainMaterial", "MateialDataUpdate", "void (int, int, ce::dynamic_array<TerrainLayer> &, ce::dynamic_array<ce::dynamic_array<float>> &)", "argument 2: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (int, int, ce::dynamic_array<TerrainLayer> &, ce::dynamic_array<ce::dynamic_array<float>> &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``MateialDataUpdate``(``width``: int, ``height``: int, ``layers``: NativeArray<TerrainLayerView>, ``layerHeightMap``: byref<NativeArray<NativeArray<single>>>) : unit =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``width``)); NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``height``)); ``layers``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.Array(NativeCodecs.Array(NativeCodecs.Single))).Encode(``layerHeightMap``)) |]
+            let response = this.InvokeBound(method_2267c10983, arguments, discardResult = true)
+            ``layerHeightMap`` <- (NativeCodecs.Array(NativeCodecs.Array(NativeCodecs.Single))).Decode(NativeTypeView.FromSnapshot(response.Arguments.[3]))
+            ()
 
         /// Native void (const TerrainLayerBuffer &); invoke uses the runtime's exact overload metadata.
         member this.``UpdateBuffer``(``layers``: TerrainLayerBufferView) : unit =

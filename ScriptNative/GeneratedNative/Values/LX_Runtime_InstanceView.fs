@@ -7,6 +7,8 @@ open CreatorEngine
 
 [<AutoOpen>]
 module LX_Runtime_InstanceViewMembers =
+    let private method_874f5648a7 = NativeMethodSpec("LX::Runtime::Instance", "operator=", false, [| "LX::Runtime::Instance" |], [| "const_reference" |])
+
     type LX_Runtime_InstanceView with
         /// Typed native value codec for collection construction and explicit value arguments.
         static member Codec : NativeCodec<LX_Runtime_InstanceView> = NativeCodecs.View(fun source -> LX_Runtime_InstanceView(source))
@@ -41,10 +43,12 @@ module LX_Runtime_InstanceViewMembers =
         /// Native field LX::Runtime::Instance::keywordSelections.
         member this.``keywordSelections`` : NativeArray<uint16> = this.Field("keywordSelections", "keywordSelections").Read(NativeCodecs.Array(NativeCodecs.UInt16))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
+        /// Unavailable native method: argument 0: native ownership transfer requires an explicit consuming API
         member _.``operator=_0def3f_0def3f_Unavailable`` =
-            NativeUnavailableMember("method", "LX::Runtime::Instance", "operator=", "Instance &(Instance &&) noexcept", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+            NativeUnavailableMember("method", "LX::Runtime::Instance", "operator=", "Instance &(Instance &&) noexcept", "argument 0: native ownership transfer requires an explicit consuming API")
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``operator=_874f56_874f56_Unavailable`` =
-            NativeUnavailableMember("method", "LX::Runtime::Instance", "operator=", "Instance &(const Instance &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native Instance &(const Instance &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``operator=_874f56``(``source``: LX_Runtime_InstanceView) : LX_Runtime_InstanceView =
+            let arguments = [| ``source``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_874f5648a7, arguments)
+            (NativeCodecs.View((fun value -> LX_Runtime_InstanceView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))

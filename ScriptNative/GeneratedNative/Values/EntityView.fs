@@ -7,22 +7,31 @@ open CreatorEngine
 
 [<AutoOpen>]
 module EntityViewMembers =
+    let private method_b3a1e88a7a = NativeMethodSpec("Entity", "AddChild", false, [| "Entity *" |], [| "value" |])
+    let private method_7398a1cc4f = NativeMethodSpec("Entity", "AttachComponentLifecycle", false, [| "Component *" |], [| "value" |])
     let private method_41c1417273 = NativeMethodSpec("Entity", "AttachSpatialComponent", false, [| "GameObjectType"; "int" |], [| "value"; "value" |])
     let private method_64442b7fd6 = NativeMethodSpec("Entity", "CanAttachComponentType", true, [| "HashedGuid" |], [| "const_reference" |])
     let private method_7cc7bccb0e = NativeMethodSpec("Entity", "Destroy", false, [|  |], [|  |])
     let private method_bf40a580c7 = NativeMethodSpec("Entity", "EntityAt", true, [| "int" |], [| "value" |])
     let private method_d6cb2649c9 = NativeMethodSpec("Entity", "FindComponent", true, [| "HashedGuid" |], [| "const_reference" |])
     let private method_e1770c0e4c = NativeMethodSpec("Entity", "GetChildrenIndices", true, [|  |], [|  |])
+    let private method_3f5cf07674 = NativeMethodSpec("Entity", "GetLayer", true, [|  |], [|  |])
     let private method_3fca1a71a9 = NativeMethodSpec("Entity", "GetParentIndex", true, [|  |], [|  |])
     let private method_237da8aa80 = NativeMethodSpec("Entity", "GetRootIndex", true, [|  |], [|  |])
     let private method_62dedfc450 = NativeMethodSpec("Entity", "GetScene", true, [|  |], [|  |])
     let private method_7a45507452 = NativeMethodSpec("Entity", "HasTransform", true, [|  |], [|  |])
     let private method_4e4176fd09 = NativeMethodSpec("Entity", "IsStatic", true, [|  |], [|  |])
+    let private method_51a9ca2acb = NativeMethodSpec("Entity", "OwnerSceneFind", false, [| "std::basic_string_view<char>" |], [| "value" |])
+    let private method_f98a27bcda = NativeMethodSpec("Entity", "OwnerSceneFindAttachedID", false, [| "HashedGuid" |], [| "const_reference" |])
+    let private method_3e6435e350 = NativeMethodSpec("Entity", "OwnerSceneFindIndex", false, [| "int" |], [| "value" |])
+    let private method_192fa4c693 = NativeMethodSpec("Entity", "OwnerSceneFindInstanceID", false, [| "HashedGuid" |], [| "const_reference" |])
     let private method_335a65c66f = NativeMethodSpec("Entity", "RebuildComponentTypeMask", false, [|  |], [|  |])
     let private method_06ef88a7cf = NativeMethodSpec("Entity", "RefreshComponentIdIndices", false, [|  |], [|  |])
     let private method_191a1d8a76 = NativeMethodSpec("Entity", "RemoveComponentTypeID", false, [| "unsigned int" |], [| "value" |])
     let private method_3bb1d98466 = NativeMethodSpec("Entity", "RemoveSuffixNumberTag", true, [|  |], [|  |])
     let private method_9cf37ddf91 = NativeMethodSpec("Entity", "SetEnabled", false, [| "bool" |], [| "value" |])
+    let private method_0813480a94 = NativeMethodSpec("Entity", "SetLayer", false, [| "ce::layers::layer_id" |], [| "value" |])
+    let private method_4c42df5352 = NativeMethodSpec("Entity", "SetLayer", false, [| "std::basic_string_view<char>" |], [| "value" |])
     let private method_c3e3709054 = NativeMethodSpec("Entity", "SetName", false, [| "std::basic_string_view<char>" |], [| "value" |])
     let private method_5af6b86bb1 = NativeMethodSpec("Entity", "SetRootIndex", false, [| "int" |], [| "value" |])
     let private method_25dfc16be9 = NativeMethodSpec("Entity", "SetStatic", false, [| "bool" |], [| "value" |])
@@ -138,9 +147,11 @@ module EntityViewMembers =
             fields.["m_isStatic"] <- (NativeCodecs.Bool).Encode(value)
             EntityView(NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(fields)))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``AddChild_Unavailable`` =
-            NativeUnavailableMember("method", "Entity", "AddChild", "void (Entity *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Entity *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AddChild``(``_objcet``: NativeReference<EntityView>) : unit =
+            let arguments = [| ``_objcet``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_b3a1e88a7a, arguments, discardResult = true)
+            ()
 
         /// Unavailable native method: argument 0: native type has no declared runtime value schema or explicit typed codec: reflgen::type_descriptor
         member _.``AddComponent_Unavailable`` =
@@ -150,9 +161,11 @@ module EntityViewMembers =
         member _.``AddComponentAllowMultiple_Unavailable`` =
             NativeUnavailableMember("method", "Entity", "AddComponentAllowMultiple", "Component *(const reflgen::type_descriptor &)", "argument 0: native type has no declared runtime value schema or explicit typed codec: reflgen::type_descriptor")
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``AttachComponentLifecycle_Unavailable`` =
-            NativeUnavailableMember("method", "Entity", "AttachComponentLifecycle", "void (Component *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Component *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AttachComponentLifecycle``(``component``: NativeReference<ComponentView>) : unit =
+            let arguments = [| ``component``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_7398a1cc4f, arguments, discardResult = true)
+            ()
 
         /// Native void (GameObjectType, Entity::Index); invoke uses the runtime's exact overload metadata.
         member this.``AttachSpatialComponent``(``type``: NativeEnumValue<GameObjectTypeTag>, ``parentIndex``: int) : unit =
@@ -194,9 +207,11 @@ module EntityViewMembers =
         member _.``GetComponent_Unavailable`` =
             NativeUnavailableMember("method", "Entity", "GetComponent", "Component *(const reflgen::type_descriptor &)", "argument 0: native type has no declared runtime value schema or explicit typed codec: reflgen::type_descriptor")
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: ce::layers::layer_id
-        member _.``GetLayer_Unavailable`` =
-            NativeUnavailableMember("method", "Entity", "GetLayer", "ce::layers::layer_id () const noexcept", "return value: native type has no declared runtime value schema or explicit typed codec: ce::layers::layer_id")
+        /// Native ce::layers::layer_id () const noexcept; invoke uses the runtime's exact overload metadata.
+        member this.``GetLayer``() : ce_layers_layer_idView =
+            let arguments = [|  |]
+            let response = this.Invoke(method_3f5cf07674, arguments)
+            (NativeCodecs.View((fun value -> ce_layers_layer_idView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native Index () const; invoke uses the runtime's exact overload metadata.
         member this.``GetParentIndex``() : int =
@@ -236,21 +251,29 @@ module EntityViewMembers =
         member _.``OnBeforeDeserialize_Unavailable`` =
             NativeUnavailableMember("method", "Entity", "OnBeforeDeserialize", "void (const Authoring::NodeView &) const", "method is reserved for engine lifecycle, scheduling, or identity management")
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``OwnerSceneFind_Unavailable`` =
-            NativeUnavailableMember("method", "Entity", "OwnerSceneFind", "Entity *(std::string_view)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native Entity *(std::string_view); invoke_bound uses the runtime's exact overload metadata.
+        member this.``OwnerSceneFind``(``name``: string) : NativeReference<EntityView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``name``)) |]
+            let response = this.InvokeBound(method_51a9ca2acb, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``OwnerSceneFindAttachedID_Unavailable`` =
-            NativeUnavailableMember("method", "Entity", "OwnerSceneFindAttachedID", "Entity *(const HashedGuid &)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native Entity *(const HashedGuid &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``OwnerSceneFindAttachedID``(``guid``: uint64) : NativeReference<EntityView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.UInt64).Encode(``guid``)) |]
+            let response = this.InvokeBound(method_f98a27bcda, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``OwnerSceneFindIndex_Unavailable`` =
-            NativeUnavailableMember("method", "Entity", "OwnerSceneFindIndex", "Entity *(Entity::Index)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native Entity *(Entity::Index); invoke_bound uses the runtime's exact overload metadata.
+        member this.``OwnerSceneFindIndex``(``index``: int) : NativeReference<EntityView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``index``)) |]
+            let response = this.InvokeBound(method_3e6435e350, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``OwnerSceneFindInstanceID_Unavailable`` =
-            NativeUnavailableMember("method", "Entity", "OwnerSceneFindInstanceID", "Entity *(const HashedGuid &)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native Entity *(const HashedGuid &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``OwnerSceneFindInstanceID``(``guid``: uint64) : NativeReference<EntityView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.UInt64).Encode(``guid``)) |]
+            let response = this.InvokeBound(method_192fa4c693, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``RebuildComponentTypeMask``() : unit =
@@ -282,13 +305,17 @@ module EntityViewMembers =
             let response = this.Invoke(method_9cf37ddf91, arguments)
             ()
 
-        /// Unavailable native method: return value: expected value/error: native type has no declared runtime value schema or explicit typed codec: ce::layers::error
-        member _.``SetLayer_081348_Unavailable`` =
-            NativeUnavailableMember("method", "Entity", "SetLayer", "ce::layers::result<void> (ce::layers::layer_id)", "return value: expected value/error: native type has no declared runtime value schema or explicit typed codec: ce::layers::error")
+        /// Native ce::layers::result<void> (ce::layers::layer_id); invoke uses the runtime's exact overload metadata.
+        member this.``SetLayer``(``layer``: ce_layers_layer_idView) : NativeExpected<unit, NativeEnumValue<ce_layers_errorTag>> =
+            let arguments = [| (NativeCodecs.View((fun value -> ce_layers_layer_idView(value)))).Encode(``layer``) |]
+            let response = this.Invoke(method_0813480a94, arguments)
+            (NativeCodecs.Expected(NativeCodecs.Unit, NativeCodecs.Enum<ce_layers_errorTag>("ce::layers::error"))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: expected value/error: native type has no declared runtime value schema or explicit typed codec: ce::layers::error
-        member _.``SetLayer_4c42df_Unavailable`` =
-            NativeUnavailableMember("method", "Entity", "SetLayer", "ce::layers::result<void> (std::string_view)", "return value: expected value/error: native type has no declared runtime value schema or explicit typed codec: ce::layers::error")
+        /// Native ce::layers::result<void> (std::string_view); invoke uses the runtime's exact overload metadata.
+        member this.``SetLayer``(``name``: string) : NativeExpected<unit, NativeEnumValue<ce_layers_errorTag>> =
+            let arguments = [| (NativeCodecs.String).Encode(``name``) |]
+            let response = this.Invoke(method_4c42df5352, arguments)
+            (NativeCodecs.Expected(NativeCodecs.Unit, NativeCodecs.Enum<ce_layers_errorTag>("ce::layers::error"))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (std::string_view); invoke uses the runtime's exact overload metadata.
         member this.``SetName``(``name``: string) : unit =

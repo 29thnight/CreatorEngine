@@ -8,6 +8,7 @@ open CreatorEngine
 [<AutoOpen>]
 module PrefabViewMembers =
     let private method_200d114d78 = NativeMethodSpec("Prefab", "GetFileGuid", true, [|  |], [|  |])
+    let private method_531e21998f = NativeMethodSpec("Prefab", "Instantiate", true, [| "Scene *"; "std::basic_string_view<char>" |], [| "value"; "value" |])
     let private method_2f2feb58c3 = NativeMethodSpec("Prefab", "Instantiate", true, [| "std::basic_string_view<char>" |], [| "value" |])
     let private method_02cebea092 = NativeMethodSpec("Prefab", "SetFileGuid", false, [| "FileGuid" |], [| "const_reference" |])
 
@@ -40,9 +41,11 @@ module PrefabViewMembers =
         member _.``GetPrefabData_Unavailable`` =
             NativeUnavailableMember("method", "Prefab", "GetPrefabData", "Authoring::ReadNode () const", "return value: native type has no declared runtime value schema or explicit typed codec: Authoring::ReadNode")
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``Instantiate_531e21_Unavailable`` =
-            NativeUnavailableMember("method", "Prefab", "Instantiate", "Entity *(Scene *, std::string_view) const", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native Entity *(Scene *, std::string_view) const; invoke_bound uses the runtime's exact overload metadata.
+        member this.``Instantiate``(``targetScene``: NativeReference<SceneView>, ``newName``: string) : NativeReference<EntityView> =
+            let arguments = [| ``targetScene``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.String).Encode(``newName``)) |]
+            let response = this.InvokeBound(method_531e21998f, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native Entity *(std::string_view) const; borrow uses the runtime's exact overload metadata.
         member this.``Instantiate``(``newName``: string) : NativeReference<EntityView> =

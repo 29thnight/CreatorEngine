@@ -9,6 +9,8 @@ open CreatorEngine
 module FoliageComponentViewMembers =
     let private method_38f3603d8a = NativeMethodSpec("FoliageComponent", "AddFoliageInstance", false, [| "FoliageInstance" |], [| "const_reference" |])
     let private method_50e23f3b66 = NativeMethodSpec("FoliageComponent", "AddFoliageType", false, [| "FoliageType" |], [| "const_reference" |])
+    let private method_e6abc2b4ac = NativeMethodSpec("FoliageComponent", "AddInstanceFromTerrain", false, [| "TerrainComponent *"; "FoliageInstance" |], [| "value"; "const_reference" |])
+    let private method_94db8eec31 = NativeMethodSpec("FoliageComponent", "AddRandomInstancesInBrush", false, [| "TerrainComponent *"; "TerrainBrush"; "unsigned int"; "int" |], [| "value"; "const_reference"; "value"; "value" |])
     let private method_e9d6c76f9e = NativeMethodSpec("FoliageComponent", "ConfigureCullingProbe", false, [| "bool" |], [| "value" |])
     let private method_ad87006da6 = NativeMethodSpec("FoliageComponent", "CullingCacheBytes", true, [|  |], [|  |])
     let private method_f7b5e601b1 = NativeMethodSpec("FoliageComponent", "CullingProbeFrameSamples", true, [|  |], [|  |])
@@ -22,6 +24,7 @@ module FoliageComponentViewMembers =
     let private method_757a69b8f8 = NativeMethodSpec("FoliageComponent", "RebindFoliageType", false, [| "unsigned int" |], [| "value" |])
     let private method_a1fddb6f47 = NativeMethodSpec("FoliageComponent", "RemoveFoliageInstance", false, [| "unsigned long long" |], [| "value" |])
     let private method_99d7f69719 = NativeMethodSpec("FoliageComponent", "RemoveFoliageType", false, [| "unsigned int" |], [| "value" |])
+    let private method_9ec8fed12c = NativeMethodSpec("FoliageComponent", "RemoveInstancesInBrush", false, [| "TerrainComponent *"; "TerrainBrush" |], [| "value"; "const_reference" |])
     let private method_3f0185b6e3 = NativeMethodSpec("FoliageComponent", "SaveFoliageAsset", false, [| "std::filesystem::path"; "std::basic_string<wchar_t>" |], [| "const_reference"; "const_reference" |])
     let private method_270c73b1a4 = NativeMethodSpec("FoliageComponent", "UpdateFoliageCullingData", false, [| "std::optional<math::bounding_frustum>" |], [| "const_reference" |])
     let private method_a69ab1e5a0 = NativeMethodSpec("FoliageComponent", "UpdateFoliageInstance", false, [| "unsigned long long"; "math::vector3"; "math::vector3"; "math::vector3" |], [| "value"; "const_reference"; "const_reference"; "const_reference" |])
@@ -53,13 +56,17 @@ module FoliageComponentViewMembers =
             let response = this.Invoke(method_50e23f3b66, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``AddInstanceFromTerrain_Unavailable`` =
-            NativeUnavailableMember("method", "FoliageComponent", "AddInstanceFromTerrain", "void (TerrainComponent *, const FoliageInstance &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (TerrainComponent *, const FoliageInstance &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AddInstanceFromTerrain``(``terrain``: NativeReference<TerrainComponentView>, ``instance``: FoliageInstanceView) : unit =
+            let arguments = [| ``terrain``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.View((fun value -> FoliageInstanceView(value)))).Encode(``instance``)) |]
+            let response = this.InvokeBound(method_e6abc2b4ac, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``AddRandomInstancesInBrush_Unavailable`` =
-            NativeUnavailableMember("method", "FoliageComponent", "AddRandomInstancesInBrush", "void (TerrainComponent *, const TerrainBrush &, uint32, int)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (TerrainComponent *, const TerrainBrush &, uint32, int); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AddRandomInstancesInBrush``(``terrain``: NativeReference<TerrainComponentView>, ``brush``: TerrainBrushView, ``typeID``: uint32, ``count``: int) : unit =
+            let arguments = [| ``terrain``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.View((fun value -> TerrainBrushView(value)))).Encode(``brush``)); NativeCallArgument.FromJson((NativeCodecs.UInt32).Encode(``typeID``)); NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``count``)) |]
+            let response = this.InvokeBound(method_94db8eec31, arguments, discardResult = true)
+            ()
 
         /// Native void (bool); invoke uses the runtime's exact overload metadata.
         member this.``ConfigureCullingProbe``(``cached``: bool) : unit =
@@ -159,9 +166,11 @@ module FoliageComponentViewMembers =
             let response = this.Invoke(method_99d7f69719, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``RemoveInstancesInBrush_Unavailable`` =
-            NativeUnavailableMember("method", "FoliageComponent", "RemoveInstancesInBrush", "void (TerrainComponent *, const TerrainBrush &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (TerrainComponent *, const TerrainBrush &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``RemoveInstancesInBrush``(``terrain``: NativeReference<TerrainComponentView>, ``brush``: TerrainBrushView) : unit =
+            let arguments = [| ``terrain``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.View((fun value -> TerrainBrushView(value)))).Encode(``brush``)) |]
+            let response = this.InvokeBound(method_9ec8fed12c, arguments, discardResult = true)
+            ()
 
         /// Native void (const std::filesystem::path &, const std::wstring &); invoke uses the runtime's exact overload metadata.
         member this.``SaveFoliageAsset``(``directory``: string, ``name``: string) : unit =

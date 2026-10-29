@@ -7,6 +7,7 @@ open CreatorEngine
 
 [<AutoOpen>]
 module experiment_VertexBufferViewMembers =
+    let private method_1a1b6584ae = NativeMethodSpec("experiment::VertexBuffer", "Append", false, [| "experiment::Vertex"; "const math::vector2 *"; "const math::vector4 *" |], [| "const_reference"; "value"; "value" |])
     let private method_8c813cb6f9 = NativeMethodSpec("experiment::VertexBuffer", "AssignPacked", false, [| "unsigned int"; "unsigned long long"; "std::span<const std::byte>" |], [| "value"; "value"; "value" |])
     let private method_2e21371a3a = NativeMethodSpec("experiment::VertexBuffer", "AttributeMask", true, [|  |], [|  |])
     let private method_c74074599b = NativeMethodSpec("experiment::VertexBuffer", "ByteSize", true, [|  |], [|  |])
@@ -28,9 +29,11 @@ module experiment_VertexBufferViewMembers =
         /// Construct an explicit read-only native wire snapshot for value arguments.
         static member FromJson(value: JsonElement) = experiment_VertexBufferView(NativeTypeView.FromSnapshot(value))
 
-        /// Unavailable native method: argument 1: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``Append_Unavailable`` =
-            NativeUnavailableMember("method", "experiment::VertexBuffer", "Append", "bool (const Vertex &, const math::vector2 *, const math::vector4 *)", "argument 1: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (const Vertex &, const math::vector2 *, const math::vector4 *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``Append``(``vertex``: experiment_VertexView, ``uv1``: NativeReference<math_vector2View>, ``color``: NativeReference<math_vector4View>) : bool =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.View((fun value -> experiment_VertexView(value)))).Encode(``vertex``)); ``uv1``.AsNativeArgument(); ``color``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_1a1b6584ae, arguments)
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native bool (VertexAttributeMask, std::size_t, std::span<const std::byte>); invoke uses the runtime's exact overload metadata.
         member this.``AssignPacked``(``attributes``: uint32, ``vertexCount``: uint64, ``bytes``: NativeArray<NativeEnumValue<std_byteTag>>) : bool =

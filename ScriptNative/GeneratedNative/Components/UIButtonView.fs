@@ -11,6 +11,8 @@ module UIButtonViewMembers =
     let private method_678947a9d5 = NativeMethodSpec("UIButton", "Click", false, [|  |], [|  |])
     let private method_5a333a9825 = NativeMethodSpec("UIButton", "ConsumeClicked", false, [|  |], [|  |])
     let private method_1c7c252264 = NativeMethodSpec("UIButton", "GetHitbox", true, [|  |], [|  |])
+    let private method_2960d95694 = NativeMethodSpec("UIButton", "SetClickFunction", false, [| "ce::func_detail::owning_func<void, false, true, false, 48, 8, ce::heap_allocator>" |], [| "value" |])
+    let private method_ff9a62307b = NativeMethodSpec("UIButton", "SetFunction", false, [| "std::basic_string<char>"; "float"; "ce::func_detail::owning_func<void, false, true, false, 48, 8, ce::heap_allocator>" |], [| "mutable_reference"; "value"; "value" |])
     let private method_013494f60d = NativeMethodSpec("UIButton", "TickInteraction", false, [| "float" |], [| "value" |])
     let private method_2f86b04322 = NativeMethodSpec("UIButton", "UpdateHitbox", false, [|  |], [|  |])
 
@@ -56,13 +58,18 @@ module UIButtonViewMembers =
         member _.``OnRemovingFromScene_Unavailable`` =
             NativeUnavailableMember("method", "UIButton", "OnRemovingFromScene", "void ()", "method is reserved for engine lifecycle, scheduling, or identity management")
 
-        /// Unavailable native method: argument 0: native callbacks require an explicit rooted callback ABI
-        member _.``SetClickFunction_Unavailable`` =
-            NativeUnavailableMember("method", "UIButton", "SetClickFunction", "void (ce::owned_func<void ()>)", "argument 0: native callbacks require an explicit rooted callback ABI")
+        /// Native void (ce::owned_func<void ()>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``SetClickFunction``(``func``: NativeCallback<unit>) : unit =
+            let arguments = [| NativeCallArgument.FromCallback(``func``.Token) |]
+            let response = this.InvokeBound(method_2960d95694, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 2: native callbacks require an explicit rooted callback ABI
-        member _.``SetFunction_Unavailable`` =
-            NativeUnavailableMember("method", "UIButton", "SetFunction", "void (std::string &, float, ce::owned_func<void ()>)", "argument 2: native callbacks require an explicit rooted callback ABI")
+        /// Native void (std::string &, float, ce::owned_func<void ()>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``SetFunction``(``funName``: byref<string>, ``key``: single, ``func``: NativeCallback<unit>) : unit =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``funName``)); NativeCallArgument.FromJson((NativeCodecs.Single).Encode(``key``)); NativeCallArgument.FromCallback(``func``.Token) |]
+            let response = this.InvokeBound(method_ff9a62307b, arguments, discardResult = true)
+            ``funName`` <- (NativeCodecs.String).Decode(NativeTypeView.FromSnapshot(response.Arguments.[0]))
+            ()
 
         /// Native void (float); invoke uses the runtime's exact overload metadata.
         member this.``TickInteraction``(``deltaSecond``: single) : unit =

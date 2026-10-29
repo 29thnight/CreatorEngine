@@ -333,6 +333,26 @@ module RHIAddressModeValues =
     let FromInt64(value: int64) = NativeEnumValue<RHIAddressModeTag>.FromInt64("RHIAddressMode", value)
     let FromUInt64(value: uint64) = NativeEnumValue<RHIAddressModeTag>.FromUInt64("RHIAddressMode", value)
 
+/// Nominal tag for native enumeration RHIBindingDesc::Dim; the provider validates names and integer values.
+[<Sealed>]
+type RHIBindingDesc_DimTag private () = class end
+
+[<RequireQualifiedAccess>]
+module RHIBindingDesc_DimValues =
+    let FromName(value: string) = NativeEnumValue<RHIBindingDesc_DimTag>.FromName("RHIBindingDesc::Dim", value)
+    let FromInt64(value: int64) = NativeEnumValue<RHIBindingDesc_DimTag>.FromInt64("RHIBindingDesc::Dim", value)
+    let FromUInt64(value: uint64) = NativeEnumValue<RHIBindingDesc_DimTag>.FromUInt64("RHIBindingDesc::Dim", value)
+
+/// Nominal tag for native enumeration RHIBindingDesc::Kind; the provider validates names and integer values.
+[<Sealed>]
+type RHIBindingDesc_KindTag private () = class end
+
+[<RequireQualifiedAccess>]
+module RHIBindingDesc_KindValues =
+    let FromName(value: string) = NativeEnumValue<RHIBindingDesc_KindTag>.FromName("RHIBindingDesc::Kind", value)
+    let FromInt64(value: int64) = NativeEnumValue<RHIBindingDesc_KindTag>.FromInt64("RHIBindingDesc::Kind", value)
+    let FromUInt64(value: uint64) = NativeEnumValue<RHIBindingDesc_KindTag>.FromUInt64("RHIBindingDesc::Kind", value)
+
 /// Nominal tag for native enumeration RHIBorderColor; the provider validates names and integer values.
 [<Sealed>]
 type RHIBorderColorTag private () = class end
@@ -653,6 +673,16 @@ module assets_ModelTextureColorSpaceValues =
     let FromInt64(value: int64) = NativeEnumValue<assets_ModelTextureColorSpaceTag>.FromInt64("assets::ModelTextureColorSpace", value)
     let FromUInt64(value: uint64) = NativeEnumValue<assets_ModelTextureColorSpaceTag>.FromUInt64("assets::ModelTextureColorSpace", value)
 
+/// Nominal tag for native enumeration ce::layers::error; the provider validates names and integer values.
+[<Sealed>]
+type ce_layers_errorTag private () = class end
+
+[<RequireQualifiedAccess>]
+module ce_layers_errorValues =
+    let FromName(value: string) = NativeEnumValue<ce_layers_errorTag>.FromName("ce::layers::error", value)
+    let FromInt64(value: int64) = NativeEnumValue<ce_layers_errorTag>.FromInt64("ce::layers::error", value)
+    let FromUInt64(value: uint64) = NativeEnumValue<ce_layers_errorTag>.FromUInt64("ce::layers::error", value)
+
 /// Nominal tag for native enumeration ce::physics::axis_lock; the provider validates names and integer values.
 [<Sealed>]
 type ce_physics_axis_lockTag private () = class end
@@ -832,6 +862,16 @@ module wave_PlaybackEndReasonValues =
     let FromName(value: string) = NativeEnumValue<wave_PlaybackEndReasonTag>.FromName("wave::PlaybackEndReason", value)
     let FromInt64(value: int64) = NativeEnumValue<wave_PlaybackEndReasonTag>.FromInt64("wave::PlaybackEndReason", value)
     let FromUInt64(value: uint64) = NativeEnumValue<wave_PlaybackEndReasonTag>.FromUInt64("wave::PlaybackEndReason", value)
+
+/// Nominal tag for native enumeration wave::RolloffKind; the provider validates names and integer values.
+[<Sealed>]
+type wave_RolloffKindTag private () = class end
+
+[<RequireQualifiedAccess>]
+module wave_RolloffKindValues =
+    let FromName(value: string) = NativeEnumValue<wave_RolloffKindTag>.FromName("wave::RolloffKind", value)
+    let FromInt64(value: int64) = NativeEnumValue<wave_RolloffKindTag>.FromInt64("wave::RolloffKind", value)
+    let FromUInt64(value: uint64) = NativeEnumValue<wave_RolloffKindTag>.FromUInt64("wave::RolloffKind", value)
 
 /// Nominal tag for native enumeration wave::SoundSourceKind; the provider validates names and integer values.
 [<Sealed>]

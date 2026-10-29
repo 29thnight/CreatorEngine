@@ -7,10 +7,13 @@ open CreatorEngine
 
 [<AutoOpen>]
 module MeshRendererViewMembers =
+    let private method_5a13678e4f = NativeMethodSpec("MeshRenderer", "BindMeshDescriptor", false, [| "own::shared_owner<const assets::ModelMeshDescriptor>" |], [| "value" |])
+    let private method_73855b390d = NativeMethodSpec("MeshRenderer", "BindModelGeneration", false, [| "own::shared_owner<const assets::ModelAssetGeneration>"; "unsigned int" |], [| "value"; "value" |])
     let private method_da3d59660a = NativeMethodSpec("MeshRenderer", "EnsureMeshBinding", false, [|  |], [|  |])
     let private method_33f774988f = NativeMethodSpec("MeshRenderer", "GetBoundingBox", true, [|  |], [|  |])
     let private method_fe6fc899c8 = NativeMethodSpec("MeshRenderer", "GetBoundingBox", true, [| "math::matrix4x4" |], [| "const_reference" |])
     let private method_0e270f2c38 = NativeMethodSpec("MeshRenderer", "GetMaterialAssetBase", true, [|  |], [|  |])
+    let private method_10c3b8f887 = NativeMethodSpec("MeshRenderer", "GetMaterialAssetReferenceState", true, [|  |], [|  |])
     let private method_660fca0beb = NativeMethodSpec("MeshRenderer", "GetMaterialInstance", true, [|  |], [|  |])
     let private method_a418b88c08 = NativeMethodSpec("MeshRenderer", "GetModelMeshHandle", true, [|  |], [|  |])
     let private method_3c173948e0 = NativeMethodSpec("MeshRenderer", "HasModelGeneration", true, [|  |], [|  |])
@@ -18,7 +21,11 @@ module MeshRendererViewMembers =
     let private method_34fdc81343 = NativeMethodSpec("MeshRenderer", "IsNeedUpdateCulling", true, [|  |], [|  |])
     let private method_fb2ddd071d = NativeMethodSpec("MeshRenderer", "IsSkinnedMesh", true, [|  |], [|  |])
     let private method_35db2964fb = NativeMethodSpec("MeshRenderer", "RefreshMaterialAsset", false, [|  |], [|  |])
+    let private method_280af2abb9 = NativeMethodSpec("MeshRenderer", "RefreshModelGeneration", false, [| "own::shared_owner<const assets::ModelAssetGeneration>" |], [| "value" |])
+    let private method_6627699f04 = NativeMethodSpec("MeshRenderer", "SetExperimentMaterialBase", false, [| "own::shared_owner<const experiment::Material>" |], [| "value" |])
     let private method_586527d1d9 = NativeMethodSpec("MeshRenderer", "SetLODEnabled", false, [| "bool" |], [| "value" |])
+    let private method_5b59abc604 = NativeMethodSpec("MeshRenderer", "SetMaterial", false, [| "own::shared_owner<Material>" |], [| "value" |])
+    let private method_54079abbd9 = NativeMethodSpec("MeshRenderer", "SetMaterialAssetReference", false, [| "own::shared_owner<Material>"; "FileGuid"; "own::shared_owner<const Material>"; "own::shared_owner<const MaterialAssetReferenceState>" |], [| "value"; "value"; "value"; "value" |])
     let private method_b5aead4345 = NativeMethodSpec("MeshRenderer", "SetNeedUpdateCulling", false, [| "bool" |], [| "value" |])
     let private method_f72f05a45c = NativeMethodSpec("MeshRenderer", "SetSkinnedMesh", false, [| "bool" |], [| "value" |])
 
@@ -73,13 +80,17 @@ module MeshRendererViewMembers =
             with get () : System.Guid = this.Field("m_meshAssetId", "m_meshAssetId").Read(NativeCodecs.Guid)
             and set (value: System.Guid) = this.Field("m_meshAssetId", "m_meshAssetId").Write(NativeCodecs.Guid, value)
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``BindMeshDescriptor_Unavailable`` =
-            NativeUnavailableMember("method", "MeshRenderer", "BindMeshDescriptor", "bool (own::shared_owner<const assets::ModelMeshDescriptor>)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (own::shared_owner<const assets::ModelMeshDescriptor>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``BindMeshDescriptor``(``descriptor``: NativeReference<assets_ModelMeshDescriptorView>) : bool =
+            let arguments = [| ``descriptor``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_5a13678e4f, arguments)
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``BindModelGeneration_Unavailable`` =
-            NativeUnavailableMember("method", "MeshRenderer", "BindModelGeneration", "bool (own::shared_owner<const assets::ModelAssetGeneration>, std::uint32_t)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (own::shared_owner<const assets::ModelAssetGeneration>, std::uint32_t); invoke_bound uses the runtime's exact overload metadata.
+        member this.``BindModelGeneration``(``generation``: NativeReference<assets_ModelAssetGenerationView>, ``meshIndex``: uint32) : bool =
+            let arguments = [| ``generation``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.UInt32).Encode(``meshIndex``)) |]
+            let response = this.InvokeBound(method_73855b390d, arguments)
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``EnsureMeshBinding``() : unit =
@@ -105,9 +116,11 @@ module MeshRendererViewMembers =
             let value = this.Borrow(method_0e270f2c38, arguments)
             (NativeCodecs.Reference(NativeCodecs.View((fun value -> MaterialView(value))))).Decode(value)
 
-        /// Unavailable native method: return value: owner pointee: native type has no declared runtime value schema or explicit typed codec: MaterialAssetReferenceState
-        member _.``GetMaterialAssetReferenceState_Unavailable`` =
-            NativeUnavailableMember("method", "MeshRenderer", "GetMaterialAssetReferenceState", "const own::shared_owner<const MaterialAssetReferenceState> &() const", "return value: owner pointee: native type has no declared runtime value schema or explicit typed codec: MaterialAssetReferenceState")
+        /// Native const own::shared_owner<const MaterialAssetReferenceState> &() const; borrow uses the runtime's exact overload metadata.
+        member this.``GetMaterialAssetReferenceState``() : NativeReference<MaterialAssetReferenceStateView> =
+            let arguments = [|  |]
+            let value = this.Borrow(method_10c3b8f887, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> MaterialAssetReferenceStateView(value))))).Decode(value)
 
         /// Native experiment::MaterialInstance *() const; borrow uses the runtime's exact overload metadata.
         member this.``GetMaterialInstance``() : NativeReference<experiment_MaterialInstanceView> =
@@ -175,13 +188,17 @@ module MeshRendererViewMembers =
             let response = this.Invoke(method_35db2964fb, arguments)
             (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``RefreshModelGeneration_Unavailable`` =
-            NativeUnavailableMember("method", "MeshRenderer", "RefreshModelGeneration", "bool (own::shared_owner<const assets::ModelAssetGeneration>)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (own::shared_owner<const assets::ModelAssetGeneration>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``RefreshModelGeneration``(``generation``: NativeReference<assets_ModelAssetGenerationView>) : bool =
+            let arguments = [| ``generation``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_280af2abb9, arguments)
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``SetExperimentMaterialBase_Unavailable`` =
-            NativeUnavailableMember("method", "MeshRenderer", "SetExperimentMaterialBase", "void (own::shared_owner<const experiment::Material>)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (own::shared_owner<const experiment::Material>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``SetExperimentMaterialBase``(``base``: NativeReference<experiment_MaterialView>) : unit =
+            let arguments = [| ``base``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_6627699f04, arguments, discardResult = true)
+            ()
 
         /// Native void (bool); invoke uses the runtime's exact overload metadata.
         member this.``SetLODEnabled``(``enabled``: bool) : unit =
@@ -189,13 +206,17 @@ module MeshRendererViewMembers =
             let response = this.Invoke(method_586527d1d9, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``SetMaterial_Unavailable`` =
-            NativeUnavailableMember("method", "MeshRenderer", "SetMaterial", "void (own::shared_owner<Material>)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (own::shared_owner<Material>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``SetMaterial``(``material``: NativeReference<MaterialView>) : unit =
+            let arguments = [| ``material``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_5b59abc604, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``SetMaterialAssetReference_Unavailable`` =
-            NativeUnavailableMember("method", "MeshRenderer", "SetMaterialAssetReference", "void (own::shared_owner<Material>, FileGuid, own::shared_owner<const Material>, own::shared_owner<const MaterialAssetReferenceState>)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (own::shared_owner<Material>, FileGuid, own::shared_owner<const Material>, own::shared_owner<const MaterialAssetReferenceState>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``SetMaterialAssetReference``(``material``: NativeReference<MaterialView>, ``baseGuid``: System.Guid, ``acceptedBase``: NativeReference<MaterialView>, ``referenceState``: NativeReference<MaterialAssetReferenceStateView>) : unit =
+            let arguments = [| ``material``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.Guid).Encode(``baseGuid``)); ``acceptedBase``.AsNativeArgument(); ``referenceState``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_54079abbd9, arguments, discardResult = true)
+            ()
 
         /// Native void (bool); invoke uses the runtime's exact overload metadata.
         member this.``SetNeedUpdateCulling``(``able``: bool) : unit =

@@ -7,12 +7,14 @@ open CreatorEngine
 
 [<AutoOpen>]
 module CanvasViewMembers =
+    let private method_b96afc3702 = NativeMethodSpec("Canvas", "AddUIObject", false, [| "Entity *" |], [| "value" |])
     let private method_2c2cf88bde = NativeMethodSpec("Canvas", "ComputeScaleFactor", true, [| "math::rect" |], [| "const_reference" |])
     let private method_00c71e3eb7 = NativeMethodSpec("Canvas", "GetCanvasName", true, [|  |], [|  |])
     let private method_9ae072c492 = NativeMethodSpec("Canvas", "GetCanvasOrder", true, [|  |], [|  |])
     let private method_f0a4b05a59 = NativeMethodSpec("Canvas", "GetFrontUIObject", false, [|  |], [|  |])
     let private method_eb55e18824 = NativeMethodSpec("Canvas", "GetPlaneDistance", true, [|  |], [|  |])
     let private method_a72c48cc43 = NativeMethodSpec("Canvas", "GetRenderMode", true, [|  |], [|  |])
+    let private method_9101de651a = NativeMethodSpec("Canvas", "RemoveUIObject", false, [| "Entity *" |], [| "value" |])
     let private method_fb4bd828e6 = NativeMethodSpec("Canvas", "SetCanvasName", false, [| "std::basic_string_view<char>" |], [| "value" |])
     let private method_2d33ae3925 = NativeMethodSpec("Canvas", "SetCanvasOrder", false, [| "int" |], [| "value" |])
     let private method_c36d680ba8 = NativeMethodSpec("Canvas", "TickCanvasOrder", false, [| "float" |], [| "value" |])
@@ -65,9 +67,11 @@ module CanvasViewMembers =
             with get () : string = this.Field("CanvasName", "CanvasName").Read(NativeCodecs.String)
             and set (value: string) = this.Field("CanvasName", "CanvasName").Write(NativeCodecs.String, value)
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``AddUIObject_Unavailable`` =
-            NativeUnavailableMember("method", "Canvas", "AddUIObject", "void (Entity *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Entity *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AddUIObject``(``obj``: NativeReference<EntityView>) : unit =
+            let arguments = [| ``obj``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_b96afc3702, arguments, discardResult = true)
+            ()
 
         /// Native float (const math::rect &) const; invoke uses the runtime's exact overload metadata.
         member this.``ComputeScaleFactor``(``screenRect``: math_rectView) : single =
@@ -125,9 +129,11 @@ module CanvasViewMembers =
         member _.``OnUninitializing_Unavailable`` =
             NativeUnavailableMember("method", "Canvas", "OnUninitializing", "void ()", "method is reserved for engine lifecycle, scheduling, or identity management")
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``RemoveUIObject_Unavailable`` =
-            NativeUnavailableMember("method", "Canvas", "RemoveUIObject", "void (Entity *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Entity *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``RemoveUIObject``(``obj``: NativeReference<EntityView>) : unit =
+            let arguments = [| ``obj``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_9101de651a, arguments, discardResult = true)
+            ()
 
         /// Native void (std::string_view); invoke uses the runtime's exact overload metadata.
         member this.``SetCanvasName``(``name``: string) : unit =

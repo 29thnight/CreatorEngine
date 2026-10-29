@@ -11,6 +11,9 @@ module TerrainMeshViewMembers =
     let private method_2cc0283613 = NativeMethodSpec("TerrainMesh", "GetMeshWidth", true, [|  |], [|  |])
     let private method_fa86e68d3f = NativeMethodSpec("TerrainMesh", "GetName", true, [|  |], [|  |])
     let private method_6b9e9f9f63 = NativeMethodSpec("TerrainMesh", "GetRevision", true, [|  |], [|  |])
+    let private method_350e7d1b37 = NativeMethodSpec("TerrainMesh", "GetVertices", true, [|  |], [|  |])
+    let private method_936b2c1189 = NativeMethodSpec("TerrainMesh", "UpdateVertexBuffer", false, [| "const Vertex *"; "unsigned int" |], [| "value"; "value" |])
+    let private method_06a788a209 = NativeMethodSpec("TerrainMesh", "UpdateVertexBufferPatch", false, [| "const Vertex *"; "unsigned int"; "unsigned int"; "unsigned int"; "unsigned int" |], [| "value"; "value"; "value"; "value"; "value" |])
 
     type TerrainMeshView with
         /// Typed native value codec for collection construction and explicit value arguments.
@@ -43,14 +46,20 @@ module TerrainMeshViewMembers =
             let response = this.Invoke(method_6b9e9f9f63, arguments)
             (NativeCodecs.UInt32).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: sequence element: native type has no declared runtime value schema or explicit typed codec: Vertex
-        member _.``GetVertices_Unavailable`` =
-            NativeUnavailableMember("method", "TerrainMesh", "GetVertices", "const ce::dynamic_array<Vertex> &() const", "return value: sequence element: native type has no declared runtime value schema or explicit typed codec: Vertex")
+        /// Native const ce::dynamic_array<Vertex> &() const; borrow uses the runtime's exact overload metadata.
+        member this.``GetVertices``() : NativeArray<VertexView> =
+            let arguments = [|  |]
+            let value = this.Borrow(method_350e7d1b37, arguments)
+            (NativeCodecs.Array(NativeCodecs.View((fun value -> VertexView(value))))).Decode(value)
 
-        /// Unavailable native method: argument 0: raw pointer has no bounded, retained record borrow contract
-        member _.``UpdateVertexBuffer_Unavailable`` =
-            NativeUnavailableMember("method", "TerrainMesh", "UpdateVertexBuffer", "void (const Vertex *, uint32_t)", "argument 0: raw pointer has no bounded, retained record borrow contract")
+        /// Native void (const Vertex *, uint32_t); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UpdateVertexBuffer``(``srcVertices``: NativeReference<VertexView>, ``vertexCount``: uint32) : unit =
+            let arguments = [| ``srcVertices``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.UInt32).Encode(``vertexCount``)) |]
+            let response = this.InvokeBound(method_936b2c1189, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: raw pointer has no bounded, retained record borrow contract
-        member _.``UpdateVertexBufferPatch_Unavailable`` =
-            NativeUnavailableMember("method", "TerrainMesh", "UpdateVertexBufferPatch", "void (const Vertex *, uint32_t, uint32_t, uint32_t, uint32_t)", "argument 0: raw pointer has no bounded, retained record borrow contract")
+        /// Native void (const Vertex *, uint32_t, uint32_t, uint32_t, uint32_t); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UpdateVertexBufferPatch``(``src``: NativeReference<VertexView>, ``offsetX``: uint32, ``offsetY``: uint32, ``patchW``: uint32, ``patchH``: uint32) : unit =
+            let arguments = [| ``src``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.UInt32).Encode(``offsetX``)); NativeCallArgument.FromJson((NativeCodecs.UInt32).Encode(``offsetY``)); NativeCallArgument.FromJson((NativeCodecs.UInt32).Encode(``patchW``)); NativeCallArgument.FromJson((NativeCodecs.UInt32).Encode(``patchH``)) |]
+            let response = this.InvokeBound(method_06a788a209, arguments, discardResult = true)
+            ()

@@ -10,10 +10,13 @@ module AnimationControllerViewMembers =
     let private method_f51109dc04 = NativeMethodSpec("AnimationController", "BlendingAnimation", false, [| "float" |], [| "value" |])
     let private method_dcb298d136 = NativeMethodSpec("AnimationController", "CheckTransition", false, [|  |], [|  |])
     let private method_c5d9670ff2 = NativeMethodSpec("AnimationController", "CreateMask", false, [|  |], [|  |])
+    let private method_2a085ec335 = NativeMethodSpec("AnimationController", "CreateState", false, [| "std::basic_string<char>"; "int"; "bool" |], [| "const_reference"; "value"; "value" |])
     let private method_187b734d03 = NativeMethodSpec("AnimationController", "CreateState_UI", false, [|  |], [|  |])
+    let private method_455dce6bf4 = NativeMethodSpec("AnimationController", "CreateTransition", false, [| "std::basic_string<char>"; "std::basic_string<char>" |], [| "const_reference"; "const_reference" |])
     let private method_beb752db0e = NativeMethodSpec("AnimationController", "DeleteAvatarMask", false, [|  |], [|  |])
     let private method_5fb324a31b = NativeMethodSpec("AnimationController", "DeleteState", false, [| "std::basic_string<char>" |], [| "value" |])
     let private method_609aa108cc = NativeMethodSpec("AnimationController", "DeleteTransiton", false, [| "std::basic_string<char>"; "std::basic_string<char>" |], [| "const_reference"; "const_reference" |])
+    let private method_ecd1e080ec = NativeMethodSpec("AnimationController", "FindState", false, [| "std::basic_string<char>" |], [| "value" |])
     let private method_9c41c2605b = NativeMethodSpec("AnimationController", "GetAniState", false, [|  |], [|  |])
     let private method_f819c0fcaf = NativeMethodSpec("AnimationController", "GetAnimationIndex", true, [|  |], [|  |])
     let private method_5407d543d2 = NativeMethodSpec("AnimationController", "GetAnimatonIndexformState", false, [| "std::basic_string<char>" |], [| "value" |])
@@ -27,6 +30,7 @@ module AnimationControllerViewMembers =
     let private method_8750b5c8b4 = NativeMethodSpec("AnimationController", "IsBlending", true, [|  |], [|  |])
     let private method_2c4ca69244 = NativeMethodSpec("AnimationController", "IsUseLayer", false, [|  |], [|  |])
     let private method_98a2d2a26e = NativeMethodSpec("AnimationController", "MarkAnimationEnded", false, [|  |], [|  |])
+    let private method_1903e457e0 = NativeMethodSpec("AnimationController", "ReCreateMask", false, [| "AvatarMask *" |], [| "value" |])
     let private method_5aa7e0a599 = NativeMethodSpec("AnimationController", "SetCurState", false, [| "std::basic_string<char>" |], [| "value" |])
     let private method_51b2efe46a = NativeMethodSpec("AnimationController", "SetNextState", false, [| "std::basic_string<char>" |], [| "value" |])
     let private method_ed37dccbcf = NativeMethodSpec("AnimationController", "SetUseLayer", false, [| "bool" |], [| "value" |])
@@ -118,9 +122,11 @@ module AnimationControllerViewMembers =
             let response = this.Invoke(method_c5d9670ff2, arguments)
             ()
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``CreateState_Unavailable`` =
-            NativeUnavailableMember("method", "AnimationController", "CreateState", "AnimationState *(const std::string &, int, bool)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native AnimationState *(const std::string &, int, bool); invoke_bound uses the runtime's exact overload metadata.
+        member this.``CreateState``(``stateName``: string, ``animationIndex``: int, ``isAny``: bool) : NativeReference<AnimationStateView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``stateName``)); NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``animationIndex``)); NativeCallArgument.FromJson((NativeCodecs.Bool).Encode(``isAny``)) |]
+            let response = this.InvokeBound(method_2a085ec335, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> AnimationStateView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native own::shared_owner<AnimationState> (); borrow uses the runtime's exact overload metadata.
         member this.``CreateState_UI``() : NativeReference<AnimationStateView> =
@@ -128,9 +134,11 @@ module AnimationControllerViewMembers =
             let value = this.Borrow(method_187b734d03, arguments)
             (NativeCodecs.Reference(NativeCodecs.View((fun value -> AnimationStateView(value))))).Decode(value)
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``CreateTransition_Unavailable`` =
-            NativeUnavailableMember("method", "AnimationController", "CreateTransition", "AniTransition *(const std::string &, const std::string &)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native AniTransition *(const std::string &, const std::string &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``CreateTransition``(``curStateName``: string, ``nextStateName``: string) : NativeReference<AniTransitionView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``curStateName``)); NativeCallArgument.FromJson((NativeCodecs.String).Encode(``nextStateName``)) |]
+            let response = this.InvokeBound(method_455dce6bf4, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> AniTransitionView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``DeleteAvatarMask``() : unit =
@@ -150,9 +158,11 @@ module AnimationControllerViewMembers =
             let response = this.Invoke(method_609aa108cc, arguments)
             ()
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``FindState_Unavailable`` =
-            NativeUnavailableMember("method", "AnimationController", "FindState", "AnimationState *(std::string)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native AnimationState *(std::string); invoke_bound uses the runtime's exact overload metadata.
+        member this.``FindState``(``stateName``: string) : NativeReference<AnimationStateView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``stateName``)) |]
+            let response = this.InvokeBound(method_ecd1e080ec, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> AnimationStateView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native own::shared_owner<AnimationState> (); borrow uses the runtime's exact overload metadata.
         member this.``GetAniState``() : NativeReference<AnimationStateView> =
@@ -236,9 +246,11 @@ module AnimationControllerViewMembers =
         member _.``OnBeforeSerialize_Unavailable`` =
             NativeUnavailableMember("method", "AnimationController", "OnBeforeSerialize", "void ()", "method is reserved for engine lifecycle, scheduling, or identity management")
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``ReCreateMask_Unavailable`` =
-            NativeUnavailableMember("method", "AnimationController", "ReCreateMask", "void (AvatarMask *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (AvatarMask *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``ReCreateMask``(``mask``: NativeReference<AvatarMaskView>) : unit =
+            let arguments = [| ``mask``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_1903e457e0, arguments, discardResult = true)
+            ()
 
         /// Native void (std::string); invoke uses the runtime's exact overload metadata.
         member this.``SetCurState``(``stateName``: string) : unit =

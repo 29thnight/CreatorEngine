@@ -18,7 +18,6 @@ module TextureImageViewMembers =
     let private method_c1f5585ac3 = NativeMethodSpec("TextureImage", "TotalBytes", true, [|  |], [|  |])
     let private method_9ad0d8fe21 = NativeMethodSpec("TextureImage", "View", true, [|  |], [|  |])
     let private method_8a5b60b516 = NativeMethodSpec("TextureImage", "Width", true, [|  |], [|  |])
-    let private method_a9005e75fb = NativeMethodSpec("TextureImage", "operator=", false, [| "TextureImage" |], [| "rvalue_reference" |])
 
     type TextureImageView with
         /// Typed native value codec for collection construction and explicit value arguments.
@@ -97,8 +96,6 @@ module TextureImageViewMembers =
             let response = this.Invoke(method_8a5b60b516, arguments)
             (NativeCodecs.UInt32).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Native TextureImage &(TextureImage &&) noexcept; invoke uses the runtime's exact overload metadata.
-        member this.``operator=``(``argument0``: TextureImageView) : TextureImageView =
-            let arguments = [| (NativeCodecs.View((fun value -> TextureImageView(value)))).Encode(``argument0``) |]
-            let response = this.Invoke(method_a9005e75fb, arguments)
-            (NativeCodecs.View((fun value -> TextureImageView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
+        /// Unavailable native method: argument 0: native ownership transfer requires an explicit consuming API
+        member _.``operator=_Unavailable`` =
+            NativeUnavailableMember("method", "TextureImage", "operator=", "TextureImage &(TextureImage &&) noexcept", "argument 0: native ownership transfer requires an explicit consuming API")

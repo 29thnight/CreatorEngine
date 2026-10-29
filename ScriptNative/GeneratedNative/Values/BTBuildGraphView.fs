@@ -7,8 +7,10 @@ open CreatorEngine
 
 [<AutoOpen>]
 module BTBuildGraphViewMembers =
+    let private method_d15743a517 = NativeMethodSpec("BTBuildGraph", "AddChildNode", false, [| "BTBuildNode *" |], [| "value" |])
     let private method_a584ab57d3 = NativeMethodSpec("BTBuildGraph", "CleanUp", false, [|  |], [|  |])
     let private method_c02133eba7 = NativeMethodSpec("BTBuildGraph", "Clear", false, [|  |], [|  |])
+    let private method_88ed325b5f = NativeMethodSpec("BTBuildGraph", "CreateNode", false, [| "BehaviorNodeType"; "std::basic_string_view<char>"; "math::vector2" |], [| "value"; "value"; "value" |])
     let private method_7f89f0ec42 = NativeMethodSpec("BTBuildGraph", "DeleteNode", false, [| "HashedGuid" |], [| "const_reference" |])
     let private method_595a8d5c63 = NativeMethodSpec("BTBuildGraph", "GetRegisteredKey", true, [|  |], [|  |])
     let private method_a82653f0c8 = NativeMethodSpec("BTBuildGraph", "GetRootID", true, [|  |], [|  |])
@@ -24,9 +26,11 @@ module BTBuildGraphViewMembers =
         /// Native field BTBuildGraph::NodeList.
         member this.``NodeList`` : NativeArray<BTBuildNodeView> = this.Field("NodeList", "NodeList").Read(NativeCodecs.Array(NativeCodecs.View((fun value -> BTBuildNodeView(value)))))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``AddChildNode_Unavailable`` =
-            NativeUnavailableMember("method", "BTBuildGraph", "AddChildNode", "void (BTBuildNode *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (BTBuildNode *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AddChildNode``(``childNode``: NativeReference<BTBuildNodeView>) : unit =
+            let arguments = [| ``childNode``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_d15743a517, arguments, discardResult = true)
+            ()
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``CleanUp``() : unit =
@@ -40,9 +44,11 @@ module BTBuildGraphViewMembers =
             let response = this.Invoke(method_c02133eba7, arguments)
             ()
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``CreateNode_Unavailable`` =
-            NativeUnavailableMember("method", "BTBuildGraph", "CreateNode", "BTBuildNode *(const BehaviorNodeType, std::string_view, math::vector2)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native BTBuildNode *(const BehaviorNodeType, std::string_view, math::vector2); invoke_bound uses the runtime's exact overload metadata.
+        member this.``CreateNode``(``type``: NativeEnumValue<BehaviorNodeTypeTag>, ``name``: string, ``pos``: math_vector2View) : NativeReference<BTBuildNodeView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.Enum<BehaviorNodeTypeTag>("BehaviorNodeType")).Encode(``type``)); NativeCallArgument.FromJson((NativeCodecs.String).Encode(``name``)); NativeCallArgument.FromJson((NativeCodecs.View((fun value -> math_vector2View(value)))).Encode(``pos``)) |]
+            let response = this.InvokeBound(method_88ed325b5f, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> BTBuildNodeView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (const HashedGuid &); invoke uses the runtime's exact overload metadata.
         member this.``DeleteNode``(``id``: uint64) : unit =

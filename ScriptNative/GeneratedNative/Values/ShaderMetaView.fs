@@ -8,6 +8,7 @@ open CreatorEngine
 [<AutoOpen>]
 module ShaderMetaViewMembers =
     let private method_733c78ec3f = NativeMethodSpec("ShaderMeta", "ResolveSource", true, [| "std::filesystem::path" |], [| "const_reference" |])
+    let private method_9cec4bc37e = NativeMethodSpec("ShaderMeta", "operator==", true, [| "ShaderMeta" |], [| "const_reference" |])
 
     type ShaderMetaView with
         /// Typed native value codec for collection construction and explicit value arguments.
@@ -112,6 +113,8 @@ module ShaderMetaViewMembers =
             let response = this.Invoke(method_733c78ec3f, arguments)
             (NativeCodecs.String).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``operator==_Unavailable`` =
-            NativeUnavailableMember("method", "ShaderMeta", "operator==", "bool (const ShaderMeta &) const", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (const ShaderMeta &) const; invoke_bound uses the runtime's exact overload metadata.
+        member this.``operator==``(``other``: ShaderMetaView) : bool =
+            let arguments = [| ``other``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_9cec4bc37e, arguments)
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))

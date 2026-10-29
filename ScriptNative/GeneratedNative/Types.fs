@@ -72,8 +72,24 @@ type AnimatorClipOverrideView internal (source: NativeTypeView) =
 type AnimatorPlaybackControlView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
+/// Typed live path or read-only snapshot of native AnimatorPoseUploadMetrics.
+type AnimatorPoseUploadMetricsView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
 /// Typed live path or read-only snapshot of native AssetBundle.
 type AssetBundleView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native AssetDepot::AssetLink<Material>.
+type AssetDepot_AssetLink_MaterialView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native AssetDepot::AssetLink<assets::ModelAnimationDescriptor>.
+type AssetDepot_AssetLink_assets_ModelAnimationDescriptorView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native AssetDepot::AssetLink<assets::ModelMeshDescriptor>.
+type AssetDepot_AssetLink_assets_ModelMeshDescriptorView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
 /// Typed live path or read-only snapshot of native AssetDepot::AssetMountId.
@@ -144,6 +160,10 @@ type BTBuildGraphView internal (source: NativeTypeView) =
 type BTBuildNodeView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
+/// Typed live path or read-only snapshot of native BasicTweenManager<Scene>.
+type BasicTweenManager_SceneView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
 /// Typed live path or read-only snapshot of native BehaviorTreeComponent.
 type BehaviorTreeComponentView internal (source: NativeTypeView) =
     inherit ComponentView(source)
@@ -184,6 +204,10 @@ type CameraView internal (source: NativeTypeView) =
 type CameraComponentView internal (source: NativeTypeView) =
     inherit ComponentView(source)
 
+/// Typed live path or read-only snapshot of native CameraSystem.
+type CameraSystemView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
 /// Typed live path or read-only snapshot of native Canvas.
 type CanvasView internal (source: NativeTypeView) =
     inherit ComponentView(source)
@@ -204,6 +228,10 @@ type ConditionParameterView internal (source: NativeTypeView) =
 type ControllerPlaybackView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
+/// Typed live path or read-only snapshot of native Core::Sizef.
+type Core_SizefView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
 /// Typed live path or read-only snapshot of native CurvePoint.
 type CurvePointView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
@@ -216,9 +244,25 @@ type DecalComponentView internal (source: NativeTypeView) =
 type DeferredPassSettingView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
+/// Typed live path or read-only snapshot of native DetachedEntityTransfer.
+type DetachedEntityTransferView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
 /// Typed live path or read-only snapshot of native Entity.
 type EntityView internal (source: NativeTypeView) =
     inherit ObjectView(source)
+
+/// Typed live path or read-only snapshot of native EntityHandle.
+type EntityHandleView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native ExecutionGraphCompileMetrics.
+type ExecutionGraphCompileMetricsView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native ExecutionGraphRelationDiagnostics.
+type ExecutionGraphRelationDiagnosticsView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
 
 /// Typed live path or read-only snapshot of native FSM::FSMState.
 type FSM_FSMStateView internal (source: NativeTypeView) =
@@ -238,6 +282,18 @@ type FoliageInstanceView internal (source: NativeTypeView) =
 
 /// Typed live path or read-only snapshot of native FoliageType.
 type FoliageTypeView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native FrameCameraSnapshot.
+type FrameCameraSnapshotView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native HierarchyIntegrityMetrics.
+type HierarchyIntegrityMetricsView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native HierarchyStore.
+type HierarchyStoreView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
 /// Typed live path or read-only snapshot of native UIComponent.
@@ -308,6 +364,10 @@ type LightMappingView internal (source: NativeTypeView) =
 type MaterialView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
+/// Typed live path or read-only snapshot of native MaterialAssetReferenceState.
+type MaterialAssetReferenceStateView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
 /// Typed live path or read-only snapshot of native MaterialFlowInformation.
 type MaterialFlowInformationView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
@@ -356,6 +416,14 @@ type PrefabView internal (source: NativeTypeView) =
 type PrefabOverrideView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
+/// Typed live path or read-only snapshot of native RHIBindingDesc.
+type RHIBindingDescView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native RHIBufferHandle.
+type RHIBufferHandleView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
 /// Typed live path or read-only snapshot of native RHISamplerDesc.
 type RHISamplerDescView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
@@ -392,12 +460,24 @@ type RHIShaderResourceReflectionView internal (source: NativeTypeView) =
 type RHIShaderValueTypeView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
+/// Typed live path or read-only snapshot of native RHITextureEntry.
+type RHITextureEntryView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native RHITextureHandle.
+type RHITextureHandleView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
 /// Typed live path or read-only snapshot of native RectTransformComponent.
 type RectTransformComponentView internal (source: NativeTypeView) =
     inherit ComponentView(source)
 
 /// Typed live path or read-only snapshot of native RenderPassSettings.
 type RenderPassSettingsView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native RenderProxyCommitMetrics.
+type RenderProxyCommitMetricsView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
 /// Typed live path or read-only snapshot of native SSAOPassSetting.
@@ -410,6 +490,14 @@ type SSGIPassSettingView internal (source: NativeTypeView) =
 
 /// Typed live path or read-only snapshot of native Scene.
 type SceneView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native Scene::RegistryCounts.
+type Scene_RegistryCountsView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native ScenePhysicsSimulation.
+type ScenePhysicsSimulationView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
 /// Typed live path or read-only snapshot of native ScenePhysicsSimulation::character_definition.
@@ -496,6 +584,18 @@ type SoundComponentView internal (source: NativeTypeView) =
 type SoundComponentSettingsView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
+/// Typed live path or read-only snapshot of native SoundSystem.
+type SoundSystemView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native SpatialPullMetrics.
+type SpatialPullMetricsView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native SpatialResolveMetrics.
+type SpatialResolveMetricsView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
 /// Typed live path or read-only snapshot of native SpriteRenderer.
 type SpriteRendererView internal (source: NativeTypeView) =
     inherit ComponentView(source)
@@ -507,6 +607,14 @@ type SpriteSheetComponentView internal (source: NativeTypeView) =
 /// Typed live path or read-only snapshot of native StateMachineComponent.
 type StateMachineComponentView internal (source: NativeTypeView) =
     inherit ComponentView(source)
+
+/// Typed live path or read-only snapshot of native SystemSchedule.
+type SystemScheduleView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native SystemSchedule::SubscriptionCounts.
+type SystemSchedule_SubscriptionCountsView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
 
 /// Typed live path or read-only snapshot of native TerrainBrush.
 type TerrainBrushView internal (source: NativeTypeView) =
@@ -564,6 +672,10 @@ type Texture_CodecImageView internal (source: NativeTypeView) =
 type Texture_ImageMemorySnapshotView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
+/// Typed live path or read-only snapshot of native TextureFramePins.
+type TextureFramePinsView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
 /// Typed live path or read-only snapshot of native TextureImage.
 type TextureImageView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
@@ -592,6 +704,30 @@ type TransConditionView internal (source: NativeTypeView) =
 type TransformView internal (source: NativeTypeView) =
     inherit ComponentView(source)
 
+/// Typed live path or read-only snapshot of native TransformBulkWriteMetrics.
+type TransformBulkWriteMetricsView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native TransformStore.
+type TransformStoreView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native TransformTopologyMutationCounters.
+type TransformTopologyMutationCountersView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native TransformUpdateMetrics.
+type TransformUpdateMetricsView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native TransformWorldWrite.
+type TransformWorldWriteView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native TransformWriteMetrics.
+type TransformWriteMetricsView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
 /// Typed live path or read-only snapshot of native TwoBoneIKConstraint.
 type TwoBoneIKConstraintView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
@@ -599,6 +735,10 @@ type TwoBoneIKConstraintView internal (source: NativeTypeView) =
 /// Typed live path or read-only snapshot of native UIButton.
 type UIButtonView internal (source: NativeTypeView) =
     inherit UIComponentView(source)
+
+/// Typed live path or read-only snapshot of native Vertex.
+type VertexView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
 
 /// Typed live path or read-only snapshot of native VignettePassSetting.
 type VignettePassSettingView internal (source: NativeTypeView) =
@@ -764,8 +904,16 @@ type assets_cluster_StreamBudgetView internal (source: NativeTypeView) =
 type assets_cpu_geometry_GeometryView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
+/// Typed live path or read-only snapshot of native ce::layers::layer_id.
+type ce_layers_layer_idView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
 /// Typed live path or read-only snapshot of native ce::physics::CollisionGeometry.
 type ce_physics_CollisionGeometryView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native ce::physics::CollisionGeometryLibrary::statistics.
+type ce_physics_CollisionGeometryLibrary_statisticsView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
 /// Typed live path or read-only snapshot of native ce::physics::ShapeInstance.
@@ -1264,6 +1412,10 @@ type wave_ConcurrencyGroupIdView internal (source: NativeTypeView) =
 type wave_ListenerStateView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
+/// Typed live path or read-only snapshot of native wave::PlayRequest.
+type wave_PlayRequestView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
 /// Typed live path or read-only snapshot of native wave::PlaybackCommand.
 type wave_PlaybackCommandView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
@@ -1290,6 +1442,10 @@ type wave_PlaybackStartedView internal (source: NativeTypeView) =
 
 /// Typed live path or read-only snapshot of native wave::RolloffPoint.
 type wave_RolloffPointView internal (source: NativeTypeView) =
+    inherit NativeTypeView(source)
+
+/// Typed live path or read-only snapshot of native wave::SoundSource.
+type wave_SoundSourceView internal (source: NativeTypeView) =
     inherit NativeTypeView(source)
 
 /// Typed live path or read-only snapshot of native wave::VoiceHandle.

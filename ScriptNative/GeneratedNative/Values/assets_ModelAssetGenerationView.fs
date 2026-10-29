@@ -7,6 +7,7 @@ open CreatorEngine
 
 [<AutoOpen>]
 module assets_ModelAssetGenerationViewMembers =
+    let private method_fa76f138aa = NativeMethodSpec("assets::ModelAssetGeneration", "AnimationTracks", true, [| "int" |], [| "value" |])
     let private method_ce65c106a4 = NativeMethodSpec("assets::ModelAssetGeneration", "Animations", true, [|  |], [|  |])
     let private method_48d9401d00 = NativeMethodSpec("assets::ModelAssetGeneration", "Animator", true, [|  |], [|  |])
     let private method_d1bc2da8fa = NativeMethodSpec("assets::ModelAssetGeneration", "EstimatedCpuBytes", true, [|  |], [|  |])
@@ -31,9 +32,11 @@ module assets_ModelAssetGenerationViewMembers =
         /// Construct an explicit read-only native wire snapshot for value arguments.
         static member FromJson(value: JsonElement) = assets_ModelAssetGenerationView(NativeTypeView.FromSnapshot(value))
 
-        /// Unavailable native method: return value: sequence element: native type has no declared runtime value schema or explicit typed codec: assets::ModelAnimationTrack *const
-        member _.``AnimationTracks_Unavailable`` =
-            NativeUnavailableMember("method", "assets::ModelAssetGeneration", "AnimationTracks", "std::span<const ModelAnimationTrack *const> (int) const noexcept", "return value: sequence element: native type has no declared runtime value schema or explicit typed codec: assets::ModelAnimationTrack *const")
+        /// Native std::span<const ModelAnimationTrack *const> (int) const noexcept; invoke uses the runtime's exact overload metadata.
+        member this.``AnimationTracks``(``clipIndex``: int) : NativeArray<NativeReference<assets_ModelAnimationTrackView>> =
+            let arguments = [| (NativeCodecs.Int32).Encode(``clipIndex``) |]
+            let response = this.Invoke(method_fa76f138aa, arguments)
+            (NativeCodecs.Array(NativeCodecs.Reference(NativeCodecs.View((fun value -> assets_ModelAnimationTrackView(value)))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native std::span<const ModelAnimationAsset> () const noexcept; invoke uses the runtime's exact overload metadata.
         member this.``Animations``() : NativeArray<assets_ModelAnimationAssetView> =

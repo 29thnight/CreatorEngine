@@ -8,8 +8,13 @@ open CreatorEngine
 [<AutoOpen>]
 module AnimatorViewMembers =
     let private method_85a9e14617 = NativeMethodSpec("Animator", "AddClipEvent", false, [| "int" |], [| "value" |])
+    let private method_82b006b148 = NativeMethodSpec("Animator", "AddDefaultParameter", false, [| "ValueType" |], [| "value" |])
+    let private method_fd2372ffd7 = NativeMethodSpec("Animator", "BindModelDescriptor", false, [| "own::shared_owner<const assets::ModelAnimationDescriptor>"; "own::shared_owner<const assets::ModelSkeletonPayload>" |], [| "value"; "value" |])
+    let private method_70de61bad1 = NativeMethodSpec("Animator", "BindModelGeneration", false, [| "own::shared_owner<const assets::ModelAssetGeneration>" |], [| "value" |])
+    let private method_4d69250f41 = NativeMethodSpec("Animator", "BuildAvatarBoneMasks", false, [| "AvatarMask"; "bool *"; "AnimatorDataPath *" |], [| "mutable_reference"; "value"; "value" |])
     let private method_069d456d22 = NativeMethodSpec("Animator", "CaptureAnimationBinding", false, [|  |], [|  |])
     let private method_72a99fe21b = NativeMethodSpec("Animator", "ClearControllersAndParams", false, [|  |], [|  |])
+    let private method_34a89addd2 = NativeMethodSpec("Animator", "ConvertLegacyAvatarMask", false, [| "AvatarMask" |], [| "mutable_reference" |])
     let private method_64ba937f8c = NativeMethodSpec("Animator", "CreateController", false, [| "std::basic_string<char>" |], [| "value" |])
     let private method_d62c6a5f7f = NativeMethodSpec("Animator", "CreateController_UI", false, [|  |], [|  |])
     let private method_ce3f69cdef = NativeMethodSpec("Animator", "CreateController_UINoAni", false, [|  |], [|  |])
@@ -19,20 +24,35 @@ module AnimatorViewMembers =
     let private method_d6fd9573a1 = NativeMethodSpec("Animator", "DeleteParameter", false, [| "int" |], [| "value" |])
     let private method_1cea738268 = NativeMethodSpec("Animator", "EnsureAnimationBinding", false, [|  |], [|  |])
     let private method_f6202aa11f = NativeMethodSpec("Animator", "EnsureClipOverride", false, [| "int" |], [| "value" |])
+    let private method_3ba91e5e33 = NativeMethodSpec("Animator", "FindBoneRecursive", false, [| "Entity *"; "std::basic_string<char>" |], [| "value"; "const_reference" |])
+    let private method_0a8b6f6712 = NativeMethodSpec("Animator", "FindClipOverride", false, [| "int" |], [| "value" |])
     let private method_9b6e667749 = NativeMethodSpec("Animator", "FindClipOverride", true, [| "int" |], [| "value" |])
+    let private method_7aaa6091f9 = NativeMethodSpec("Animator", "FindParameter", false, [| "std::basic_string_view<char>" |], [| "value" |])
     let private method_8117d0b3be = NativeMethodSpec("Animator", "FindParameterIndex", true, [| "std::basic_string_view<char>" |], [| "value" |])
+    let private method_45aaf82ce6 = NativeMethodSpec("Animator", "FindSocket", false, [| "std::basic_string_view<char>" |], [| "value" |])
+    let private method_059e2b5ca6 = NativeMethodSpec("Animator", "GetBoneCount", true, [| "bool *"; "AnimatorDataPath *" |], [| "value"; "value" |])
+    let private method_64aa4a09d2 = NativeMethodSpec("Animator", "GetBoneName", true, [| "int"; "bool *"; "AnimatorDataPath *" |], [| "value"; "value"; "value" |])
+    let private method_767cd54769 = NativeMethodSpec("Animator", "GetClipCount", true, [| "bool *"; "AnimatorDataPath *" |], [| "value"; "value" |])
+    let private method_2bdcdf39e5 = NativeMethodSpec("Animator", "GetClipDuration", true, [| "int"; "bool *"; "AnimatorDataPath *" |], [| "value"; "value"; "value" |])
+    let private method_8dbd853eca = NativeMethodSpec("Animator", "GetClipFrameCount", true, [| "int"; "bool *"; "AnimatorDataPath *" |], [| "value"; "value"; "value" |])
+    let private method_1ffd310127 = NativeMethodSpec("Animator", "GetClipName", true, [| "int"; "bool *"; "AnimatorDataPath *" |], [| "value"; "value"; "value" |])
+    let private method_5aa9d0e349 = NativeMethodSpec("Animator", "GetController", false, [| "std::basic_string<char>" |], [| "value" |])
     let private method_cbc26cbb37 = NativeMethodSpec("Animator", "GetPlaybackControl", false, [|  |], [|  |])
     let private method_b3de23cf74 = NativeMethodSpec("Animator", "GetPlaybackControl", true, [|  |], [|  |])
     let private method_5f79f6a09c = NativeMethodSpec("Animator", "GetSelectedClipIndex", true, [|  |], [|  |])
     let private method_9d831e7a7e = NativeMethodSpec("Animator", "GetSkeletonPath", true, [|  |], [|  |])
+    let private method_72adfe8691 = NativeMethodSpec("Animator", "GetSkeletonSerial", true, [| "bool *"; "AnimatorDataPath *" |], [| "value"; "value" |])
     let private method_d367db3bf7 = NativeMethodSpec("Animator", "HasSocket", false, [|  |], [|  |])
     let private method_54889abbbf = NativeMethodSpec("Animator", "InvokeClipEvents", false, [| "int"; "double"; "double" |], [| "value"; "value"; "value" |])
     let private method_8446c41f71 = NativeMethodSpec("Animator", "IsClipLooping", true, [| "int" |], [| "value" |])
     let private method_58bb3558d5 = NativeMethodSpec("Animator", "IsDirectEditorPreview", true, [|  |], [|  |])
     let private method_a375b1b938 = NativeMethodSpec("Animator", "IsSkinBindingCompatible", true, [| "assets::ModelAssetGeneration" |], [| "const_reference" |])
+    let private method_2a376bd1af = NativeMethodSpec("Animator", "IsSkinBindingCompatible", true, [| "assets::ModelMeshDescriptor" |], [| "const_reference" |])
+    let private method_cfbdd0f7b1 = NativeMethodSpec("Animator", "MakeSocket", false, [| "std::basic_string_view<char>"; "std::basic_string_view<char>"; "Entity *" |], [| "value"; "value"; "value" |])
     let private method_de624fc207 = NativeMethodSpec("Animator", "NotifyParameterLayoutChanged", false, [|  |], [|  |])
     let private method_910b1b9dc9 = NativeMethodSpec("Animator", "ParameterAt", true, [| "unsigned long long" |], [| "value" |])
     let private method_27fea5d152 = NativeMethodSpec("Animator", "ParameterVersion", true, [|  |], [|  |])
+    let private method_c58cdc61a7 = NativeMethodSpec("Animator", "ResolveBoneIndex", true, [| "std::basic_string<char>"; "bool *"; "AnimatorDataPath *" |], [| "const_reference"; "value"; "value" |])
     let private method_a3ece2cd63 = NativeMethodSpec("Animator", "SetAnimation", false, [| "int" |], [| "value" |])
     let private method_96d940a7dd = NativeMethodSpec("Animator", "SetClipLooping", false, [| "int"; "bool" |], [| "value"; "value" |])
     let private method_a74ac46ae5 = NativeMethodSpec("Animator", "SetSelectedClipIndex", false, [| "unsigned int" |], [| "value" |])
@@ -103,21 +123,31 @@ module AnimatorViewMembers =
             let response = this.Invoke(method_85a9e14617, arguments)
             ()
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``AddDefaultParameter_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "AddDefaultParameter", "ConditionParameter *(ValueType)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native ConditionParameter *(ValueType); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AddDefaultParameter``(``vType``: NativeEnumValue<ValueTypeTag>) : NativeReference<ConditionParameterView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.Enum<ValueTypeTag>("ValueType")).Encode(``vType``)) |]
+            let response = this.InvokeBound(method_82b006b148, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> ConditionParameterView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``BindModelDescriptor_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "BindModelDescriptor", "bool (own::shared_owner<const assets::ModelAnimationDescriptor>, own::shared_owner<const assets::ModelSkeletonPayload>)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (own::shared_owner<const assets::ModelAnimationDescriptor>, own::shared_owner<const assets::ModelSkeletonPayload>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``BindModelDescriptor``(``descriptor``: NativeReference<assets_ModelAnimationDescriptorView>, ``skeleton``: NativeReference<assets_ModelSkeletonPayloadView>) : bool =
+            let arguments = [| ``descriptor``.AsNativeArgument(); ``skeleton``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_fd2372ffd7, arguments)
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``BindModelGeneration_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "BindModelGeneration", "void (own::shared_owner<const assets::ModelAssetGeneration>)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (own::shared_owner<const assets::ModelAssetGeneration>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``BindModelGeneration``(``generation``: NativeReference<assets_ModelAssetGenerationView>) : unit =
+            let arguments = [| ``generation``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_70de61bad1, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``BuildAvatarBoneMasks_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "BuildAvatarBoneMasks", "BoneMask *(AvatarMask &, bool *, AnimatorDataPath *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native BoneMask *(AvatarMask &, bool *, AnimatorDataPath *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``BuildAvatarBoneMasks``(``mask``: AvatarMaskView, ``outViaExperiment``: byref<bool>, ``outPath``: byref<NativeEnumValue<AnimatorDataPathTag>>) : NativeReference<BoneMaskView> =
+            let arguments = [| ``mask``.AsNativeArgument(); NativeCallArgument.FromOutput((NativeCodecs.Bool).Encode(``outViaExperiment``)); NativeCallArgument.FromOutput((NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Encode(``outPath``)) |]
+            let response = this.InvokeBound(method_4d69250f41, arguments)
+            ``outViaExperiment`` <- (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.Arguments.[1]))
+            ``outPath`` <- (NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Decode(NativeTypeView.FromSnapshot(response.Arguments.[2]))
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> BoneMaskView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native AnimatorAnimationBinding (); invoke uses the runtime's exact overload metadata.
         member this.``CaptureAnimationBinding``() : AnimatorAnimationBindingView =
@@ -131,9 +161,11 @@ module AnimatorViewMembers =
             let response = this.Invoke(method_72a99fe21b, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``ConvertLegacyAvatarMask_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "ConvertLegacyAvatarMask", "bool (AvatarMask &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (AvatarMask &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``ConvertLegacyAvatarMask``(``mask``: AvatarMaskView) : bool =
+            let arguments = [| ``mask``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_34a89addd2, arguments)
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (std::string); invoke uses the runtime's exact overload metadata.
         member this.``CreateController``(``name``: string) : unit =
@@ -189,13 +221,17 @@ module AnimatorViewMembers =
             let response = this.Invoke(method_f6202aa11f, arguments)
             (NativeCodecs.View((fun value -> AnimatorClipOverrideView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``FindBoneRecursive_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "FindBoneRecursive", "Entity *(Entity *, const std::string &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native Entity *(Entity *, const std::string &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``FindBoneRecursive``(``parent``: NativeReference<EntityView>, ``boneName``: string) : NativeReference<EntityView> =
+            let arguments = [| ``parent``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.String).Encode(``boneName``)) |]
+            let response = this.InvokeBound(method_3ba91e5e33, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``FindClipOverride_0a8b6f_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "FindClipOverride", "AnimatorClipOverride *(int)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native AnimatorClipOverride *(int); invoke_bound uses the runtime's exact overload metadata.
+        member this.``FindClipOverride``(``clipIndex``: int) : NativeReference<AnimatorClipOverrideView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``clipIndex``)) |]
+            let response = this.InvokeBound(method_0a8b6f6712, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> AnimatorClipOverrideView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native const AnimatorClipOverride *(int) const; borrow uses the runtime's exact overload metadata.
         member this.``FindClipOverride_Const``(``clipIndex``: int) : NativeReference<AnimatorClipOverrideView> =
@@ -203,9 +239,11 @@ module AnimatorViewMembers =
             let value = this.Borrow(method_9b6e667749, arguments)
             (NativeCodecs.Reference(NativeCodecs.View((fun value -> AnimatorClipOverrideView(value))))).Decode(value)
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``FindParameter_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "FindParameter", "ConditionParameter *(std::string_view)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native ConditionParameter *(std::string_view); invoke_bound uses the runtime's exact overload metadata.
+        member this.``FindParameter``(``valueName``: string) : NativeReference<ConditionParameterView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``valueName``)) |]
+            let response = this.InvokeBound(method_7aaa6091f9, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> ConditionParameterView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native std::size_t (std::string_view) const; invoke uses the runtime's exact overload metadata.
         member this.``FindParameterIndex``(``valueName``: string) : uint64 =
@@ -213,37 +251,65 @@ module AnimatorViewMembers =
             let response = this.Invoke(method_8117d0b3be, arguments)
             (NativeCodecs.UInt64).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``FindSocket_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "FindSocket", "Socket *(std::string_view)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native Socket *(std::string_view); invoke_bound uses the runtime's exact overload metadata.
+        member this.``FindSocket``(``socketName``: string) : NativeReference<SocketView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``socketName``)) |]
+            let response = this.InvokeBound(method_45aaf82ce6, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> SocketView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: raw pointer has no bounded, retained record borrow contract
-        member _.``GetBoneCount_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "GetBoneCount", "std::size_t (bool *, AnimatorDataPath *) const", "argument 0: raw pointer has no bounded, retained record borrow contract")
+        /// Native std::size_t (bool *, AnimatorDataPath *) const; invoke_bound uses the runtime's exact overload metadata.
+        member this.``GetBoneCount``(``outViaExperiment``: byref<bool>, ``outPath``: byref<NativeEnumValue<AnimatorDataPathTag>>) : uint64 =
+            let arguments = [| NativeCallArgument.FromOutput((NativeCodecs.Bool).Encode(``outViaExperiment``)); NativeCallArgument.FromOutput((NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Encode(``outPath``)) |]
+            let response = this.InvokeBound(method_059e2b5ca6, arguments)
+            ``outViaExperiment`` <- (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.Arguments.[0]))
+            ``outPath`` <- (NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Decode(NativeTypeView.FromSnapshot(response.Arguments.[1]))
+            (NativeCodecs.UInt64).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 1: raw pointer has no bounded, retained record borrow contract
-        member _.``GetBoneName_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "GetBoneName", "std::string (int, bool *, AnimatorDataPath *) const", "argument 1: raw pointer has no bounded, retained record borrow contract")
+        /// Native std::string (int, bool *, AnimatorDataPath *) const; invoke_bound uses the runtime's exact overload metadata.
+        member this.``GetBoneName``(``boneIndex``: int, ``outViaExperiment``: byref<bool>, ``outPath``: byref<NativeEnumValue<AnimatorDataPathTag>>) : string =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``boneIndex``)); NativeCallArgument.FromOutput((NativeCodecs.Bool).Encode(``outViaExperiment``)); NativeCallArgument.FromOutput((NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Encode(``outPath``)) |]
+            let response = this.InvokeBound(method_64aa4a09d2, arguments)
+            ``outViaExperiment`` <- (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.Arguments.[1]))
+            ``outPath`` <- (NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Decode(NativeTypeView.FromSnapshot(response.Arguments.[2]))
+            (NativeCodecs.String).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: raw pointer has no bounded, retained record borrow contract
-        member _.``GetClipCount_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "GetClipCount", "std::size_t (bool *, AnimatorDataPath *) const", "argument 0: raw pointer has no bounded, retained record borrow contract")
+        /// Native std::size_t (bool *, AnimatorDataPath *) const; invoke_bound uses the runtime's exact overload metadata.
+        member this.``GetClipCount``(``outViaExperiment``: byref<bool>, ``outPath``: byref<NativeEnumValue<AnimatorDataPathTag>>) : uint64 =
+            let arguments = [| NativeCallArgument.FromOutput((NativeCodecs.Bool).Encode(``outViaExperiment``)); NativeCallArgument.FromOutput((NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Encode(``outPath``)) |]
+            let response = this.InvokeBound(method_767cd54769, arguments)
+            ``outViaExperiment`` <- (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.Arguments.[0]))
+            ``outPath`` <- (NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Decode(NativeTypeView.FromSnapshot(response.Arguments.[1]))
+            (NativeCodecs.UInt64).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 1: raw pointer has no bounded, retained record borrow contract
-        member _.``GetClipDuration_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "GetClipDuration", "double (int, bool *, AnimatorDataPath *) const", "argument 1: raw pointer has no bounded, retained record borrow contract")
+        /// Native double (int, bool *, AnimatorDataPath *) const; invoke_bound uses the runtime's exact overload metadata.
+        member this.``GetClipDuration``(``clipIndex``: int, ``outViaExperiment``: byref<bool>, ``outPath``: byref<NativeEnumValue<AnimatorDataPathTag>>) : double =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``clipIndex``)); NativeCallArgument.FromOutput((NativeCodecs.Bool).Encode(``outViaExperiment``)); NativeCallArgument.FromOutput((NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Encode(``outPath``)) |]
+            let response = this.InvokeBound(method_2bdcdf39e5, arguments)
+            ``outViaExperiment`` <- (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.Arguments.[1]))
+            ``outPath`` <- (NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Decode(NativeTypeView.FromSnapshot(response.Arguments.[2]))
+            (NativeCodecs.Double).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 1: raw pointer has no bounded, retained record borrow contract
-        member _.``GetClipFrameCount_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "GetClipFrameCount", "std::size_t (int, bool *, AnimatorDataPath *) const", "argument 1: raw pointer has no bounded, retained record borrow contract")
+        /// Native std::size_t (int, bool *, AnimatorDataPath *) const; invoke_bound uses the runtime's exact overload metadata.
+        member this.``GetClipFrameCount``(``clipIndex``: int, ``outViaExperiment``: byref<bool>, ``outPath``: byref<NativeEnumValue<AnimatorDataPathTag>>) : uint64 =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``clipIndex``)); NativeCallArgument.FromOutput((NativeCodecs.Bool).Encode(``outViaExperiment``)); NativeCallArgument.FromOutput((NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Encode(``outPath``)) |]
+            let response = this.InvokeBound(method_8dbd853eca, arguments)
+            ``outViaExperiment`` <- (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.Arguments.[1]))
+            ``outPath`` <- (NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Decode(NativeTypeView.FromSnapshot(response.Arguments.[2]))
+            (NativeCodecs.UInt64).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 1: raw pointer has no bounded, retained record borrow contract
-        member _.``GetClipName_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "GetClipName", "std::string (int, bool *, AnimatorDataPath *) const", "argument 1: raw pointer has no bounded, retained record borrow contract")
+        /// Native std::string (int, bool *, AnimatorDataPath *) const; invoke_bound uses the runtime's exact overload metadata.
+        member this.``GetClipName``(``clipIndex``: int, ``outViaExperiment``: byref<bool>, ``outPath``: byref<NativeEnumValue<AnimatorDataPathTag>>) : string =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.Int32).Encode(``clipIndex``)); NativeCallArgument.FromOutput((NativeCodecs.Bool).Encode(``outViaExperiment``)); NativeCallArgument.FromOutput((NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Encode(``outPath``)) |]
+            let response = this.InvokeBound(method_1ffd310127, arguments)
+            ``outViaExperiment`` <- (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.Arguments.[1]))
+            ``outPath`` <- (NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Decode(NativeTypeView.FromSnapshot(response.Arguments.[2]))
+            (NativeCodecs.String).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``GetController_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "GetController", "AnimationController *(std::string)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native AnimationController *(std::string); invoke_bound uses the runtime's exact overload metadata.
+        member this.``GetController``(``name``: string) : NativeReference<AnimationControllerView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``name``)) |]
+            let response = this.InvokeBound(method_5aa9d0e349, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> AnimationControllerView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Unavailable native method: method is reserved for engine lifecycle, scheduling, or identity management
         member _.``GetInstance_e11d0e_Unavailable`` =
@@ -277,9 +343,13 @@ module AnimatorViewMembers =
             let response = this.Invoke(method_9d831e7a7e, arguments)
             (NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: raw pointer has no bounded, retained record borrow contract
-        member _.``GetSkeletonSerial_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "GetSkeletonSerial", "uint64 (bool *, AnimatorDataPath *) const", "argument 0: raw pointer has no bounded, retained record borrow contract")
+        /// Native uint64 (bool *, AnimatorDataPath *) const; invoke_bound uses the runtime's exact overload metadata.
+        member this.``GetSkeletonSerial``(``outViaExperiment``: byref<bool>, ``outPath``: byref<NativeEnumValue<AnimatorDataPathTag>>) : uint64 =
+            let arguments = [| NativeCallArgument.FromOutput((NativeCodecs.Bool).Encode(``outViaExperiment``)); NativeCallArgument.FromOutput((NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Encode(``outPath``)) |]
+            let response = this.InvokeBound(method_72adfe8691, arguments)
+            ``outViaExperiment`` <- (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.Arguments.[0]))
+            ``outPath`` <- (NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Decode(NativeTypeView.FromSnapshot(response.Arguments.[1]))
+            (NativeCodecs.UInt64).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native bool (); invoke uses the runtime's exact overload metadata.
         member this.``HasSocket``() : bool =
@@ -311,13 +381,17 @@ module AnimatorViewMembers =
             let response = this.Invoke(method_a375b1b938, arguments)
             (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``IsSkinBindingCompatible_2a376b_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "IsSkinBindingCompatible", "bool (const assets::ModelMeshDescriptor &) const noexcept", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (const assets::ModelMeshDescriptor &) const noexcept; invoke_bound uses the runtime's exact overload metadata.
+        member this.``IsSkinBindingCompatible``(``geometry``: assets_ModelMeshDescriptorView) : bool =
+            let arguments = [| ``geometry``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_2a376bd1af, arguments)
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 2: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``MakeSocket_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "MakeSocket", "Socket *(std::string_view, std::string_view, Entity *)", "argument 2: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native Socket *(std::string_view, std::string_view, Entity *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``MakeSocket``(``socketName``: string, ``boneName``: string, ``object``: NativeReference<EntityView>) : NativeReference<SocketView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``socketName``)); NativeCallArgument.FromJson((NativeCodecs.String).Encode(``boneName``)); ``object``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_cfbdd0f7b1, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> SocketView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void () noexcept; invoke uses the runtime's exact overload metadata.
         member this.``NotifyParameterLayoutChanged``() : unit =
@@ -365,9 +439,13 @@ module AnimatorViewMembers =
             let response = this.Invoke(method_27fea5d152, arguments)
             (NativeCodecs.UInt64).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 1: raw pointer has no bounded, retained record borrow contract
-        member _.``ResolveBoneIndex_Unavailable`` =
-            NativeUnavailableMember("method", "Animator", "ResolveBoneIndex", "int (const std::string &, bool *, AnimatorDataPath *) const", "argument 1: raw pointer has no bounded, retained record borrow contract")
+        /// Native int (const std::string &, bool *, AnimatorDataPath *) const; invoke_bound uses the runtime's exact overload metadata.
+        member this.``ResolveBoneIndex``(``boneName``: string, ``outViaExperiment``: byref<bool>, ``outPath``: byref<NativeEnumValue<AnimatorDataPathTag>>) : int =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``boneName``)); NativeCallArgument.FromOutput((NativeCodecs.Bool).Encode(``outViaExperiment``)); NativeCallArgument.FromOutput((NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Encode(``outPath``)) |]
+            let response = this.InvokeBound(method_c58cdc61a7, arguments)
+            ``outViaExperiment`` <- (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.Arguments.[1]))
+            ``outPath`` <- (NativeCodecs.Enum<AnimatorDataPathTag>("AnimatorDataPath")).Decode(NativeTypeView.FromSnapshot(response.Arguments.[2]))
+            (NativeCodecs.Int32).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native void (int); invoke uses the runtime's exact overload metadata.
         member this.``SetAnimation``(``index``: int) : unit =

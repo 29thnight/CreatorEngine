@@ -7,6 +7,8 @@ open CreatorEngine
 
 [<AutoOpen>]
 module ce_physics_tick_idViewMembers =
+    let private method_757fad22fc = NativeMethodSpec("ce::physics::tick_id", "operator<=>", true, [| "ce::physics::tick_id" |], [| "const_reference" |])
+
     type ce_physics_tick_idView with
         /// Typed native value codec for collection construction and explicit value arguments.
         static member Codec : NativeCodec<ce_physics_tick_idView> = NativeCodecs.View(fun source -> ce_physics_tick_idView(source))
@@ -32,6 +34,8 @@ module ce_physics_tick_idViewMembers =
             fields.["value"] <- (NativeCodecs.UInt64).Encode(value)
             ce_physics_tick_idView(NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(fields)))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: std::strong_ordering
-        member _.``operator<=>_Unavailable`` =
-            NativeUnavailableMember("method", "ce::physics::tick_id", "operator<=>", "std::strong_ordering (const tick_id &) const", "return value: native type has no declared runtime value schema or explicit typed codec: std::strong_ordering")
+        /// Native std::strong_ordering (const tick_id &) const; invoke uses the runtime's exact overload metadata.
+        member this.``operator<=>``(``argument0``: ce_physics_tick_idView) : int =
+            let arguments = [| (NativeCodecs.View((fun value -> ce_physics_tick_idView(value)))).Encode(``argument0``) |]
+            let response = this.Invoke(method_757fad22fc, arguments)
+            (NativeCodecs.Int32).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))

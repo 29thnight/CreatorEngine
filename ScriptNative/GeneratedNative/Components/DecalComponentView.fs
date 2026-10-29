@@ -13,6 +13,7 @@ module DecalComponentViewMembers =
     let private method_c19bc72404 = NativeMethodSpec("DecalComponent", "GetNormalTextureShared", true, [|  |], [|  |])
     let private method_41551b1f9f = NativeMethodSpec("DecalComponent", "GetORMTexture", false, [|  |], [|  |])
     let private method_20143f5851 = NativeMethodSpec("DecalComponent", "GetORMTextureShared", true, [|  |], [|  |])
+    let private method_111aa7c22b = NativeMethodSpec("DecalComponent", "ReplaceTextureOwner", false, [| "const Texture *"; "own::shared_owner<const Texture>" |], [| "value"; "const_reference" |])
     let private method_ef1e718ded = NativeMethodSpec("DecalComponent", "SetDecalTexture", false, [| "FileGuid" |], [| "const_reference" |])
     let private method_58b06e25c2 = NativeMethodSpec("DecalComponent", "SetDecalTexture", false, [| "std::basic_string_view<char>" |], [| "const_reference" |])
     let private method_005680baec = NativeMethodSpec("DecalComponent", "SetNormalTexture", false, [| "FileGuid" |], [| "const_reference" |])
@@ -136,9 +137,11 @@ module DecalComponentViewMembers =
         member _.``OnUninitializing_Unavailable`` =
             NativeUnavailableMember("method", "DecalComponent", "OnUninitializing", "void ()", "method is reserved for engine lifecycle, scheduling, or identity management")
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``ReplaceTextureOwner_Unavailable`` =
-            NativeUnavailableMember("method", "DecalComponent", "ReplaceTextureOwner", "void (const Texture *, const own::shared_owner<const Texture> &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (const Texture *, const own::shared_owner<const Texture> &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``ReplaceTextureOwner``(``previous``: NativeReference<TextureView>, ``replacement``: NativeReference<TextureView>) : unit =
+            let arguments = [| ``previous``.AsNativeArgument(); ``replacement``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_111aa7c22b, arguments, discardResult = true)
+            ()
 
         /// Native void (const FileGuid &); invoke uses the runtime's exact overload metadata.
         member this.``SetDecalTexture``(``fileGuid``: System.Guid) : unit =

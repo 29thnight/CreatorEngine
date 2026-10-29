@@ -7,7 +7,9 @@ open CreatorEngine
 
 [<AutoOpen>]
 module SocketViewMembers =
+    let private method_9cc179b1d3 = NativeMethodSpec("Socket", "AttachObject", false, [| "Entity *" |], [| "value" |])
     let private method_7176851d30 = NativeMethodSpec("Socket", "DetachAllObject", false, [|  |], [|  |])
+    let private method_1fef40af71 = NativeMethodSpec("Socket", "DetachObject", false, [| "Entity *" |], [| "value" |])
 
     type SocketView with
         /// Typed native value codec for collection construction and explicit value arguments.
@@ -61,9 +63,8 @@ module SocketViewMembers =
         /// Native field Socket::transform.
         member this.``transform`` : SocketTransformView = this.Field("transform", "transform").Read(NativeCodecs.View((fun value -> SocketTransformView(value))))
 
-        /// Unavailable native field: native type has no declared runtime value schema or explicit typed codec: ce::delegate_handle
-        member _.``m_activeSceneChangedEventHandle_Unavailable`` =
-            NativeUnavailableMember("field", "Socket", "m_activeSceneChangedEventHandle", "ce::delegate_handle", "native type has no declared runtime value schema or explicit typed codec: ce::delegate_handle")
+        /// Native field Socket::m_activeSceneChangedEventHandle.
+        member this.``m_activeSceneChangedEventHandle`` : uint32 = this.Field("m_activeSceneChangedEventHandle", "m_activeSceneChangedEventHandle").Read(NativeCodecs.UInt32)
 
         /// Native field Socket::AttachObejctIndex.
         member this.``AttachObejctIndex`` : NativeArray<uint64> = this.Field("AttachObejctIndex", "AttachObejctIndex").Read(NativeCodecs.Array(NativeCodecs.UInt64))
@@ -71,9 +72,11 @@ module SocketViewMembers =
         /// Native field Socket::AttachObjects.
         member this.``AttachObjects`` : NativeArray<NativeReference<EntityView>> = this.Field("AttachObjects", "AttachObjects").Read(NativeCodecs.Array(NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``AttachObject_Unavailable`` =
-            NativeUnavailableMember("method", "Socket", "AttachObject", "void (Entity *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Entity *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``AttachObject``(``Object``: NativeReference<EntityView>) : unit =
+            let arguments = [| ``Object``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_9cc179b1d3, arguments, discardResult = true)
+            ()
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``DetachAllObject``() : unit =
@@ -81,9 +84,11 @@ module SocketViewMembers =
             let response = this.Invoke(method_7176851d30, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``DetachObject_Unavailable`` =
-            NativeUnavailableMember("method", "Socket", "DetachObject", "void (Entity *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Entity *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``DetachObject``(``Object``: NativeReference<EntityView>) : unit =
+            let arguments = [| ``Object``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_1fef40af71, arguments, discardResult = true)
+            ()
 
         /// Unavailable native method: method is reserved for engine lifecycle, scheduling, or identity management
         member _.``ReleaseManagedResources_Unavailable`` =

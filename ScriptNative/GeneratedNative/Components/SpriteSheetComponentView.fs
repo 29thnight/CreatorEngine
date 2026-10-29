@@ -8,6 +8,7 @@ open CreatorEngine
 [<AutoOpen>]
 module SpriteSheetComponentViewMembers =
     let private method_b61ba93cde = NativeMethodSpec("SpriteSheetComponent", "LoadSpriteSheet", false, [| "std::filesystem::path" |], [| "const_reference" |])
+    let private method_f8357f3253 = NativeMethodSpec("SpriteSheetComponent", "ReplaceTextureOwner", false, [| "const Texture *"; "own::shared_owner<const Texture>" |], [| "value"; "const_reference" |])
     let private method_6cf4680ec3 = NativeMethodSpec("SpriteSheetComponent", "TickLayout", false, [| "float" |], [| "value" |])
 
     type SpriteSheetComponentView with
@@ -76,9 +77,11 @@ module SpriteSheetComponentViewMembers =
         member _.``OnUninitializing_Unavailable`` =
             NativeUnavailableMember("method", "SpriteSheetComponent", "OnUninitializing", "void ()", "method is reserved for engine lifecycle, scheduling, or identity management")
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``ReplaceTextureOwner_Unavailable`` =
-            NativeUnavailableMember("method", "SpriteSheetComponent", "ReplaceTextureOwner", "void (const Texture *, const own::shared_owner<const Texture> &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (const Texture *, const own::shared_owner<const Texture> &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``ReplaceTextureOwner``(``previous``: NativeReference<TextureView>, ``replacement``: NativeReference<TextureView>) : unit =
+            let arguments = [| ``previous``.AsNativeArgument(); ``replacement``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_f8357f3253, arguments, discardResult = true)
+            ()
 
         /// Native void (float); invoke uses the runtime's exact overload metadata.
         member this.``TickLayout``(``tick``: single) : unit =

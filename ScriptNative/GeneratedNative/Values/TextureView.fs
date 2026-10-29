@@ -12,6 +12,7 @@ module TextureViewMembers =
     let private method_4fb3cf7122 = NativeMethodSpec("Texture", "GetAssetOrigin", true, [|  |], [|  |])
     let private method_98f4b81b0f = NativeMethodSpec("Texture", "GetImageDescription", true, [|  |], [|  |])
     let private method_1e563b6f68 = NativeMethodSpec("Texture", "GetImageSize", true, [|  |], [|  |])
+    let private method_4dc8a8ea4a = NativeMethodSpec("Texture", "GetImageView", true, [| "own::shared_owner<const Texture::CodecImage>" |], [| "const_reference" |])
     let private method_88e208f5af = NativeMethodSpec("Texture", "GetSize", true, [|  |], [|  |])
     let private method_cf6e3479e1 = NativeMethodSpec("Texture", "HasImage", true, [|  |], [|  |])
     let private method_9987c1348b = NativeMethodSpec("Texture", "IsTextureAlpha", true, [|  |], [|  |])
@@ -106,9 +107,11 @@ module TextureViewMembers =
             let response = this.Invoke(method_1e563b6f68, arguments)
             (NativeCodecs.View((fun value -> math_vector2View(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``GetImageView_Unavailable`` =
-            NativeUnavailableMember("method", "Texture", "GetImageView", "TextureImageView (const own::shared_owner<const CodecImage> &) const", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native TextureImageView (const own::shared_owner<const CodecImage> &) const; invoke_bound uses the runtime's exact overload metadata.
+        member this.``GetImageView``(``image``: NativeReference<Texture_CodecImageView>) : TextureImageViewView =
+            let arguments = [| ``image``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_4dc8a8ea4a, arguments)
+            (NativeCodecs.View((fun value -> TextureImageViewView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native math::vector2 () const; invoke uses the runtime's exact overload metadata.
         member this.``GetSize``() : math_vector2View =

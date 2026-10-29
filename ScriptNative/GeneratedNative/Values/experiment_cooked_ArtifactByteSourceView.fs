@@ -7,6 +7,7 @@ open CreatorEngine
 
 [<AutoOpen>]
 module experiment_cooked_ArtifactByteSourceViewMembers =
+    let private method_0674273c55 = NativeMethodSpec("experiment::cooked::ArtifactByteSource", "CaptureArtifact", true, [| "std::basic_string_view<char>"; "own::shared_owner<const experiment::cooked::ArtifactByteSource>"; "std::basic_string<char>" |], [| "value"; "mutable_reference"; "mutable_reference" |])
     let private method_9ba8ba5a46 = NativeMethodSpec("experiment::cooked::ArtifactByteSource", "ReadAt", true, [| "std::basic_string_view<char>"; "unsigned long long"; "std::span<std::byte>"; "std::basic_string<char>" |], [| "value"; "value"; "value"; "mutable_reference" |])
     let private method_5f5f3093a9 = NativeMethodSpec("experiment::cooked::ArtifactByteSource", "Size", true, [| "std::basic_string_view<char>"; "unsigned long long"; "std::basic_string<char>" |], [| "value"; "mutable_reference"; "mutable_reference" |])
 
@@ -17,9 +18,12 @@ module experiment_cooked_ArtifactByteSourceViewMembers =
         /// Construct an explicit read-only native wire snapshot for value arguments.
         static member FromJson(value: JsonElement) = experiment_cooked_ArtifactByteSourceView(NativeTypeView.FromSnapshot(value))
 
-        /// Unavailable native method: argument 1: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``CaptureArtifact_Unavailable`` =
-            NativeUnavailableMember("method", "experiment::cooked::ArtifactByteSource", "CaptureArtifact", "bool (std::string_view, own::shared_owner<const ArtifactByteSource> &, std::string &) const", "argument 1: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (std::string_view, own::shared_owner<const ArtifactByteSource> &, std::string &) const; invoke_bound uses the runtime's exact overload metadata.
+        member this.``CaptureArtifact``(``argument0``: string, ``narrowed``: NativeReference<experiment_cooked_ArtifactByteSourceView>, ``failure``: byref<string>) : bool =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``argument0``)); ``narrowed``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.String).Encode(``failure``)) |]
+            let response = this.InvokeBound(method_0674273c55, arguments)
+            ``failure`` <- (NativeCodecs.String).Decode(NativeTypeView.FromSnapshot(response.Arguments.[2]))
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native bool (std::string_view, std::uint64_t, std::span<std::byte>, std::string &) const; invoke uses the runtime's exact overload metadata.
         member this.``ReadAt``(``path``: string, ``offset``: uint64, ``out``: byref<NativeArray<NativeEnumValue<std_byteTag>>>, ``failure``: byref<string>) : bool =

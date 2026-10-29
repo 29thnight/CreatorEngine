@@ -8,6 +8,7 @@ open CreatorEngine
 [<AutoOpen>]
 module CameraComponentViewMembers =
     let private method_95ba00ad66 = NativeMethodSpec("CameraComponent", "CalculateLODDistance", true, [| "math::vector3" |], [| "value" |])
+    let private method_680ff7e33b = NativeMethodSpec("CameraComponent", "CaptureFrameSnapshot", true, [| "float" |], [| "value" |])
     let private method_026c11cd99 = NativeMethodSpec("CameraComponent", "GetCamera", false, [|  |], [|  |])
     let private method_9121ce2093 = NativeMethodSpec("CameraComponent", "GetCamera", true, [|  |], [|  |])
     let private method_eae2de7a72 = NativeMethodSpec("CameraComponent", "GetEditorBoundingBox", true, [|  |], [|  |])
@@ -41,9 +42,11 @@ module CameraComponentViewMembers =
             let response = this.Invoke(method_95ba00ad66, arguments)
             (NativeCodecs.Single).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: return value: native type has no declared runtime value schema or explicit typed codec: FrameCameraSnapshot
-        member _.``CaptureFrameSnapshot_Unavailable`` =
-            NativeUnavailableMember("method", "CameraComponent", "CaptureFrameSnapshot", "FrameCameraSnapshot (float) const", "return value: native type has no declared runtime value schema or explicit typed codec: FrameCameraSnapshot")
+        /// Native FrameCameraSnapshot (float) const; invoke uses the runtime's exact overload metadata.
+        member this.``CaptureFrameSnapshot``(``aspectRatio``: single) : FrameCameraSnapshotView =
+            let arguments = [| (NativeCodecs.Single).Encode(``aspectRatio``) |]
+            let response = this.Invoke(method_680ff7e33b, arguments)
+            (NativeCodecs.View((fun value -> FrameCameraSnapshotView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native Camera *() noexcept; borrow uses the runtime's exact overload metadata.
         member this.``GetCamera``() : NativeReference<CameraView> =

@@ -53,9 +53,8 @@ module ce_physics_ShapeInstanceViewMembers =
             fields.["query_enabled"] <- (NativeCodecs.Bool).Encode(value)
             ce_physics_ShapeInstanceView(NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(fields)))
 
-        /// Unavailable native field: native type has no declared runtime value schema or explicit typed codec: ce::layers::layer_id
-        member _.``layer_override_Unavailable`` =
-            NativeUnavailableMember("field", "ce::physics::ShapeInstance", "layer_override", "ce::layers::layer_id", "native type has no declared runtime value schema or explicit typed codec: ce::layers::layer_id")
+        /// Native field ce::physics::ShapeInstance::layer_override.
+        member this.``layer_override`` : ce_layers_layer_idView = this.Field("layer_override", "layer_override").Read(NativeCodecs.View((fun value -> ce_layers_layer_idView(value))))
 
         /// Native field ce::physics::ShapeInstance::contact_role.
         member this.``contact_role`` : ce_physics_contact_role_idView = this.Field("contact_role", "contact_role").Read(NativeCodecs.View((fun value -> ce_physics_contact_role_idView(value))))

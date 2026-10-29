@@ -7,6 +7,7 @@ open CreatorEngine
 
 [<AutoOpen>]
 module MaterialViewMembers =
+    let private method_3cc4158c4d = NativeMethodSpec("Material", "BuildShaderPropertyBlock", true, [| "ShaderMeta"; "ShaderMetaBindingLayout"; "ce::dynamic_array<unsigned char>"; "std::basic_string<char>" |], [| "const_reference"; "const_reference"; "mutable_reference"; "mutable_reference" |])
     let private method_2a6ec1476e = NativeMethodSpec("Material", "ConvertToLinearSpace", false, [| "unsigned int" |], [| "value" |])
     let private method_67b98ab03a = NativeMethodSpec("Material", "GetAOMapShared", true, [|  |], [|  |])
     let private method_c9e8f596b6 = NativeMethodSpec("Material", "GetAssetOrigin", true, [|  |], [|  |])
@@ -25,6 +26,7 @@ module MaterialViewMembers =
     let private method_92b32d13e3 = NativeMethodSpec("Material", "GetTextureMapShared", true, [| "std::basic_string_view<char>" |], [| "value" |])
     let private method_dbd71e8992 = NativeMethodSpec("Material", "GetTextureOwners", true, [|  |], [|  |])
     let private method_a751c41cdd = NativeMethodSpec("Material", "HasMaterialGraph", true, [|  |], [|  |])
+    let private method_8dc65f194a = NativeMethodSpec("Material", "ReplaceTextureOwner", false, [| "const Texture *"; "own::shared_owner<const Texture>"; "std::basic_string<char>" |], [| "value"; "const_reference"; "mutable_reference" |])
     let private method_302879646e = NativeMethodSpec("Material", "SetBaseColor", false, [| "float"; "float"; "float" |], [| "value"; "value"; "value" |])
     let private method_db7e9d6fac = NativeMethodSpec("Material", "SetBaseColor", false, [| "math::vector3" |], [| "value" |])
     let private method_3f189d011a = NativeMethodSpec("Material", "SetMetallic", false, [| "float" |], [| "value" |])
@@ -60,6 +62,12 @@ module MaterialViewMembers =
     let private method_9aae48cb5e = NativeMethodSpec("Material", "TrySetVector", false, [| "std::basic_string_view<char>"; "std::basic_string_view<char>"; "math::vector2" |], [| "value"; "value"; "const_reference" |])
     let private method_b6d58ef093 = NativeMethodSpec("Material", "TrySetVector", false, [| "std::basic_string_view<char>"; "std::basic_string_view<char>"; "math::vector3" |], [| "value"; "value"; "const_reference" |])
     let private method_746de1a317 = NativeMethodSpec("Material", "TrySetVector", false, [| "std::basic_string_view<char>"; "std::basic_string_view<char>"; "math::vector4" |], [| "value"; "value"; "const_reference" |])
+    let private method_030a9799b6 = NativeMethodSpec("Material", "UseAOMap", false, [| "own::shared_owner<const Texture>" |], [| "value" |])
+    let private method_f41af27cff = NativeMethodSpec("Material", "UseBaseColorMap", false, [| "own::shared_owner<const Texture>" |], [| "value" |])
+    let private method_7d69dde1d2 = NativeMethodSpec("Material", "UseEmissiveMap", false, [| "own::shared_owner<const Texture>" |], [| "value" |])
+    let private method_9dfb84dd81 = NativeMethodSpec("Material", "UseNormalMap", false, [| "own::shared_owner<const Texture>" |], [| "value" |])
+    let private method_ed40b81296 = NativeMethodSpec("Material", "UseOccRoughMetalMap", false, [| "own::shared_owner<const Texture>" |], [| "value" |])
+    let private method_51d575f962 = NativeMethodSpec("Material", "UseTextureMap", false, [| "std::basic_string_view<char>"; "own::shared_owner<const Texture>" |], [| "value"; "value" |])
     let private method_7382c7178b = NativeMethodSpec("Material", "operator==", true, [| "Material" |], [| "const_reference" |])
 
     type MaterialView with
@@ -201,9 +209,13 @@ module MaterialViewMembers =
             fields.["m_doubleSided"] <- (NativeCodecs.Bool).Encode(value)
             MaterialView(NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(fields)))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``BuildShaderPropertyBlock_Unavailable`` =
-            NativeUnavailableMember("method", "Material", "BuildShaderPropertyBlock", "bool (const ShaderMeta &, const ShaderMetaBindingLayout &, ce::dynamic_array<std::uint8_t> &, std::string &) const", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (const ShaderMeta &, const ShaderMetaBindingLayout &, ce::dynamic_array<std::uint8_t> &, std::string &) const; invoke_bound uses the runtime's exact overload metadata.
+        member this.``BuildShaderPropertyBlock``(``meta``: ShaderMetaView, ``layout``: ShaderMetaBindingLayoutView, ``outBytes``: byref<NativeArray<byte>>, ``outError``: byref<string>) : bool =
+            let arguments = [| ``meta``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.View((fun value -> ShaderMetaBindingLayoutView(value)))).Encode(``layout``)); NativeCallArgument.FromJson((NativeCodecs.Array(NativeCodecs.UInt8)).Encode(``outBytes``)); NativeCallArgument.FromJson((NativeCodecs.String).Encode(``outError``)) |]
+            let response = this.InvokeBound(method_3cc4158c4d, arguments)
+            ``outBytes`` <- (NativeCodecs.Array(NativeCodecs.UInt8)).Decode(NativeTypeView.FromSnapshot(response.Arguments.[2]))
+            ``outError`` <- (NativeCodecs.String).Decode(NativeTypeView.FromSnapshot(response.Arguments.[3]))
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Unavailable native method: method is reserved for engine lifecycle, scheduling, or identity management
         member _.``ConfigureShaderProperties_Unavailable`` =
@@ -325,9 +337,12 @@ module MaterialViewMembers =
         member _.``ReloadCodeShader_Unavailable`` =
             NativeUnavailableMember("method", "Material", "ReloadCodeShader", "bool (own::shared_owner<const LX::Runtime::ShaderGeneration>, std::string &)", "method is reserved for engine lifecycle, scheduling, or identity management")
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``ReplaceTextureOwner_Unavailable`` =
-            NativeUnavailableMember("method", "Material", "ReplaceTextureOwner", "bool (const Texture *, const own::shared_owner<const Texture> &, std::string &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native bool (const Texture *, const own::shared_owner<const Texture> &, std::string &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``ReplaceTextureOwner``(``previous``: NativeReference<TextureView>, ``replacement``: NativeReference<TextureView>, ``error``: byref<string>) : bool =
+            let arguments = [| ``previous``.AsNativeArgument(); ``replacement``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.String).Encode(``error``)) |]
+            let response = this.InvokeBound(method_8dc65f194a, arguments)
+            ``error`` <- (NativeCodecs.String).Decode(NativeTypeView.FromSnapshot(response.Arguments.[2]))
+            (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native Material &(float, float, float); invoke uses the runtime's exact overload metadata.
         member this.``SetBaseColor``(``r``: single, ``g``: single, ``b``: single) : MaterialView =
@@ -560,29 +575,41 @@ module MaterialViewMembers =
             let response = this.Invoke(method_746de1a317, arguments)
             (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UseAOMap_Unavailable`` =
-            NativeUnavailableMember("method", "Material", "UseAOMap", "Material &(own::shared_owner<const Texture>)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native Material &(own::shared_owner<const Texture>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UseAOMap``(``texture``: NativeReference<TextureView>) : MaterialView =
+            let arguments = [| ``texture``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_030a9799b6, arguments)
+            (NativeCodecs.View((fun value -> MaterialView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UseBaseColorMap_Unavailable`` =
-            NativeUnavailableMember("method", "Material", "UseBaseColorMap", "Material &(own::shared_owner<const Texture>)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native Material &(own::shared_owner<const Texture>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UseBaseColorMap``(``texture``: NativeReference<TextureView>) : MaterialView =
+            let arguments = [| ``texture``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_f41af27cff, arguments)
+            (NativeCodecs.View((fun value -> MaterialView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UseEmissiveMap_Unavailable`` =
-            NativeUnavailableMember("method", "Material", "UseEmissiveMap", "Material &(own::shared_owner<const Texture>)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native Material &(own::shared_owner<const Texture>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UseEmissiveMap``(``texture``: NativeReference<TextureView>) : MaterialView =
+            let arguments = [| ``texture``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_7d69dde1d2, arguments)
+            (NativeCodecs.View((fun value -> MaterialView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UseNormalMap_Unavailable`` =
-            NativeUnavailableMember("method", "Material", "UseNormalMap", "Material &(own::shared_owner<const Texture>)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native Material &(own::shared_owner<const Texture>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UseNormalMap``(``texture``: NativeReference<TextureView>) : MaterialView =
+            let arguments = [| ``texture``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_9dfb84dd81, arguments)
+            (NativeCodecs.View((fun value -> MaterialView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UseOccRoughMetalMap_Unavailable`` =
-            NativeUnavailableMember("method", "Material", "UseOccRoughMetalMap", "Material &(own::shared_owner<const Texture>)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native Material &(own::shared_owner<const Texture>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UseOccRoughMetalMap``(``texture``: NativeReference<TextureView>) : MaterialView =
+            let arguments = [| ``texture``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_ed40b81296, arguments)
+            (NativeCodecs.View((fun value -> MaterialView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: argument 1: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``UseTextureMap_Unavailable`` =
-            NativeUnavailableMember("method", "Material", "UseTextureMap", "Material &(std::string_view, own::shared_owner<const Texture>)", "argument 1: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native Material &(std::string_view, own::shared_owner<const Texture>); invoke_bound uses the runtime's exact overload metadata.
+        member this.``UseTextureMap``(``property``: string, ``texture``: NativeReference<TextureView>) : MaterialView =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``property``)); ``texture``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_51d575f962, arguments)
+            (NativeCodecs.View((fun value -> MaterialView(value)))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native bool (const Material &) const; invoke uses the runtime's exact overload metadata.
         member this.``operator==``(``other``: MaterialView) : bool =

@@ -26,9 +26,8 @@ module material_graph_TextureBindingViewMembers =
             fields.["slot"] <- (NativeCodecs.UInt32).Encode(value)
             material_graph_TextureBindingView(NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(fields)))
 
-        /// Unavailable native field: native type has no declared runtime value schema or explicit typed codec: RHITextureEntry
-        member _.``texture_Unavailable`` =
-            NativeUnavailableMember("field", "material_graph::TextureBinding", "texture", "RHITextureEntry", "native type has no declared runtime value schema or explicit typed codec: RHITextureEntry")
+        /// Native field material_graph::TextureBinding::texture.
+        member this.``texture`` : RHITextureEntryView = this.Field("texture", "texture").Read(NativeCodecs.View((fun value -> RHITextureEntryView(value))))
 
         /// Native field material_graph::TextureBinding::owner.
         member this.``owner`` : NativeReference<TextureView> = this.Field("owner", "owner").Read(NativeCodecs.Reference(NativeCodecs.View((fun value -> TextureView(value)))))

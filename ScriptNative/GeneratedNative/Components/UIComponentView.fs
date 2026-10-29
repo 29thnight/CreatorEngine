@@ -10,10 +10,13 @@ module UIComponentViewMembers =
     let private method_341782d4dd = NativeMethodSpec("UIComponent", "DeserializeNavi", false, [|  |], [|  |])
     let private method_8b0c08230b = NativeMethodSpec("UIComponent", "GetLayerOrder", true, [|  |], [|  |])
     let private method_ffabdce9cd = NativeMethodSpec("UIComponent", "GetNavigations", true, [|  |], [|  |])
+    let private method_8cfe40d923 = NativeMethodSpec("UIComponent", "GetNextNavi", false, [| "Direction" |], [| "value" |])
     let private method_06ee2d12d6 = NativeMethodSpec("UIComponent", "GetOwnerCanvas", false, [|  |], [|  |])
     let private method_7c897c830c = NativeMethodSpec("UIComponent", "IsNavLock", true, [|  |], [|  |])
     let private method_8e9cfbb204 = NativeMethodSpec("UIComponent", "IsNavigationThis", false, [|  |], [|  |])
+    let private method_677cc4e129 = NativeMethodSpec("UIComponent", "SetCanvas", false, [| "Canvas *" |], [| "value" |])
     let private method_6981e9d982 = NativeMethodSpec("UIComponent", "SetNavLock", false, [| "bool" |], [| "value" |])
+    let private method_e71dbc0b33 = NativeMethodSpec("UIComponent", "SetNavi", false, [| "Direction"; "Entity *" |], [| "value"; "value" |])
     let private method_a5522a5bb1 = NativeMethodSpec("UIComponent", "SetOrder", false, [| "int" |], [| "value" |])
 
     type UIComponentView with
@@ -62,9 +65,11 @@ module UIComponentViewMembers =
             let response = this.Invoke(method_ffabdce9cd, arguments)
             (NativeCodecs.Array(NativeCodecs.View((fun value -> NavigationView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``GetNextNavi_Unavailable`` =
-            NativeUnavailableMember("method", "UIComponent", "GetNextNavi", "Entity *(Direction)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native Entity *(Direction); invoke_bound uses the runtime's exact overload metadata.
+        member this.``GetNextNavi``(``dir``: NativeEnumValue<DirectionTag>) : NativeReference<EntityView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.Enum<DirectionTag>("Direction")).Encode(``dir``)) |]
+            let response = this.InvokeBound(method_8cfe40d923, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> EntityView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native Canvas *(); borrow uses the runtime's exact overload metadata.
         member this.``GetOwnerCanvas``() : NativeReference<CanvasView> =
@@ -100,9 +105,11 @@ module UIComponentViewMembers =
         member _.``OnRemovingFromScene_Unavailable`` =
             NativeUnavailableMember("method", "UIComponent", "OnRemovingFromScene", "void ()", "method is reserved for engine lifecycle, scheduling, or identity management")
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``SetCanvas_Unavailable`` =
-            NativeUnavailableMember("method", "UIComponent", "SetCanvas", "void (Canvas *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Canvas *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``SetCanvas``(``canvas``: NativeReference<CanvasView>) : unit =
+            let arguments = [| ``canvas``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_677cc4e129, arguments, discardResult = true)
+            ()
 
         /// Native void (bool); invoke uses the runtime's exact overload metadata.
         member this.``SetNavLock``(``lock``: bool) : unit =
@@ -110,9 +117,11 @@ module UIComponentViewMembers =
             let response = this.Invoke(method_6981e9d982, arguments)
             ()
 
-        /// Unavailable native method: argument 1: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``SetNavi_Unavailable`` =
-            NativeUnavailableMember("method", "UIComponent", "SetNavi", "void (Direction, Entity *)", "argument 1: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Direction, Entity *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``SetNavi``(``dir``: NativeEnumValue<DirectionTag>, ``otherUI``: NativeReference<EntityView>) : unit =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.Enum<DirectionTag>("Direction")).Encode(``dir``)); ``otherUI``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_e71dbc0b33, arguments, discardResult = true)
+            ()
 
         /// Native void (int); invoke uses the runtime's exact overload metadata.
         member this.``SetOrder``(``index``: int) : unit =

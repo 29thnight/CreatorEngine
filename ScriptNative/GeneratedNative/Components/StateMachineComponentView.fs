@@ -7,8 +7,12 @@ open CreatorEngine
 
 [<AutoOpen>]
 module StateMachineComponentViewMembers =
+    let private method_4a3241f2ab = NativeMethodSpec("StateMachineComponent", "AddState", false, [| "std::basic_string<char>" |], [| "const_reference" |])
+    let private method_bb690f7118 = NativeMethodSpec("StateMachineComponent", "AddTransition", false, [| "FSM::FSMState *"; "FSM::FSMState *"; "ce::func_detail::owning_func<bool, false, true, false, 48, 8, ce::heap_allocator, const BlackBoard &>" |], [| "value"; "value"; "value" |])
     let private method_bf1e473253 = NativeMethodSpec("StateMachineComponent", "FindStateByName", true, [| "std::basic_string<char>" |], [| "const_reference" |])
     let private method_f541926c93 = NativeMethodSpec("StateMachineComponent", "Initialize", false, [|  |], [|  |])
+    let private method_ab16288cc5 = NativeMethodSpec("StateMachineComponent", "RemoveState", false, [| "FSM::FSMState *" |], [| "value" |])
+    let private method_20de08c0bf = NativeMethodSpec("StateMachineComponent", "RemoveTransition", false, [| "FSM::Transition *" |], [| "value" |])
 
     type StateMachineComponentView with
         /// Typed native value codec for collection construction and explicit value arguments.
@@ -25,18 +29,22 @@ module StateMachineComponentViewMembers =
             with get () : string = this.Field("name", "name").Read(NativeCodecs.String)
             and set (value: string) = this.Field("name", "name").Write(NativeCodecs.String, value)
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``AddState_Unavailable`` =
-            NativeUnavailableMember("method", "StateMachineComponent", "AddState", "FSM::FSMState *(const std::string &)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native FSM::FSMState *(const std::string &); invoke_identity uses the runtime's exact overload metadata.
+        member this.``AddState``(``name``: string) : NativeReference<FSM_FSMStateView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``name``)) |]
+            let response, value = this.InvokeBoundReference(method_4a3241f2ab, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> FSM_FSMStateView(value))))).Decode(value)
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``AddTransition_Unavailable`` =
-            NativeUnavailableMember("method", "StateMachineComponent", "AddTransition", "FSM::Transition *(FSM::FSMState *, FSM::FSMState *, ConditionFunc)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native FSM::Transition *(FSM::FSMState *, FSM::FSMState *, ConditionFunc); invoke_identity uses the runtime's exact overload metadata.
+        member this.``AddTransition``(``from``: NativeReference<FSM_FSMStateView>, ``to``: NativeReference<FSM_FSMStateView>, ``condition``: NativeCallback<NativeBlackBoardSnapshot>) : NativeReference<FSM_TransitionView> =
+            let arguments = [| ``from``.AsNativeArgument(); ``to``.AsNativeArgument(); NativeCallArgument.FromCallback(``condition``.Token) |]
+            let response, value = this.InvokeBoundReference(method_bb690f7118, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> FSM_TransitionView(value))))).Decode(value)
 
-        /// Native FSM::FSMState *(const std::string &) const; borrow uses the runtime's exact overload metadata.
+        /// Native FSM::FSMState *(const std::string &) const; invoke_identity uses the runtime's exact overload metadata.
         member this.``FindStateByName``(``name``: string) : NativeReference<FSM_FSMStateView> =
-            let arguments = [| (NativeCodecs.String).Encode(``name``) |]
-            let value = this.Borrow(method_bf1e473253, arguments)
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.String).Encode(``name``)) |]
+            let response, value = this.InvokeBoundReference(method_bf1e473253, arguments)
             (NativeCodecs.Reference(NativeCodecs.View((fun value -> FSM_FSMStateView(value))))).Decode(value)
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
@@ -53,10 +61,14 @@ module StateMachineComponentViewMembers =
         member _.``OnRemovingFromScene_Unavailable`` =
             NativeUnavailableMember("method", "StateMachineComponent", "OnRemovingFromScene", "void ()", "method is reserved for engine lifecycle, scheduling, or identity management")
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``RemoveState_Unavailable`` =
-            NativeUnavailableMember("method", "StateMachineComponent", "RemoveState", "void (FSM::FSMState *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (FSM::FSMState *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``RemoveState``(``state``: NativeReference<FSM_FSMStateView>) : unit =
+            let arguments = [| ``state``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_ab16288cc5, arguments, discardResult = true)
+            ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``RemoveTransition_Unavailable`` =
-            NativeUnavailableMember("method", "StateMachineComponent", "RemoveTransition", "void (FSM::Transition *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (FSM::Transition *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``RemoveTransition``(``transition``: NativeReference<FSM_TransitionView>) : unit =
+            let arguments = [| ``transition``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_20de08c0bf, arguments, discardResult = true)
+            ()

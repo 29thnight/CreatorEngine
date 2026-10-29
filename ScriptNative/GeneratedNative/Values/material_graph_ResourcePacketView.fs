@@ -17,9 +17,8 @@ module material_graph_ResourcePacketViewMembers =
         /// Native field material_graph::ResourcePacket::uniforms.
         member this.``uniforms`` : NativeArray<byte> = this.Field("uniforms", "uniforms").Read(NativeCodecs.Array(NativeCodecs.UInt8))
 
-        /// Unavailable native field: sequence element: native type has no declared runtime value schema or explicit typed codec: RHIBindingDesc
-        member _.``textures_Unavailable`` =
-            NativeUnavailableMember("field", "material_graph::ResourcePacket", "textures", "ce::dynamic_array<RHIBindingDesc>", "sequence element: native type has no declared runtime value schema or explicit typed codec: RHIBindingDesc")
+        /// Native field material_graph::ResourcePacket::textures.
+        member this.``textures`` : NativeArray<RHIBindingDescView> = this.Field("textures", "textures").Read(NativeCodecs.Array(NativeCodecs.View((fun value -> RHIBindingDescView(value)))))
 
         /// Native field material_graph::ResourcePacket::samplers.
         member this.``samplers`` : NativeArray<RHISamplerDescView> = this.Field("samplers", "samplers").Read(NativeCodecs.Array(NativeCodecs.View((fun value -> RHISamplerDescView(value)))))

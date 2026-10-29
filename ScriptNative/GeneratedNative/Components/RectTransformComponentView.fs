@@ -26,6 +26,7 @@ module RectTransformComponentViewMembers =
     let private method_c34e128b28 = NativeMethodSpec("RectTransformComponent", "SetAnchoredPosition", false, [| "math::vector2" |], [| "const_reference" |])
     let private method_acdc488dac = NativeMethodSpec("RectTransformComponent", "SetAnchorsPivotKeepWorld", false, [| "math::vector2"; "math::vector2"; "math::vector2"; "math::rect" |], [| "const_reference"; "const_reference"; "const_reference"; "const_reference" |])
     let private method_cba732caa6 = NativeMethodSpec("RectTransformComponent", "SetLayoutScale", false, [| "float"; "bool" |], [| "value"; "value" |])
+    let private method_2635a96634 = NativeMethodSpec("RectTransformComponent", "SetParentKeepWorldPosition", false, [| "Entity *" |], [| "value" |])
     let private method_639b32ff8c = NativeMethodSpec("RectTransformComponent", "SetPivot", false, [| "math::vector2" |], [| "const_reference" |])
     let private method_ddc872aee1 = NativeMethodSpec("RectTransformComponent", "SetScreenPosition", false, [| "math::vector2" |], [| "const_reference" |])
     let private method_27dfa8200b = NativeMethodSpec("RectTransformComponent", "SetSizeDelta", false, [| "math::vector2" |], [| "const_reference" |])
@@ -175,9 +176,11 @@ module RectTransformComponentViewMembers =
             let response = this.Invoke(method_cba732caa6, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``SetParentKeepWorldPosition_Unavailable`` =
-            NativeUnavailableMember("method", "RectTransformComponent", "SetParentKeepWorldPosition", "void (Entity *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (Entity *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``SetParentKeepWorldPosition``(``newParent``: NativeReference<EntityView>) : unit =
+            let arguments = [| ``newParent``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_2635a96634, arguments, discardResult = true)
+            ()
 
         /// Native void (const math::vector2 &); invoke uses the runtime's exact overload metadata.
         member this.``SetPivot``(``pivot``: math_vector2View) : unit =

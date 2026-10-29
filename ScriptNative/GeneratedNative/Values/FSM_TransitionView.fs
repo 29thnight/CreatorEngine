@@ -15,23 +15,20 @@ module FSM_TransitionViewMembers =
         /// Typed native value codec for collection construction and explicit value arguments.
         static member Codec : NativeCodec<FSM_TransitionView> = NativeCodecs.View(fun source -> FSM_TransitionView(source))
 
-        /// Construct an explicit read-only native wire snapshot for value arguments.
-        static member FromJson(value: JsonElement) = FSM_TransitionView(NativeTypeView.FromSnapshot(value))
-
-        /// Native FSMState *() const; borrow uses the runtime's exact overload metadata.
+        /// Native FSMState *() const; invoke_identity uses the runtime's exact overload metadata.
         member this.``GetFrom``() : NativeReference<FSM_FSMStateView> =
             let arguments = [|  |]
-            let value = this.Borrow(method_be8514c782, arguments)
+            let response, value = this.InvokeBoundReference(method_be8514c782, arguments)
             (NativeCodecs.Reference(NativeCodecs.View((fun value -> FSM_FSMStateView(value))))).Decode(value)
 
-        /// Native FSMState *() const; borrow uses the runtime's exact overload metadata.
+        /// Native FSMState *() const; invoke_identity uses the runtime's exact overload metadata.
         member this.``GetTo``() : NativeReference<FSM_FSMStateView> =
             let arguments = [|  |]
-            let value = this.Borrow(method_866aa78f5f, arguments)
+            let response, value = this.InvokeBoundReference(method_866aa78f5f, arguments)
             (NativeCodecs.Reference(NativeCodecs.View((fun value -> FSM_FSMStateView(value))))).Decode(value)
 
-        /// Native bool (const BlackBoard &) const; invoke uses the runtime's exact overload metadata.
+        /// Native bool (const BlackBoard &) const; invoke_bound uses the runtime's exact overload metadata.
         member this.``operator()``(``bb``: BlackBoardView) : bool =
-            let arguments = [| (NativeCodecs.View((fun value -> BlackBoardView(value)))).Encode(``bb``) |]
-            let response = this.Invoke(method_2cf6b96430, arguments)
+            let arguments = [| ``bb``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_2cf6b96430, arguments)
             (NativeCodecs.Bool).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))

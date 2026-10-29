@@ -12,7 +12,9 @@ module TerrainComponentViewMembers =
     let private method_ca3048a94a = NativeMethodSpec("TerrainComponent", "ClearLayers", false, [|  |], [|  |])
     let private method_6a842942aa = NativeMethodSpec("TerrainComponent", "GetCurrentBrush", false, [|  |], [|  |])
     let private method_e93ce511db = NativeMethodSpec("TerrainComponent", "GetHeight", true, [|  |], [|  |])
+    let private method_a8991e6830 = NativeMethodSpec("TerrainComponent", "GetHeightSamples", true, [|  |], [|  |])
     let private method_5f185c9c49 = NativeMethodSpec("TerrainComponent", "GetLayerCount", true, [|  |], [|  |])
+    let private method_6d45e3f840 = NativeMethodSpec("TerrainComponent", "GetLayerDesc", false, [| "unsigned int" |], [| "value" |])
     let private method_00bcf2310a = NativeMethodSpec("TerrainComponent", "GetLayerNames", false, [|  |], [|  |])
     let private method_c3eb14dfe8 = NativeMethodSpec("TerrainComponent", "GetMaterial", true, [|  |], [|  |])
     let private method_851293c909 = NativeMethodSpec("TerrainComponent", "GetMaterialShared", true, [|  |], [|  |])
@@ -29,7 +31,9 @@ module TerrainComponentViewMembers =
     let private method_5e7e63ac39 = NativeMethodSpec("TerrainComponent", "RemoveLayer", false, [| "unsigned int" |], [| "value" |])
     let private method_b7a621bb06 = NativeMethodSpec("TerrainComponent", "Resize", false, [| "int"; "int" |], [| "value"; "value" |])
     let private method_5e4a917e32 = NativeMethodSpec("TerrainComponent", "Save", false, [| "std::basic_string<wchar_t>"; "std::basic_string<wchar_t>" |], [| "const_reference"; "const_reference" |])
+    let private method_9cfd92c98f = NativeMethodSpec("TerrainComponent", "SetBrushMaskTexture", false, [| "TerrainBrush *"; "std::basic_string<wchar_t>" |], [| "value"; "const_reference" |])
     let private method_7ff7482d48 = NativeMethodSpec("TerrainComponent", "SetSelectedLayerId", false, [| "unsigned int" |], [| "value" |])
+    let private method_6077513c5f = NativeMethodSpec("TerrainComponent", "SetTerrainBrush", false, [| "TerrainBrush *" |], [| "value" |])
     let private method_cf61af52d2 = NativeMethodSpec("TerrainComponent", "UpdateLayerDesc", false, [|  |], [|  |])
 
     type TerrainComponentView with
@@ -91,15 +95,23 @@ module TerrainComponentViewMembers =
         member _.``GetHeightMap_Unavailable`` =
             NativeUnavailableMember("method", "TerrainComponent", "GetHeightMap", "float *()", "return value: raw pointer has no bounded, retained record borrow contract")
 
+        /// Native std::span<const float> () const; borrow uses the runtime's exact overload metadata.
+        member this.``GetHeightSamples``() : NativeArray<single> =
+            let arguments = [|  |]
+            let value = this.Borrow(method_a8991e6830, arguments)
+            (NativeCodecs.Array(NativeCodecs.Single)).Decode(value)
+
         /// Native ce::dynamic_array<TerrainLayer> () const; invoke uses the runtime's exact overload metadata.
         member this.``GetLayerCount``() : NativeArray<TerrainLayerView> =
             let arguments = [|  |]
             let response = this.Invoke(method_5f185c9c49, arguments)
             (NativeCodecs.Array(NativeCodecs.View((fun value -> TerrainLayerView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
-        /// Unavailable native method: mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path
-        member _.``GetLayerDesc_Unavailable`` =
-            NativeUnavailableMember("method", "TerrainComponent", "GetLayerDesc", "TerrainLayer *(uint32_t)", "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path")
+        /// Native TerrainLayer *(uint32_t); invoke_bound uses the runtime's exact overload metadata.
+        member this.``GetLayerDesc``(``layerID``: uint32) : NativeReference<TerrainLayerView> =
+            let arguments = [| NativeCallArgument.FromJson((NativeCodecs.UInt32).Encode(``layerID``)) |]
+            let response = this.InvokeBound(method_6d45e3f840, arguments)
+            (NativeCodecs.Reference(NativeCodecs.View((fun value -> TerrainLayerView(value))))).Decode(NativeTypeView.FromSnapshot(response.ReturnValue))
 
         /// Native ce::dynamic_array<const char *> (); invoke uses the runtime's exact overload metadata.
         member this.``GetLayerNames``() : NativeArray<string> =
@@ -220,9 +232,11 @@ module TerrainComponentViewMembers =
             let response = this.Invoke(method_5e4a917e32, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``SetBrushMaskTexture_Unavailable`` =
-            NativeUnavailableMember("method", "TerrainComponent", "SetBrushMaskTexture", "void (TerrainBrush *, const std::wstring &)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (TerrainBrush *, const std::wstring &); invoke_bound uses the runtime's exact overload metadata.
+        member this.``SetBrushMaskTexture``(``brush``: NativeReference<TerrainBrushView>, ``path``: string) : unit =
+            let arguments = [| ``brush``.AsNativeArgument(); NativeCallArgument.FromJson((NativeCodecs.String).Encode(``path``)) |]
+            let response = this.InvokeBound(method_9cfd92c98f, arguments, discardResult = true)
+            ()
 
         /// Native void (uint32); invoke uses the runtime's exact overload metadata.
         member this.``SetSelectedLayerId``(``layerId``: uint32) : unit =
@@ -230,9 +244,11 @@ module TerrainComponentViewMembers =
             let response = this.Invoke(method_7ff7482d48, arguments)
             ()
 
-        /// Unavailable native method: argument 0: native ownership, pointer, or callback cannot be manufactured from JSON
-        member _.``SetTerrainBrush_Unavailable`` =
-            NativeUnavailableMember("method", "TerrainComponent", "SetTerrainBrush", "void (TerrainBrush *)", "argument 0: native ownership, pointer, or callback cannot be manufactured from JSON")
+        /// Native void (TerrainBrush *); invoke_bound uses the runtime's exact overload metadata.
+        member this.``SetTerrainBrush``(``brush``: NativeReference<TerrainBrushView>) : unit =
+            let arguments = [| ``brush``.AsNativeArgument() |]
+            let response = this.InvokeBound(method_6077513c5f, arguments, discardResult = true)
+            ()
 
         /// Native void (); invoke uses the runtime's exact overload metadata.
         member this.``UpdateLayerDesc``() : unit =
