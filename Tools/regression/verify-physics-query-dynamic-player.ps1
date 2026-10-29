@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([Parameter(Mandatory)][string]$Stage)
 
 $ErrorActionPreference='Stop'
@@ -34,7 +34,7 @@ foreach($iteration in 1..2){
 }
 
 $hashes=@{}
-foreach($path in @('GameScripts/PhysicsB2PlayerProbe.cs','GameScripts/PhysicsB2DynamicQueryProbe.cs','Tools/regression/verify-physics-b2-player.ps1','Tools/regression/verify-physics-query-dynamic-player.ps1','Tools/regression/author-physics-query-dynamic.ps1','Tools/regression/fixtures/PhysicsQueryDynamic.creator')){
+foreach($path in @('GameScripts/PhysicsB2PlayerProbe.fs','GameScripts/PhysicsB2DynamicQueryProbe.fs','Tools/regression/verify-physics-b2-player.ps1','Tools/regression/verify-physics-query-dynamic-player.ps1','Tools/regression/author-physics-query-dynamic.ps1','Tools/regression/fixtures/PhysicsQueryDynamic.creator')){
     $hashes[$path]=(Get-FileHash (Join-Path $repo $path)).Hash
 }
 

@@ -58,7 +58,8 @@ def main() -> None:
                f"-p:ScriptNativeGenerator={args.generator.resolve()}",
                f"-p:ScriptNativeOutput={work / 'table'}", f"-p:ScriptNativeClangArguments={clang_arguments}",
                f"-p:ScriptReflectionGeneratedProps={generated_props}"]
-    result = subprocess.run(command, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    result = subprocess.run(command, env=env, text=True, encoding="utf-8", errors="replace",
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     (work / "managed-build.log").write_text(result.stdout, encoding="utf-8")
     if result.returncode:
         raise SystemExit(f"Managed build failed ({result.returncode}):\n{result.stdout}")

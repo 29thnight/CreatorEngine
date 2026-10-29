@@ -1,4 +1,4 @@
-#include "../../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+﻿#include "../../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
 #include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
@@ -137,13 +137,7 @@ namespace EditorScriptAuthoring
                     return FailWork(work, "Compiling scripts in a source checkout requires the .NET SDK (dotnet.exe on PATH).");
                 program = dotnet.data();
                 workingDirectory = checkout.repository;
-#if defined(CREATOR_LEGACY_SCRIPT_BASELINE)
-                const auto scriptProject = ClrHost::Get().UsesFSharpNative()
-                    ? L"ScriptNative.GameScripts/ScriptNative.GameScripts.fsproj"
-                    : L"GameScripts/GameScripts.fsproj";
-#else
-                const auto scriptProject = L"ScriptNative.GameScripts/ScriptNative.GameScripts.fsproj";
-#endif
+                const auto scriptProject = L"Engine/Scripting/GameScripts/ScriptNative.GameScripts.fsproj";
                 arguments = {L"build", (checkout.repository / scriptProject).wstring(), L"-c", checkout.configuration,
                     L"--nologo", L"-v", L"quiet", L"-p:CreatorScriptSourceRoot=" + (projectRoot / L"Assets/Script").wstring(),
                     L"-flp:logfile=" + work.log.wstring() + L";verbosity=minimal"};

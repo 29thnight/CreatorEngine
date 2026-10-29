@@ -6,11 +6,9 @@ Push-Location $repo
 try {
     $out=Join-Path $repo ('Build/Verification/N3Exchange/Contracts-'+[guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Force $out|Out-Null
-    foreach($project in @('FixedUpdateProbe','ContactStreamProbe')) {
-        dotnet run --project "Tools/regression/$project" -c $Configuration *> "$out/$project.log"
-        if($LASTEXITCODE){throw "$project failed: $out/$project.log"}
-        Get-Content "$out/$project.log" | Where-Object {$_ -match '^(FIXED_UPDATE_MANAGED_OK|CONTACT_STREAM_OK)'}
-    }
+    & "$PSScriptRoot/verify-script-native-table.ps1" -Configuration $Configuration *> "$out/fsharp-runtime.log"
+    if($LASTEXITCODE){throw "F# runtime regression failed: $out/fsharp-runtime.log"}
+    Get-Content "$out/fsharp-runtime.log" | Where-Object {$_ -match '^(FIXED_UPDATE_MANAGED_OK|CONTACT_STREAM_OK|PHYSICS_BODY_IDENTITY_OK)'}
     if(!$SkipNative) {
         $vswhere=Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
         $vs=& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
@@ -28,18 +26,14 @@ if errorlevel 1 exit /b 1
         if($LASTEXITCODE){throw "Native clock regression failed: $out/clock.log"}
         Get-Content "$out/clock.log" | Where-Object {$_ -like 'SIMULATION_EXCHANGE_OK*'}
     }
-    $removed=Get-ChildItem ScriptCore -File -Filter *.cs | Select-String -Pattern 'public\s+(virtual\s+)?Task\s+OnSimulate|class\s+SimulationScope|public\s+SimulationScope\s+Scope'
-    if($removed){throw 'Removed coroutine authoring API remains'}
     $hashes=@{}
-    foreach($path in @('Engine/SceneRuntime/SimulationTick.h','Engine/SceneRuntime/SimulationExchange.h','ScriptCore/Simulation.cs','Engine/SceneRuntime/SceneManager.cpp','Engine/SceneRuntime/ScenePhysicsSimulation.cpp','Engine/SceneRuntime/ClrHost.cpp','ScriptCore/Bootstrap.cs','ScriptCore/Component.cs','ScriptCore/ScriptRegistry.cs','ScriptCore/ScriptFactory.cs','ScriptCore/ContactStream.cs','ScriptCore/ComponentLifetime.cs')) {
-        $hashes[$path]=(Get-FileHash $path).Hash
+    foreach($path in @('Engine/SceneRuntime/SimulationTick.h','Engine/SceneRuntime/SimulationExchange.h','Engine/SceneRuntime/SceneManager.cpp','Engine/SceneRuntime/ScenePhysicsSimulation.cpp','Engine/SceneRuntime/ClrHost.cpp')) {
+        $hashes[$path]=(Get-FileHash "$repo/$path").Hash
     }
-    foreach($file in Get-ChildItem "$repo/ScriptRuntime" -File -Filter *.fs) {
-        $relative='ScriptRuntime/'+$file.Name
-        $hashes[$relative]=(Get-FileHash $file.FullName).Hash
+    foreach($file in Get-ChildItem "$repo/Engine/Scripting/Bindings" -Recurse -File -Filter *.fs | Where-Object {$_.FullName -notmatch '\\(bin|obj)\\'}) {
+        $hashes[[IO.Path]::GetRelativePath($repo,$file.FullName).Replace('\','/')]=(Get-FileHash $file.FullName).Hash
     }
-    $hashes['ScriptCore/ManagedRuntime.cs']=(Get-FileHash "$repo/ScriptCore/ManagedRuntime.cs").Hash
-    @{result='N3_EXCHANGE_CONTRACTS_OK';configuration=$Configuration;nativeClockTested=(!$SkipNative);sourceHashes=$hashes;scope='Native command/snapshot exchange, synthetic frame cadence, concurrent value producers and real ScriptCore dispatch. Actual Editor/Player acceptance is separate'}|ConvertTo-Json -Depth 10|Set-Content "$out/result.json" -Encoding utf8
+    @{result='N3_EXCHANGE_CONTRACTS_OK';configuration=$Configuration;nativeClockTested=(!$SkipNative);sourceHashes=$hashes;scope='Native command/snapshot exchange, synthetic frame cadence, concurrent value producers and real F# dispatch. Actual Editor/Player acceptance is separate'}|ConvertTo-Json -Depth 10|Set-Content "$out/result.json" -Encoding utf8
     "N3_EXCHANGE_CONTRACTS_OK evidence=$out"
     if($Product){& "$PSScriptRoot/verify-simulation-exchange-http.ps1" -Configuration $Configuration -EditorExe $EditorExe}
 } finally {Pop-Location}

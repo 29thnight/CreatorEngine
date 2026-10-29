@@ -10,7 +10,7 @@ New-Item -ItemType Directory "$project/Assets", $backup, $source -Force | Out-Nu
 Copy-Item -LiteralPath "$repo/Dynamic_CPP/ProjectSetting" -Destination $project -Recurse
 Copy-Item -LiteralPath "$repo/Dynamic_CPP/Assets/Shaders" -Destination "$project/Assets" -Recurse
 $fixture = Join-Path $PSScriptRoot 'fixtures/NativeComponentBindings'
-& dotnet build "$repo/ScriptNative.GameScripts/ScriptNative.GameScripts.fsproj" -c $Configuration "-p:CreatorScriptSourceRoot=$fixture" "-p:CreatorNativeGameOutDir=$source/" "-p:CreatorScriptBuildKey=NativeComponents-$([guid]::NewGuid().ToString('N'))" --nologo -v:q *> "$work/build.log"
+& dotnet build "$repo/Engine/Scripting/GameScripts/ScriptNative.GameScripts.fsproj" -c $Configuration "-p:CreatorScriptSourceRoot=$fixture" "-p:CreatorNativeGameOutDir=$source/" "-p:CreatorScriptBuildKey=NativeComponents-$([guid]::NewGuid().ToString('N'))" --nologo -v:q *> "$work/build.log"
 if ($LASTEXITCODE -ne 0) { throw "Fixture build failed: $work/build.log" }
 $target = Join-Path $repo "Bin/x64-$Configuration/Managed/FSharpNative/Scripts"
 $files = @('GameScripts.dll', 'GameScripts.deps.json', 'GameScripts.pdb', 'GameScripts.scripts.metadata.json')

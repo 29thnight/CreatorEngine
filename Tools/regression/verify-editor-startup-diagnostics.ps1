@@ -1,4 +1,4 @@
-# 에디터가 한 바퀴 도는 동안 **아무도 안 읽던 두 채널**을 판정한다.
+﻿# 에디터가 한 바퀴 도는 동안 **아무도 안 읽던 두 채널**을 판정한다.
 #
 # ── 왜 필요한가 ─────────────────────────────────────────────────────────────
 #
@@ -264,7 +264,7 @@ Assert ($distinctManaged.Count -ge 2) `
 
 # 자극이 실제로 래퍼를 지났는가. 이 줄이 없으면 아래 '래퍼 파일이 없다' 단정이
 # 빈 집합을 통과한다 — 래퍼를 안 지났으니 당연히 래퍼 이름도 안 나온다.
-Assert (@($managedSources | Where-Object { $_ -like 'ManagedLogProbe.cs:*' }).Count -ge 1) `
+Assert (@($managedSources | Where-Object { $_ -like 'ManagedLogProbe.fs:*' }).Count -ge 1) `
     ("ManagedLogProbe 가 낸 줄이 로그에 없다 — script.invoke 가 돌지 않았거나 래퍼 경로가 끊겼다. 관측: " +
      ($distinctManaged -join ', '))
 

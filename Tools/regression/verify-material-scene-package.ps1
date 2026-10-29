@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
     [string]$EngineDistribution = '',
     [switch]$Shipping,
@@ -54,23 +54,8 @@ $generation = '8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45/8'
 $generationParent = Join-Path $project 'Library/ModelAssetGenerations/8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45'
 New-Item -ItemType Directory -Path $generationParent -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repo "Dynamic_CPP/Library/ModelAssetGenerations/$generation") -Destination $generationParent -Recurse
-$probeSource = @'
-using CreatorEngine;
-
-public sealed class PackageSmokeProbe : Component
-{
-    public override void OnInitialized()
-    {
-        System.Console.WriteLine("[SMOKE] managed OnInitialized: PackageSmokeProbe");
-    }
-
-    public override void OnBeginSimulation()
-    {
-        System.Console.WriteLine("[SMOKE] managed OnBeginSimulation: PackageSmokeProbe");
-    }
-}
-'@
-[IO.File]::WriteAllText((Join-Path $assets 'Script/PackageSmokeProbe.cs'), $probeSource)
+Copy-Item -LiteralPath (Join-Path $repo 'GameScripts/PackageSmokeProbe.fs') -Destination (Join-Path $assets 'Script/PackageSmokeProbe.fs')
+Set-Content (Join-Path $assets 'Script/compile.order') 'PackageSmokeProbe.fs' -Encoding utf8
 $originalScene = [IO.File]::ReadAllText((Join-Path $repo 'Dynamic_CPP/Assets/Scenes/FT_Primitives.creator'))
 $entities = [Regex]::Split($originalScene, '(?m)(?=^  - Entity:)')
 $sceneText = ($entities[0..4] -join '').Replace('m_name: FT_Primitives', 'm_name: LX_CookFixture').Replace(

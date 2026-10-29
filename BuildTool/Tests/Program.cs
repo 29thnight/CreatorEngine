@@ -1,11 +1,11 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text.Json.Nodes;
 using CreatorBuildTool;
 
 if (args.Length == 2 && args[0] == "--native-api-check")
 {
-    var version = EnginePublisher.ReadManagedApiVersion(Path.GetFullPath(args[1]), true);
-    if (version != 48) throw new Exception($"Unexpected native F# API version: {version}");
+    var version = EnginePublisher.ReadManagedApiVersion(Path.GetFullPath(args[1]));
+    if (version != 49) throw new Exception($"Unexpected native F# API version: {version}");
     Console.WriteLine($"FSHARP_NATIVE_METADATA_OK version={version}");
     return 0;
 }
@@ -40,10 +40,9 @@ async Task RejectAsync(Func<Task> action, string message)
 using var context = new BuildContext(new Options(["help"]), CancellationToken.None);
 try
 {
-    Check(new Options(["publish-engine", "--legacy-script-baseline", "--build"]).Flag("legacy-script-baseline"), "Legacy comparison flag was not accepted");
-    Check(GameCompiler.ManagedFiles.Contains("Scripts/FSharp.Core.dll") && GameCompiler.ManagedFiles.Contains("Scripts/CreatorEngine.FSharp.Runtime.dll"), "F# private runtime closure omitted from package file list");
-    Check(GameCompiler.CoreFiles.Contains("CreatorEngine.ManagedRuntime.dll")
-        && GameCompiler.CoreFiles.Contains("CreatorEngine.ManagedRuntime.deps.json")
+    Check(GameCompiler.ManagedFiles.Contains("FSharpNative/Scripts/FSharp.Core.dll") && GameCompiler.ManagedFiles.Contains("FSharpNative/Scripts/CreatorEngine.FSharp.Runtime.dll"), "F# private runtime closure omitted from package file list");
+    Check(GameCompiler.CoreFiles.Contains("CreatorEngine.NativeBindings.dll")
+        && GameCompiler.CoreFiles.Contains("CreatorEngine.AudioValues.dll")
         && GameCompiler.CoreFiles.Contains("FSharp.Core.dll"), "Process-resident F# engine runtime closure omitted from SDK/package");
     var sourceRoot = Path.Combine(root, "FSharp sources with spaces"); Directory.CreateDirectory(sourceRoot);
     File.WriteAllText(Path.Combine(sourceRoot, "A.fs"), "namespace A");
@@ -318,9 +317,13 @@ try
     { var bad = version.DeepClone(); bad["version"] = invalid; Reject(() => Metadata.ValidateVersion(bad), "Invalid version accepted"); }
     var manifest = Metadata.Object(new { schemaVersion = 1, productName = "CreatorEngine 2", featureRelease = "", version = "0.0.0.0", channel = "preview", localDevelopment = true,
         buildId = Guid.NewGuid().ToString("D"), payloadDigest = Metadata.Digest(files), platform = "win-x64", configuration = "Debug", shipping = false,
-        binaryRoot = "Bin/x64-Debug", scriptApi = 24, hostAbi = 1, files });
+        binaryRoot = "Bin/x64-Debug", scriptApi = 49, scriptBackend = "fsharp-native", hostAbi = 1, files });
     Metadata.Write(Path.Combine(engineRoot, "engine.manifest.json"), manifest); File.WriteAllText(Path.Combine(engineRoot, "engine.info"), Metadata.Info(manifest));
     var engine = EngineDistribution.Load(engineRoot, context); Check(engine.Configuration == "Debug", "Valid engine rejected");
+    var retiredBackend = manifest.DeepClone(); retiredBackend["scriptBackend"] = "scriptcore";
+    Metadata.Write(Path.Combine(engineRoot, "engine.manifest.json"), retiredBackend);
+    Reject(() => EngineDistribution.Load(engineRoot, context), "Retired scripting distribution accepted");
+    Metadata.Write(Path.Combine(engineRoot, "engine.manifest.json"), manifest);
     File.WriteAllText(Path.Combine(engineRoot, "extra.dll"), "extra"); Reject(() => EngineDistribution.Load(engineRoot, context), "Unlisted DLL accepted"); File.Delete(Path.Combine(engineRoot, "extra.dll"));
     File.WriteAllText(Path.Combine(engineRoot, "payload.txt"), "tampered payload"); Reject(() => EngineDistribution.Load(engineRoot, context), "Modified payload accepted");
     File.WriteAllText(Path.Combine(engineRoot, "payload.txt"), "original payload");

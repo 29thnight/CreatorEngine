@@ -1,4 +1,4 @@
-#include "../Containers/ContainerAPI.h"
+﻿#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -124,7 +124,7 @@ namespace
     static_assert(offsetof(ScriptApiTable, Camera_NotifyCameraCut)
         == offsetof(ScriptApiTable, Body_ShapeRole) + sizeof(decltype(ScriptApiTable::Body_ShapeRole)));
     static_assert(sizeof(ScriptApiTable)
-        == offsetof(ScriptApiTable, NativeReflection_Release) + sizeof(decltype(ScriptApiTable::NativeReflection_Release)));
+        == offsetof(ScriptApiTable, NativeCallback_EndGeneration) + sizeof(decltype(ScriptApiTable::NativeCallback_EndGeneration)));
 
 	ScriptApiTable g_apiTable{};
 
@@ -2626,13 +2626,7 @@ ClrHost& ClrHost::Get()
 bool ClrHost::BindEntryPoints(const std::filesystem::path& assemblyPath)
 {
 	const std::wstring assembly = assemblyPath.wstring();
-#if defined(CREATOR_LEGACY_SCRIPT_BASELINE)
-	const wchar_t* typeName = m_useFSharp
-        ? L"CreatorEngine.Native.RuntimeBootstrap, CreatorEngine.NativeBindings"
-        : L"CreatorEngine.Bootstrap, ScriptCore";
-#else
 	const wchar_t* typeName = L"CreatorEngine.Native.RuntimeBootstrap, CreatorEngine.NativeBindings";
-#endif
 
 	auto bindFrom = [&](const wchar_t* owningType, const wchar_t* method, void** out) -> bool
 	{
@@ -2653,8 +2647,7 @@ bool ClrHost::BindEntryPoints(const std::filesystem::path& assemblyPath)
 	};
 
 	void* fn = nullptr;
-	if (m_useFSharp)
-    {
+	    {
         const wchar_t* nativeType = L"CreatorEngine.Native.NativeBootstrap, CreatorEngine.NativeBindings";
         if (!bindFrom(nativeType, L"Initialize", &fn))
         {
@@ -2672,16 +2665,6 @@ bool ClrHost::BindEntryPoints(const std::filesystem::path& assemblyPath)
         }
         m_fnFSharpStart = reinterpret_cast<FSharpStartFn>(fn);
     }
-#if defined(CREATOR_LEGACY_SCRIPT_BASELINE)
-    else
-    {
-        if (!bind(L"Initialize", &fn))
-        {
-            return false;
-        }
-        m_fnInitialize = reinterpret_cast<InitializeFn>(fn);
-    }
-#endif
 	if (!bind(L"Shutdown", &fn))         return false;  m_fnShutdown = reinterpret_cast<ShutdownFn>(fn);
 	if (!bind(L"FlushRegistrations", &fn)) return false;  m_fnFlushRegistrations = reinterpret_cast<NoArgumentFn>(fn);
 	if (!bind(L"OnTickSimulate", &fn)) return false; m_fnUpdate = reinterpret_cast<TickFn>(fn);
@@ -2691,7 +2674,7 @@ bool ClrHost::BindEntryPoints(const std::filesystem::path& assemblyPath)
 	if (!bind(L"PublishContacts", &fn)) return false;  m_fnFlushPhysicsEvents = reinterpret_cast<FlushPhysicsFn>(fn);
 	if (!bind(L"CreateComponent", &fn))  return false;  m_fnCreateComponent = reinterpret_cast<CreateFn>(fn);
 
-	// 선택 바인딩 — 구 ScriptCore 어셈블리에는 없을 수 있다. 실패해도 계속 간다
+	// 런타임 기능별 진입점을 연결한다.
 	// (해당 기능만 조용히 꺼진다: 목록 UI는 빈 목록, 메시지는 전달되지 않음).
 	if (bind(L"GetComponentTypeNames", &fn))    m_fnGetComponentTypeNames    = reinterpret_cast<TypeNamesFn>(fn);
 	if (bind(L"GetAniBehaviorTypeNames", &fn)) m_fnGetAniBehaviorTypeNames = reinterpret_cast<TypeNamesFn>(fn);
@@ -2710,13 +2693,7 @@ bool ClrHost::BindEntryPoints(const std::filesystem::path& assemblyPath)
 	// 성격이 스크립트 수명이 아니라 런타임 정책이라 진입점 묶음을 나눴다.
 	// 선택 바인딩이라 이것이 없는 어셈블리에서는 GC 연동만 조용히 꺼진다.
 	{
-#if defined(CREATOR_LEGACY_SCRIPT_BASELINE)
-		const wchar_t* gcType = m_useFSharp
-            ? L"CreatorEngine.Native.GcControl, CreatorEngine.NativeBindings"
-            : L"CreatorEngine.GcControl, ScriptCore";
-#else
 		const wchar_t* gcType = L"CreatorEngine.Native.GcControl, CreatorEngine.NativeBindings";
-#endif
 		if (bindFrom(gcType, L"CollectNow", &fn))     m_fnGcCollectNow     = reinterpret_cast<NoArgumentFn>(fn);
 		if (bindFrom(gcType, L"SetLatencyMode", &fn)) m_fnGcSetLatencyMode = reinterpret_cast<GcLatencyFn>(fn);
 		if (bindFrom(gcType, L"GetStats", &fn))       m_fnGcGetStats       = reinterpret_cast<GcStatsFn>(fn);
@@ -2770,21 +2747,9 @@ bool ClrHost::Initialize()
 	// 관리 어셈블리 위치는 Host가 ce::paths::roots로 결정한다. 개발 빌드는 Editor와
 	// Player가 구성별 공통 Managed를 쓰고, 패키지는 Player 옆 Managed를 쓴다.
 	const std::filesystem::path baseDir = ce::paths::managed_path();
-#if defined(CREATOR_LEGACY_SCRIPT_BASELINE)
-	wchar_t fsharpMode[2]{};
-	const DWORD fsharpModeLength = GetEnvironmentVariableW(L"CREATOR_FSHARP_NATIVE", fsharpMode, 2);
-	m_useFSharp = !(fsharpModeLength == 1 && fsharpMode[0] == L'0');
-#else
-	m_useFSharp = true;
-#endif
 
-#if defined(CREATOR_LEGACY_SCRIPT_BASELINE)
-	const std::filesystem::path assemblyPath = baseDir / (m_useFSharp ? L"CreatorEngine.NativeBindings.dll" : L"ScriptCore.dll");
-	const std::filesystem::path configPath = baseDir / (m_useFSharp ? L"CreatorEngine.NativeBindings.runtimeconfig.json" : L"ScriptCore.runtimeconfig.json");
-#else
 	const std::filesystem::path assemblyPath = baseDir / L"CreatorEngine.NativeBindings.dll";
 	const std::filesystem::path configPath = baseDir / L"CreatorEngine.NativeBindings.runtimeconfig.json";
-#endif
 
 	if (!std::filesystem::exists(assemblyPath) || !std::filesystem::exists(configPath))
 	{
@@ -2806,8 +2771,7 @@ bool ClrHost::Initialize()
 	FillApiTable();
     ScriptObjectRegistry::Get().BeginAssetSession(DataSystem::GetIfAlive());
     int initResult = 0;
-    if (m_useFSharp)
-    {
+        {
 #if defined(CE_SCENE_HEADLESS)
         constexpr int headless = 1;
 #else
@@ -2823,12 +2787,6 @@ bool ClrHost::Initialize()
             }
         }
     }
-#if defined(CREATOR_LEGACY_SCRIPT_BASELINE)
-    else
-    {
-        initResult = m_fnInitialize(&g_apiTable);
-    }
-#endif
 	if (0 != initResult)
 	{
         ce::script::binding::EndReflectionSession();
@@ -2842,13 +2800,7 @@ bool ClrHost::Initialize()
 
 	// 게임 스크립트 어셈블리를 언로드 가능한 컨텍스트에 올린다.
 	// 없어도 엔진은 동작한다 — 스크립트만 비어 있을 뿐이다.
-#if defined(CREATOR_LEGACY_SCRIPT_BASELINE)
-	const std::filesystem::path scriptsPath = m_useFSharp
-        ? baseDir / L"FSharpNative" / L"Scripts" / L"GameScripts.dll"
-        : baseDir / L"Scripts" / L"GameScripts.dll";
-#else
 	const std::filesystem::path scriptsPath = baseDir / L"FSharpNative" / L"Scripts" / L"GameScripts.dll";
-#endif
 	if (std::filesystem::exists(scriptsPath))
 	{
 		const auto pathUtf8 = scriptsPath.u8string();
@@ -3009,7 +2961,7 @@ void ClrHost::Shutdown()
         if (result != 0)
             Debug::PrintLog(spdlog::level::warn, "[CLR] Managed shutdown completed with cleanup errors.");
     }
-    if (m_useFSharp && m_fnFSharpUnbind)
+    if (m_fnFSharpUnbind)
     {
         m_fnFSharpUnbind();
     }

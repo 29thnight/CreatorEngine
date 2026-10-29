@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Compile real audio consumer source against small scene stubs and check native/managed ABI.
-This does not compile the Windows product, exercise the real scene lifecycle, or run C#.
+This does not compile the Windows product, exercise the real scene lifecycle, or run managed scripts.
 Run: python3 Tools/regression/verify-audio-consumer-contract.py
 """
 from pathlib import Path
@@ -98,33 +98,33 @@ STUBS = {'Component.h': '#pragma once\n'
 def main():
     native = (ROOT / "Engine/SceneRuntime/ClrHost.cpp").read_text(encoding="utf-8-sig")
     native_header = (ROOT / "Engine/SceneRuntime/ScriptApiTable.h").read_text(encoding="utf-8-sig")
-    managed = (ROOT / "ScriptCore/Native.cs").read_text(encoding="utf-8-sig")
+    manifest = json.loads((ROOT / "Engine/Scripting/Bindings/obj/Release/native-bindings/reflgen_creator_script_native.json").read_text(encoding="utf-8-sig"))
     native_table = native_header.split("struct ScriptApiTable", 1)[1].split("\n\t};", 1)[0]
-    managed_table = managed.split("internal static unsafe class Native", 1)[0]
     native_names = re.findall(r"\(__stdcall\*\s*(\w+)\)", native_table)
-    managed_names = re.findall(r"delegate\* unmanaged<[^;]+>\s+(\w+)\s*;", managed_table)
-    assert native_names == managed_names, "Native/managed API table order mismatch"
+    table = manifest["tables"][0]
+    managed_names = [field["name"] for field in table["fields"][2:]]
+    assert native_names == managed_names, "Native/generated F# API table order mismatch"
     native_version = re.search(r"CreatorScriptApiVersion\s*=\s*(\d+)",
         (ROOT / "Engine/Utility_Framework/Runtime/ScriptApiVersion.h").read_text()).group(1)
-    managed_version = re.search(r"ExpectedVersion\s*=\s*(\d+)", managed).group(1)
-    assert native_version == managed_version, "Native/managed API version mismatch"
+    assert int(native_version) == table["version"], "Native/generated F# API version mismatch"
     audio_names = [name for name in native_names if name.startswith(("Audio_", "AudioListener_", "Sound_"))]
     for name in audio_names:
         assert re.search(r"g_apiTable\." + name + r"\s*=\s*&Api_" + name + r"\s*;", native), name
         assert re.search(r"\bApi_" + name + r"\s*\([^;]*?\)\s*\{", native, re.S), name
     settings_native = native_header.split("    struct AudioPlaySettings", 1)[1].split("    struct AudioParameter", 1)[0]
-    audio_cs = (ROOT / "ScriptCore/Audio.cs").read_text(encoding="utf-8-sig")
-    settings_managed = audio_cs.split("public struct AudioPlaySettings", 1)[1].split("[StructLayout", 1)[0]
+    audio_fs = (ROOT / "Engine/Scripting/AudioValues/AudioValues.fs").read_text(encoding="utf-8-sig")
+    settings_managed = audio_fs.split("type AudioPlaySettings =", 1)[1].split("    static member", 1)[0]
     native_types = re.findall(r"\b(float|int|std::uint32_t)\s+\w+\s*;", settings_native)
-    managed_types = re.findall(r"public\s+(float|int|uint|AudioBus|AudioRolloff|AudioOwnerDestroyedPolicy)\s+\w+\s*(?:=[^;]+)?;", settings_managed)
-    native_types = ["uint" if value == "std::uint32_t" else value for value in native_types]
+    managed_types = re.findall(r"val mutable \w+: (single|int|uint32|AudioBus|AudioRolloff|AudioOwnerDestroyedPolicy)", settings_managed)
+    native_types = ["uint32" if value == "std::uint32_t" else "single" if value == "float" else value for value in native_types]
     managed_types = ["int" if value.startswith("Audio") else value for value in managed_types]
     assert native_types == managed_types and len(native_types) == 15, "AudioPlaySettings packet scalar layout mismatch"
-    assert "AudioPlaySettings*, Native.AudioParameterABI*, int, ulong> Audio_Play" in managed
+    audio_play = next(field for field in table["fields"] if field["name"] == "Audio_Play")
+    assert len(audio_play["type"]["pointee"]["parameters"]) == 9, "Audio_Play parameter count"
     assert "const AudioPlaySettings* settings, const AudioParameter* parameters, int parameterCount" in native
     for relative in ["Engine/SceneRuntime/SoundComponent.h", "Engine/SceneRuntime/SoundDefinition.h",
                      "Engine/SceneRuntime/SoundSystem.h", "Engine/SceneRuntime/AudioListenerComponent.h",
-                     "ScriptCore/SoundComponent.cs", "ScriptCore/Audio.cs"]:
+                     "Engine/Scripting/Bindings/Components/Sound.fs", "Engine/Scripting/Bindings/Services/Audio.fs"]:
         assert not re.search(r"FMOD|fmod|ma_sound|ma_engine|BackendVoiceId", (ROOT / relative).read_text(encoding="utf-8-sig")), relative
     component = (ROOT / "Engine/SceneRuntime/SoundComponent.cpp").read_text(encoding="utf-8-sig")
     assert "PlayAttached(" not in component, "Emitter must preserve authored spatial blend"

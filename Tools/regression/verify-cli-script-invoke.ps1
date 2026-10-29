@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$Exe  = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = (Join-Path $env:TEMP "lc7"),
@@ -19,7 +19,7 @@ param(
 #   ① 표식된 static 메서드가 호출되고 결과가 **값으로** 돌아온다.
 #   ② 표식 **없는** 메서드는 이름을 알아도 호출되지 않는다.
 #   ③ 사용자 코드가 던져도 에디터가 죽지 않고, 그것이 명령의 실패로 나온다.
-#   ④ **에디터를 끄지 않고** C# 수정 → 빌드 → reload → invoke 가 한 세션에서 닫힌다.
+#   ④ **에디터를 끄지 않고** F# 수정 → 빌드 → reload → invoke 가 한 세션에서 닫힌다.
 #
 # ── ② 를 어떻게 뜻있게 만드는가 ─────────────────────────────────────────
 #
@@ -53,13 +53,13 @@ $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 New-Item -ItemType Directory -Force -Path $Work | Out-Null
 
 $endpointPath = Join-Path $repoRoot 'Dynamic_CPP\Library\CommandService\endpoint.json'
-$probeSource  = Join-Path $repoRoot 'GameScripts\EngineCallableProbe.cs'
-$probeProject = Join-Path $repoRoot 'GameScripts\GameScripts.csproj'
+$probeSource  = Join-Path $repoRoot 'GameScripts\EngineCallableProbe.fs'
+$probeProject = Join-Path $repoRoot 'Engine\Scripting\GameScripts\ScriptNative.GameScripts.fsproj'
 if (-not (Test-Path -LiteralPath $probeSource -PathType Leaf)) {
     "프로브 소스가 없다: $probeSource"; exit 1
 }
 
-$sourceBackup = Join-Path $Work 'EngineCallableProbe.backup.cs'
+$sourceBackup = Join-Path $Work 'EngineCallableProbe.backup.fs'
 Copy-Item -LiteralPath $probeSource -Destination $sourceBackup -Force
 
 # ★ 되돌린 뒤 **수정 시각을 지금으로 올린다.**
@@ -123,7 +123,7 @@ $dotnet = Get-Command 'dotnet' -ErrorAction SilentlyContinue
 #   비용은 빌드 한 번(약 2.5 초)이고, 그 대가로 이 게이트는 지난 실행이 어떻게
 #   죽었든 같은 자리에서 시작한다.
 if ($null -ne $dotnet -and -not $SkipLiveRoundTrip) {
-    & $dotnet.Source build $probeProject -c Debug --nologo -v q *> (Join-Path $Work 'invoke_baseline_build.log')
+    & $dotnet.Source build $probeProject -c Debug --nologo -v q "-p:CreatorScriptSourceRoot=$repoRoot/GameScripts" *> (Join-Path $Work 'invoke_baseline_build.log')
     if ($LASTEXITCODE -ne 0) {
         "기준선 빌드가 실패했다 — 로그 $(Join-Path $Work 'invoke_baseline_build.log')"; exit 1
     }
@@ -242,7 +242,7 @@ try {
         $failures.Add("alive-after-exception : 사용자 예외 뒤에 호출 계층이 망가졌다(status=$($after.status) return=$((Get-Return $after)))")
     }
 
-    # ── 2d) 에디터를 끄지 않고 C# 수정이 반영된다 (§10.2 완료 모습) ─────
+    # ── 2d) 에디터를 끄지 않고 F# 수정이 반영된다 (§10.2 완료 모습) ─────
     if ($SkipLiveRoundTrip) {
         $failures.Add('live-round-trip : -SkipLiveRoundTrip 로 건너뛰었다 — LC7 의 완료 기준을 확인하지 않았다')
     }
@@ -256,8 +256,8 @@ try {
 
             $edit = [Diagnostics.Stopwatch]::StartNew()
             $text = [IO.File]::ReadAllText($probeSource)
-            $mutated = $text.Replace('public static string Ping() => "pong";',
-                                     "public static string Ping() => `"$token`";")
+            $mutated = $text.Replace('static member Ping() = "pong"',
+                                     "static member Ping() = `"$token`"")
             if ($mutated -eq $text) {
                 throw "프로브의 Ping() 정의를 찾지 못했다 — 이 게이트가 무엇을 고칠지 모른다: $probeSource"
             }
@@ -266,7 +266,7 @@ try {
 
             $build = [Diagnostics.Stopwatch]::StartNew()
             $buildLog = Join-Path $Work 'invoke_build.log'
-            & $dotnet.Source build $probeProject -c Debug --nologo -v q *> $buildLog
+            & $dotnet.Source build $probeProject -c Debug --nologo -v q "-p:CreatorScriptSourceRoot=$repoRoot/GameScripts" *> $buildLog
             $buildOk = ($LASTEXITCODE -eq 0)
             $build.Stop()
             if (-not $buildOk) {
@@ -306,7 +306,7 @@ try {
             # 반영됐는지**를 본다 — 소스만 되돌리고 DLL 을 두면 다음 실행의
             # 기준선이 깨진 채 남는다.
             Restore-ProbeSource
-            & $dotnet.Source build $probeProject -c Debug --nologo -v q *> (Join-Path $Work 'invoke_restore_build.log')
+            & $dotnet.Source build $probeProject -c Debug --nologo -v q "-p:CreatorScriptSourceRoot=$repoRoot/GameScripts" *> (Join-Path $Work 'invoke_restore_build.log')
             $restoreBuildOk = ($LASTEXITCODE -eq 0)
             $null = Send '{"command":"script.reload","mode":"sync","timeoutMs":60000}'
             $restored = Invoke-Probe 'Ping'

@@ -5,7 +5,7 @@ on:
   push:
     branches: [work/fsharp-native-completion-20261029]
     paths-ignore:
-      - 'ScriptNative/GeneratedNative/**'
+      - 'Engine/Scripting/Bindings/GeneratedNative/**'
       - 'docs/**'
 
 permissions:
@@ -63,7 +63,7 @@ jobs:
           cmake --build $generatorBuild --target reflgen_cli --parallel 4
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $generator = Join-Path $generatorBuild 'generator/reflgen.exe'
-          $facades = Join-Path $env:GITHUB_WORKSPACE 'ScriptNative/GeneratedNative'
+          $facades = Join-Path $env:GITHUB_WORKSPACE 'Engine/Scripting/Bindings/GeneratedNative'
           # This refresh intentionally replaces only this job's checkout. It
           # never edits declaration JSON by hand or writes a repository ref.
           python Tools/regression/verify-native-reflection-surface.py --generator $generator --reflgen-root $dependency --vcpkg (Join-Path $env:GITHUB_WORKSPACE 'Build/ReflectionVcpkg/vcpkg.exe') --configuration Debug --work (Join-Path $env:RUNNER_TEMP 'NativeReflectionSurface') --facades-output $facades
@@ -83,7 +83,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: native-fsharp-generated
-          path: ScriptNative/GeneratedNative/
+          path: Engine/Scripting/Bindings/GeneratedNative/
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()

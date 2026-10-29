@@ -1,0 +1,67 @@
+m_sceneName: FSharpCurve
+m_buildIndex: 0
+m_Entities:
+  - Entity: 8465162159729457626
+    m_name: Indicator
+    m_layerId: 1
+    m_instanceID: 100
+    m_index: 0
+    m_parentIndex: -1
+    m_rootIndex: 0
+    m_childrenIndices: [1]
+    m_components:
+      - Transform: 13979161094353040123
+        m_instanceID: 1000
+        position: {x: 0, y: 0, z: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1}
+      - ScriptComponent: 1
+        m_instanceID: 3001
+        m_scriptType: CurveIndicator
+        m_fieldData: []
+      - ScriptComponent: 1
+        m_instanceID: 3002
+        m_scriptType: CurveIndicatorProbe
+        m_fieldData: []
+  - Entity: 8465162159729457626
+    m_name: IndicatorMesh
+    m_layerId: 1
+    m_instanceID: 101
+    m_index: 1
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+    m_components:
+      - Transform: 13979161094353040123
+        m_instanceID: 1001
+        position: {x: 0, y: 0, z: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1}
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 4254143591
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          lattice_material: 1
+          name: Weapon_Dagger_G3_005_Default
+          assetId: 30df7fc2-1bb6-8c88-8af5-ca14a0bd93a6
+          graphAssetId: f3289c86-556f-8c98-9c50-c1bb354ce1fc
+          doubleSided: true
+          blendMode: opaque
+          parameters: []
+          textures: []
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+        m_modelGuid: 00000000-0000-0000-0000-000000000000
+        m_meshAssetId: 00000000-0000-0000-0000-000000000000

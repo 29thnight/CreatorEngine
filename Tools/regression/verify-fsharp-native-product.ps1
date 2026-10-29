@@ -133,7 +133,11 @@ function Wait-PlayState($Endpoint, [bool]$Expected) {
 function Wait-ProbeResult($Process, [string]$Stdout) {
     $deadline = [DateTime]::UtcNow.AddSeconds(120)
     do {
-        $text = [IO.File]::ReadAllText($Stdout)
+        $stream = [IO.File]::Open($Stdout, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+        try {
+            $reader = [IO.StreamReader]::new($stream)
+            try { $text = $reader.ReadToEnd() } finally { $reader.Dispose() }
+        } finally { $stream.Dispose() }
         if ($text.Contains('[native.reflection.failure]')) { throw "Managed product failure: $Stdout" }
         if ($text.Contains('[native.reflection.acceptance] ')) {
             return Read-NativeReflectionAcceptance $text $Process.Id $expectedComponents $apiVersion
@@ -145,7 +149,7 @@ function Wait-ProbeResult($Process, [string]$Stdout) {
 }
 
 $managed = Join-Path $workRoot 'Managed'
-& dotnet build "$repo/ScriptNative.GameScripts/ScriptNative.GameScripts.fsproj" -c $Configuration `
+& dotnet build "$repo/Engine/Scripting/GameScripts/ScriptNative.GameScripts.fsproj" -c $Configuration `
     "-p:CreatorScriptSourceRoot=$scriptRoot" "-p:CreatorNativeGameOutDir=$managed/" `
     "-p:CreatorScriptBuildKey=NativeReflection-$([guid]::NewGuid().ToString('N'))" --nologo -v:q *> "$workRoot/build.log"
 if ($LASTEXITCODE) { throw "Product probe compilation failed: $workRoot/build.log" }
@@ -210,8 +214,7 @@ if ($LASTEXITCODE) { throw "Cooked Player packaging or rendering failed: $workRo
 $pointer = Get-Content "$workRoot/Staging/Project.current.json" -Raw | ConvertFrom-Json
 if ($pointer.verification -cne 'passed') { throw 'Cooked Player rendering was not verified.' }
 $stage = Join-Path "$workRoot/Staging" $pointer.releaseDirectory
-Copy-Item "$stage/verify.stdout.log" "$workRoot/package-smoke.out"
-Copy-Item "$stage/verify.stderr.log" "$workRoot/package-smoke.err"
+Copy-Item "$workRoot/package.log" "$workRoot/package-smoke.out"
 $before = @{}
 Get-ChildItem $stage -Recurse -File | ForEach-Object { $before[$_.FullName] = (Get-FileHash $_.FullName).Hash }
 $runtime = Join-Path $workRoot 'PlayerRuntime'

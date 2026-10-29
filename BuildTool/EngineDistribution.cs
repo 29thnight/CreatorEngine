@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+﻿using System.Text.Json.Nodes;
 
 namespace CreatorBuildTool;
 
@@ -14,6 +14,10 @@ internal sealed record EngineDistribution(string Root, JsonObject Manifest)
         root = Paths.Canonical(root, true);
         var manifest = Metadata.Read(Path.Combine(root, "engine.manifest.json"));
         Metadata.ValidateVersion(manifest);
+        if (manifest.Text("scriptBackend") != "fsharp-native")
+        {
+            throw new BuildException("Only F# native scripting distributions are supported.");
+        }
         if (manifest.Text("platform") != "win-x64" || manifest.Text("configuration") is not ("Debug" or "Release") ||
             manifest.Text("binaryRoot") != $"Bin/x64-{manifest.Text("configuration")}" ||
             !Guid.TryParseExact(manifest.Text("buildId"), "D", out var id) || id == Guid.Empty)

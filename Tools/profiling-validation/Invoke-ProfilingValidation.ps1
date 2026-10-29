@@ -1,4 +1,4 @@
-#Requires -Version 7.0
+﻿#Requires -Version 7.0
 <#
 .SYNOPSIS
     프레임 프로파일러 라이브 검증 진입점 (PHASE 14).
@@ -922,7 +922,7 @@ function Invoke-Providers {
         $frame = $_
         $gc = @($frame.counters | Where-Object { $_.id -eq 14 -and $_.value -gt $baselineGen2 })
         $markers = @($frame.threads | ForEach-Object { $_.events } |
-            Where-Object { $_.name -eq 'ScriptCore.PrePhysicsTick' -or $_.name -eq 'ScriptCore.PostPhysicsTick' })
+            Where-Object { $_.name -eq 'CreatorEngine.NativeBindings.PrePhysicsTick' -or $_.name -eq 'CreatorEngine.NativeBindings.PostPhysicsTick' })
         $gc.Count -gt 0 -and $markers.Count -gt 0
     } | Select-Object -First 1)
     if ($play.status -ne 'succeeded' -or $collect.status -ne 'succeeded') {
@@ -937,7 +937,7 @@ function Invoke-Providers {
         }
     }
     if ($gcFrame.Count -eq 0) {
-        $failures.Add('강제 GC 뒤 증가한 Gen2 값과 ScriptCore 마커가 같은 프레임에 없다')
+        $failures.Add('강제 GC 뒤 증가한 Gen2 값과 CreatorEngine.NativeBindings 마커가 같은 프레임에 없다')
     }
     if (@($on.data.counterDescriptors | Where-Object { $_.id -eq 25 -and $_.name -eq 'Resource provider cost' }).Count -eq 0) {
         $failures.Add('캡처가 Resource 제공자 어휘를 보존하지 않았다')

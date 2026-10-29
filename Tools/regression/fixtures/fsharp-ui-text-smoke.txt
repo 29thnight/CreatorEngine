@@ -1,0 +1,12 @@
+wait 60
+scene.new FSharpUiTextProbe
+wait 30
+object.create UiCanvas Canvas
+component.add UiCanvas Canvas
+component.add UiCanvas TextComponent
+wait 30
+script.add UiCanvas UiTextProbe
+play
+wait 120
+log.flush
+quit

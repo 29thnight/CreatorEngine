@@ -1,0 +1,15 @@
+wait 60
+scene.new FSharpUiNavProbe
+wait 30
+object.create UiCanvas Canvas
+component.add UiCanvas Canvas
+object.create UiImage UI
+component.add UiImage ImageComponent
+component.add UiImage UIButton
+object.parent UiImage UiCanvas
+wait 30
+script.add UiImage UiNavProbe
+play
+wait 120
+log.flush
+quit

@@ -1,5 +1,5 @@
-[CmdletBinding()]
-param([string]$Configuration='Release', [ValidateSet('Box','Sphere')][string]$Sensor='Sphere', [string]$CaptureReader='', [switch]$SolidContacts, [switch]$LateOverlap, [switch]$GroupTargets, [switch]$Retirement, [switch]$Topology, [switch]$SensorTransition, [switch]$BurstTopology, [switch]$RemoveComponent, [switch]$SubscriberLifetime, [switch]$RoleTransition, [switch]$ExplicitBinding, [ValidateSet('None','Overflow','Exception')][string]$FaultCase='None')
+﻿[CmdletBinding()]
+param([string]$Configuration='Release', [string]$ProjectRoot='', [ValidateSet('Box','Sphere')][string]$Sensor='Sphere', [string]$CaptureReader='', [switch]$SolidContacts, [switch]$LateOverlap, [switch]$GroupTargets, [switch]$Retirement, [switch]$Topology, [switch]$SensorTransition, [switch]$BurstTopology, [switch]$RemoveComponent, [switch]$SubscriberLifetime, [switch]$RoleTransition, [switch]$ExplicitBinding, [ValidateSet('None','Overflow','Exception')][string]$FaultCase='None')
 $ErrorActionPreference='Stop'
 if($SolidContacts -and ($GroupTargets -or $LateOverlap -or $Retirement -or $Topology -or $SensorTransition -or $BurstTopology -or $RemoveComponent -or $SubscriberLifetime -or $RoleTransition -or $ExplicitBinding -or $FaultCase -ne 'None')){throw 'Use a separate solid fixture'}
 $ContactFault=$FaultCase -ne 'None'
@@ -19,13 +19,14 @@ if($SolidContacts -or $Retirement -or $Topology -or $SensorTransition -or $Subsc
 if($LateOverlap -and $GroupTargets){throw 'Use separate late-overlap and target-grouping fixtures'}
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if(Get-Process CreatorEditor -ErrorAction SilentlyContinue){throw 'Owned Editor session required; close the running Editor first.'}
+$ProjectRoot=if($ProjectRoot){[IO.Path]::GetFullPath($ProjectRoot)}else{Join-Path $repo 'Dynamic_CPP'}
 $out=Join-Path $repo ('Build/Verification/ContactStream/Product-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force $out | Out-Null
 $exe=Join-Path $repo "Bin/x64-$Configuration/Editor/CreatorEditor.exe"
-$process=Start-Process $exe -ArgumentList '--command-service','--console','--allow-user-code' -WorkingDirectory (Split-Path $exe) -WindowStyle Hidden -RedirectStandardOutput "$out/editor.out" -RedirectStandardError "$out/editor.err" -PassThru
+$process=Start-Process $exe -ArgumentList '--development-project',('"'+$ProjectRoot+'"'),'--command-service','--console','--allow-user-code'  -WorkingDirectory (Split-Path $exe) -WindowStyle Hidden -RedirectStandardOutput "$out/editor.out" -RedirectStandardError "$out/editor.err" -PassThru
 $script:sequence=0
 try {
-    $endpoint=Join-Path $repo 'Dynamic_CPP/Library/CommandService/endpoint.json'
+    $endpoint=Join-Path $ProjectRoot 'Library/CommandService/endpoint.json'
     $deadline=(Get-Date).AddSeconds(180)
     $info=$null
     do {
@@ -123,7 +124,7 @@ try {
         $null=Command 'script.add' @('LateObserverTemplate','PhysicsLateContactProbe')
         $null=Command 'prefab.create' @('LateObserverTemplate',$prefabName)
         $null=Command 'object.delete' @('LateObserverTemplate')
-        $latePrefab=Join-Path $repo "Dynamic_CPP/Assets/Prefabs/$prefabName.prefab"
+        $latePrefab=Join-Path $ProjectRoot "Assets/Prefabs/$prefabName.prefab"
         if(!(Test-Path -LiteralPath $latePrefab)){throw 'Late observer prefab was not saved'}
         $fields=(Command 'script.fields' @("$attackScript")).data.fields
         $field=@($fields|Where-Object {($_.name -replace '[^a-zA-Z]','').ToLowerInvariant() -eq 'lateobserverprefab'})
@@ -134,7 +135,7 @@ try {
     $null=Command 'component.add' @('ContactCamera','CameraComponent')
     $null=Command 'object.transform' @('ContactCamera','3','2','-10')
     $null=Command 'object.property' @('ContactCamera','CameraComponent','m_isPrimary','true')
-    $scene=Join-Path $repo ('Dynamic_CPP/Assets/Scenes/PhysicsContactStream-'+(Split-Path $out -Leaf)+'.creator')
+    $scene=Join-Path $ProjectRoot ('Assets/Scenes/PhysicsContactStream-'+(Split-Path $out -Leaf)+'.creator')
     if(Test-Path -LiteralPath $scene){throw 'Contact fixture already exists; refuse overwriting an authored scene.'}
     $null=Command 'scene.save' @($scene)
     $sceneHash=(Get-FileHash -LiteralPath $scene).Hash

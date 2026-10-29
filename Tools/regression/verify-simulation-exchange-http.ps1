@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([ValidateSet('Debug','Release')][string]$Configuration='Release', [string]$EditorExe='')
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -12,7 +12,7 @@ Copy-Item "$repo/Dynamic_CPP/ProjectSetting" $project -Recurse
 Copy-Item "$repo/Dynamic_CPP/Assets/Shaders" "$project/Assets/Shaders" -Recurse
 Copy-Item "$repo/GameScripts/SimulationExchangeContractProbe.fs" "$project/Assets/Script"
 Set-Content "$project/Assets/Script/compile.order" 'SimulationExchangeContractProbe.fs' -Encoding utf8
-& dotnet build "$repo/GameScripts/GameScripts.fsproj" -c $Configuration "-p:CreatorScriptSourceRoot=$project/Assets/Script" -v:q *> "$out/managed-build.log"
+& dotnet build "$repo/Engine/Scripting/GameScripts/ScriptNative.GameScripts.fsproj" -c $Configuration "-p:CreatorScriptSourceRoot=$project/Assets/Script" -v:q *> "$out/managed-build.log"
 if($LASTEXITCODE){throw "F# exchange fixture build failed: $out/managed-build.log"}
 $started=Get-Date
 $process=Start-Process $exe -ArgumentList @('--development-project',('"'+$project+'"'),'--command-service','--allow-user-code','--smoke-offscreen') -WorkingDirectory (Split-Path $exe) -WindowStyle Hidden -RedirectStandardOutput "$out/editor.out" -RedirectStandardError "$out/editor.err" -PassThru
@@ -90,6 +90,6 @@ try {
     $text=((Get-Content "$out/editor.html" -Raw) -replace '<[^>]+>','') + (Get-Content "$out/editor.out" -Raw)
     if([regex]::Matches($text,'\[N3_PRODUCT_OK\]').Count -ne 2 -or $text -match '\[N3_FAIL\]'){throw 'Product log assertions failed'}
     if((Get-FileHash $scene).Hash -ne $sceneHash){throw 'Authored scene mutated'}
-    @{result='N3_EXCHANGE_EDITOR_OK';scene=$scene;sceneSha256=$sceneHash;cycles=$cycles;reload=$reloadState;sceneChange=$sceneState;hostHash=(Get-FileHash (Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll')).Hash;scriptCoreHash=(Get-FileHash (Join-Path (Split-Path (Split-Path $exe)) 'Managed/ScriptCore.dll')).Hash}|ConvertTo-Json -Depth 20|Set-Content "$out/result.json" -Encoding utf8
+    @{result='N3_EXCHANGE_EDITOR_OK';scene=$scene;sceneSha256=$sceneHash;cycles=$cycles;reload=$reloadState;sceneChange=$sceneState;hostHash=(Get-FileHash (Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll')).Hash;nativeBindingHash=(Get-FileHash (Join-Path (Split-Path (Split-Path $exe)) 'Managed/CreatorEngine.NativeBindings.dll')).Hash}|ConvertTo-Json -Depth 20|Set-Content "$out/result.json" -Encoding utf8
     "N3_EXCHANGE_EDITOR_OK evidence=$out"
 } finally {if(!$process.WaitForExit(30000)){$process.Kill();$process.WaitForExit()}}

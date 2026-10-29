@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -160,10 +160,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(CreatorLegacyScriptBaseline)'=='true'">
-    <ClCompile><PreprocessorDefinitions>CREATOR_LEGACY_SCRIPT_BASELINE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
-  </ItemDefinitionGroup>
-  <ItemGroup>
+<ItemGroup>
     <!-- Register before unity discovery; the shared target deduplicates reflgen's late registration. -->
     <ClCompile Include="$(IntDir)reflgen\reflgen_SceneRuntime.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
@@ -447,7 +444,7 @@
     <ScriptNativeProofDir>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntDir)', 'ScriptNative'))</ScriptNativeProofDir>
   </PropertyGroup>
   <Target Name="GenerateScriptNativeProof" BeforeTargets="SetModuleDependencies;ClCompile" DependsOnTargets="$(_EngineRequireReflgenAfter)" Condition="'$(DesignTimeBuild)' != 'true'">
-    <Exec Command="dotnet msbuild &quot;$(MSBuildProjectDirectory)\..\..\ScriptNative\ScriptNative.fsproj&quot; /t:GenerateScriptNativeBindings /p:Configuration=$(Configuration) /p:ScriptNativeOutput=&quot;$(ScriptNativeProofDir)&quot; /nologo /v:quiet" />
+    <Exec Command="dotnet msbuild &quot;$(MSBuildProjectDirectory)\..\..\Engine\Scripting\Bindings\ScriptNative.fsproj&quot; /t:GenerateScriptNativeBindings /p:Configuration=$(Configuration) /p:ScriptNativeOutput=&quot;$(ScriptNativeProofDir)&quot; /nologo /v:quiet" />
   </Target>
   <Import Project="EngineModeReflection.targets" />
   <ImportGroup Label="ExtensionTargets">

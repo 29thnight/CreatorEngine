@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([Parameter(Mandatory)][string]$EngineDistribution,[Parameter(Mandatory)][string]$EditorResult,[switch]$Shipping,[string]$ReuseProject='', [ValidateSet('Debug','Release')][string]$Configuration='Release')
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -12,7 +12,7 @@ if($ReuseProject){
     foreach($pair in @(
         @($editor.scene,"$project/Assets/Scenes/ContactStream.creator"),
         @($editor.destination,"$project/Assets/Scenes/ContactDestination.creator"),
-        @("$repo/GameScripts/PhysicsHierarchyContactProbe.cs","$project/Assets/Script/PhysicsHierarchyContactProbe.cs")
+        @("$repo/GameScripts/PhysicsHierarchyContactProbe.fs","$project/Assets/Script/PhysicsHierarchyContactProbe.fs")
     )) {
         if((Get-FileHash -LiteralPath $pair[0]).Hash -ne (Get-FileHash -LiteralPath $pair[1]).Hash){
             throw 'Reuse project does not match the accepted hierarchy fixture'
@@ -25,7 +25,7 @@ Get-ChildItem -LiteralPath "$repo/Dynamic_CPP/Assets/Shaders" | Copy-Item -Desti
 Copy-Item "$repo/Dynamic_CPP/ProjectSetting" "$project/ProjectSetting" -Recurse
 Copy-Item -LiteralPath $editor.scene -Destination "$project/Assets/Scenes/ContactStream.creator"
 Copy-Item -LiteralPath ($editor.scene+'.meta') -Destination "$project/Assets/Scenes/ContactStream.creator.meta"
-Copy-Item "$repo/GameScripts/PhysicsHierarchyContactProbe.cs" "$project/Assets/Script"
+Copy-Item "$repo/GameScripts/PhysicsHierarchyContactProbe.fs" "$project/Assets/Script"
 Copy-Item -LiteralPath $editor.destination -Destination "$project/Assets/Scenes/ContactDestination.creator"
 if(Test-Path -LiteralPath ($editor.destination+'.meta')){
     Copy-Item -LiteralPath ($editor.destination+'.meta') -Destination "$project/Assets/Scenes/ContactDestination.creator.meta"
@@ -33,6 +33,7 @@ if(Test-Path -LiteralPath ($editor.destination+'.meta')){
     "guid: $([guid]::NewGuid())`nimportSettings:`n  extension: .creator`n  timestamp: $([DateTime]::UtcNow.ToFileTimeUtc())"|Set-Content "$project/Assets/Scenes/ContactDestination.creator.meta" -Encoding utf8
 }
 }
+Set-Content "$project/Assets/Script/compile.order" "PhysicsHierarchyContactProbe.fs" -Encoding utf8
 # Debug cooker validates a model corpus even for physics-only scenes.
 # This small packaging input is not instantiated in the contact test scene.
 if(!(Get-ChildItem "$project/Assets" -Recurse -File -Filter '*.glb' | Select-Object -First 1)) {

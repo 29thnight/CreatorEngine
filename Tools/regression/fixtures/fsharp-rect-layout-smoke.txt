@@ -1,0 +1,14 @@
+wait 60
+scene.new FSharpRectLayoutProbe
+wait 30
+object.create MainCamera Empty
+component.add MainCamera CameraComponent
+object.create Canvas Canvas
+component.add Canvas Canvas
+object.create UiChild UI
+object.parent UiChild Canvas
+script.add Canvas RectLayoutProbe
+play
+wait 200
+log.flush
+quit

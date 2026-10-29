@@ -4,8 +4,7 @@ param(
     [Parameter(Mandatory)][string]$CookedScene,
     [Parameter(Mandatory)][string]$ManagedDirectory,
     [Parameter(Mandatory)][string]$OutputPath,
-    [string]$Dependencies = '',
-    [switch]$FSharpNative = $true
+    [string]$Dependencies = ''
 )
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -17,7 +16,7 @@ $bytes = [IO.File]::ReadAllBytes([IO.Path]::GetFullPath($CookedScene))
 if ($bytes.Length -lt 16 -or [Text.Encoding]::ASCII.GetString($bytes,0,4) -ne 'CEDO') {
     throw 'Only an offline cooked CEDO scene can be staged'
 }
-$scriptDirectory = if ($FSharpNative) { 'FSharpNative/Scripts' } else { 'Scripts' }
+$scriptDirectory = 'FSharpNative/Scripts'
 New-Item -ItemType Directory -Path "$OutputPath/Managed/$scriptDirectory" -Force | Out-Null
 Copy-Item -LiteralPath "$repo/Bin/x64-$Configuration/HeadlessHost/HeadlessHost.exe" -Destination $OutputPath
 Copy-Item -LiteralPath "$repo/ThirdParty/DotNetHost/bin/nethost.dll" -Destination $OutputPath
@@ -29,14 +28,8 @@ foreach ($name in 'PhysX_64.dll','PhysXCommon_64.dll','PhysXFoundation_64.dll','
 }
 $formatLibrary = if ($Configuration -eq 'Debug') { 'fmtd.dll' } else { 'fmt.dll' }
 Copy-Item -LiteralPath (Join-Path $nativeBin $formatLibrary) -Destination $OutputPath
-$residentFiles = if ($FSharpNative) {
-    @('CreatorEngine.NativeBindings.dll','CreatorEngine.NativeBindings.deps.json',
-      'CreatorEngine.NativeBindings.runtimeconfig.json','CreatorEngine.AudioValues.dll','FSharp.Core.dll')
-} else {
-    @('ScriptCore.dll','ScriptCore.deps.json','ScriptCore.runtimeconfig.json',
-      'CreatorEngine.ManagedRuntime.dll','CreatorEngine.ManagedRuntime.deps.json',
-      'CreatorEngine.ManagedRuntime.runtimeconfig.json','FSharp.Core.dll')
-}
+$residentFiles = @('CreatorEngine.NativeBindings.dll','CreatorEngine.NativeBindings.deps.json',
+    'CreatorEngine.NativeBindings.runtimeconfig.json','CreatorEngine.AudioValues.dll','FSharp.Core.dll')
 foreach ($name in $residentFiles) {
     Copy-Item -LiteralPath (Join-Path $ManagedDirectory $name) -Destination "$OutputPath/Managed"
 }

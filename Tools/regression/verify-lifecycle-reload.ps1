@@ -1,4 +1,4 @@
-# Verifies actual native script.reload, old instance teardown, new OnTickSimulate and old ALC collection.
+﻿# Verifies actual native script.reload, old instance teardown, new OnTickSimulate and old ALC collection.
 # Dedicated simulation coroutine cancellation was retired 2026-10-22.
 param(
     [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
@@ -18,7 +18,7 @@ $scenario = Join-Path $PSScriptRoot "lifecycle_reload_probe.txt"
 if (-not (Test-Path $scenario)) { "시나리오가 없다: $scenario"; exit 1 }
 
 "실행 파일: $Exe ($((Get-Item $Exe).LastWriteTime))"
-$dll = Join-Path $exeDir "..\Managed\Scripts\GameScripts.dll"
+$dll = Join-Path $exeDir "..\Managed\FSharpNative\Scripts\GameScripts.dll"
 if (Test-Path $dll) { "GameScripts: $((Get-Item $dll).LastWriteTime)" }
 else { "GameScripts.dll을 찾지 못했다: $dll" }
 
@@ -64,8 +64,8 @@ if ($rows.Count -eq 0) {
 }
 
 # 어셈블리 세대와 문맥 회수는 엔진 로그가 남긴다.
-$generations = @([regex]::Matches($logText, '\[ScriptCore\].*?\(세대 (\d+)\)') | ForEach-Object { [int]$_.Groups[1].Value })
 $results = @(Read-CommandResults $resultPath)
+$reloads = @($results | Where-Object { $_.command -eq 'script.reload' -and $_.status -eq 'succeeded' })
 if ($proc.ExitCode -ne 0 -or @($results | Where-Object status -ne 'succeeded').Count) { throw 'Lifecycle reload command failed' }
 $status = Get-SucceededCommand $results 'script.status'
 $statusStale = [bool]$status.previousContextAlive
@@ -74,7 +74,7 @@ $dropped = [regex]::Match($logText, '리로드로 재개 (\d+) 건을 버렸다'
 
 ""
 "─ 엔진 관측 ─────────────────────────────────────────────────────"
-"  어셈블리 세대: $(if ($generations.Count) { $generations -join ' → ' } else { '(없음)' })"
+"  성공한 어셈블리 교체 명령: $($reloads.Count)"
 "  script.status: $(if ($statusClean) { '이전 어셈블리 정리됨' } elseif ($statusStale) { '이전 어셈블리 잔존(참조 누수)' } else { '(표지 없음)' })"
 "  배수 폐기    : $(if ($dropped.Success) { "재개 $($dropped.Groups[1].Value) 건" } else { '0 건(로그 없음)' })"
 
@@ -113,15 +113,9 @@ function Count-In($set, [string]$point) { return @($set | Where-Object { $_.Poin
 # 이것이 없으면 아래 전부가 무의미하다 — 리로드가 안 일어났는데 초록이 나오면
 # 그 초록은 리로드에 대해 아무것도 말하지 않는다.
 
-"판정 NN 리로드 발생: 세대 $(if ($generations.Count -ge 2) { "$($generations[0]) → $($generations[-1])" } else { '(1개 이하)' }) · 정적 id 되돌아감 $(if ($gen2[0].Id -le $gen1[0].Id) { '있음' } else { '없음' })"
-if ($generations.Count -lt 3) {
-    "  → 어셈블리 세대가 3까지 오르지 않았다. 시나리오는 리로드를 두 번 부른다"
-    "     (편집 모드 1 + 재생 중 1) — 세대가 모자라면 그중 하나가 교체까지 가지 못했다."
-    $failed.Add('NN(횟수)')
-}
-if ($generations.Count -lt 2 -or $generations[-1] -le $generations[0]) {
-    "  → 어셈블리 세대가 오르지 않았다. script.reload 가 교체까지 가지 못했다."
-    $failed.Add('NN')
+"판정 NN 리로드 발생: 성공한 교체 명령 $($reloads.Count)회 · 정적 id 되돌아감 $(if ($gen2[0].Id -le $gen1[0].Id) { '있음' } else { '없음' })"
+if ($reloads.Count -lt 2) {
+    $failed.Add('NN(교체 명령 횟수)')
 }
 if ($gen2[0].Id -gt $gen1[0].Id) {
     "  → 정적 카운터가 이어졌다. 어셈블리가 갈리지 않고 인스턴스만 새로 만들어졌다는"

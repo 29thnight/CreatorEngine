@@ -1,10 +1,10 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param()
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $out=Join-Path $repo ('Build/Verification/N3Pacing/Wiring-'+[guid]::NewGuid().ToString('N'))
 $root=Join-Path $out 'Fixture'
-New-Item -ItemType Directory -Force "$root/Tools/regression","$root/ScriptCore","$root/Stage"|Out-Null
+New-Item -ItemType Directory -Force "$root/Tools/regression","$root/Engine/Scripting/Bindings","$root/Stage"|Out-Null
 foreach($name in @('run-all.ps1','network_handoff_suite.py','network-handoff.suite.json')){Copy-Item "$PSScriptRoot/$name" "$root/Tools/regression"}
 $manifest=Get-Content "$root/Tools/regression/network-handoff.suite.json" -Raw|ConvertFrom-Json
 $products=@('verify-simulation-exchange-http.ps1','verify-scene-gc.ps1','verify-archive-parser-product.ps1','verify-n1-diagnostic-product.ps1','verify-n3-pacing-product.ps1')

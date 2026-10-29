@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)][string]$Project,
     [Parameter(Mandatory = $true)][string]$EngineDistribution,
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release'
@@ -15,56 +15,7 @@ if (-not $Project.StartsWith($ownedRoot, [StringComparison]::OrdinalIgnoreCase))
 }
 $work = Join-Path $Project 'Saved/AudioLifecycleGate'
 New-Item -ItemType Directory -Path $work -Force | Out-Null
-$source = @'
-using CreatorEngine;
-using System;
-
-public sealed partial class AudioEditorProbe : Component
-{
-    private static PlaybackHandle world;
-    private static PlaybackHandle session;
-    private static PlaybackHandle attached;
-    private static int starts;
-    private static int stops;
-
-    private static void Require(bool value, string message)
-    {
-        if (!value)
-        {
-            Console.WriteLine("[AUDIO_EDITOR_FAIL] " + message + " native=" + Audio.LastError);
-            throw new InvalidOperationException(message);
-        }
-    }
-
-    public override void OnBeginSimulation()
-    {
-        Require(world.State == AudioPlaybackState.Stopped && session.State == AudioPlaybackState.Stopped &&
-            attached.State == AudioPlaybackState.Stopped, "Previous generation cleaned");
-        var source = new AudioSource(AudioAssetId.Parse("01234567-89ab-4cde-8fab-0123456789ab"));
-        var settings = new AudioPlaySettings { Volume = 0.001f, Loop = 1, SpatialBlend = 0 };
-        world = Audio.Play2D(Audio.World, source, settings);
-        session = Audio.Play2D(Audio.Session, source, settings);
-        attached = Audio.PlayAttached(Audio.World, source, Entity, settings);
-        Require(world.IsValid && session.IsValid && attached.IsValid, "Three native play paths");
-        GC.Collect();
-        Require(world.IsPlaying && session.IsPlaying && attached.IsPlaying, "GC preserves value handles");
-        ++starts;
-        Console.WriteLine("[AUDIO_EDITOR_BEGIN] starts=" + starts);
-    }
-
-    public void AssertStopped()
-    {
-        Require(world.State == AudioPlaybackState.Stopped && session.State == AudioPlaybackState.Stopped &&
-            attached.State == AudioPlaybackState.Stopped, "Stop ends world/session/attached playback");
-        ++stops;
-        Console.WriteLine("[AUDIO_EDITOR_STOP] stops=" + stops);
-    }
-}
-'@
-[IO.File]::WriteAllText((Join-Path $Project 'Assets/Script/AudioEditorProbe.cs'), $source)
-# The Player-only component is replaced for this second, independently compiled fixture.
-[IO.File]::WriteAllText((Join-Path $Project 'Assets/Script/PackageSmokeProbe.cs'),
-    'using CreatorEngine; public sealed class PackageSmokeProbe : Component { }')
+Copy-Item -Path (Join-Path $PSScriptRoot 'fixtures/audio-editor/*') -Destination (Join-Path $Project 'Assets/Script') -Force
 $tool = Join-Path $repo "Bin/x64-$Configuration/Tools/CreatorBuildTool/CreatorBuildTool.exe"
 $managed = Join-Path $work 'Managed'
 & $tool compile-game --engine-distribution $EngineDistribution --project $Project --output $managed --config $Configuration *> (Join-Path $work 'compile.log')

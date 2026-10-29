@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
@@ -15,11 +15,6 @@ internal static class EnginePublisher
         var repository = Paths.Repository(options.Get("repository"));
         var config = options.Choice("config", "Release", "Debug", "Release");
         var shipping = options.Flag("shipping");
-        var nativeScripts = !options.Flag("legacy-script-baseline");
-        if (!nativeScripts && !(buildNative || options.Flag("build")))
-        {
-            throw new BuildException("Legacy comparison distributions require --build so their hosts enable the comparison backend.");
-        }
         var output = Paths.Canonical(options.Get("output-root", Path.Combine(repository, "Build/Distributions")));
         var metadata = Metadata.Read(Path.Combine(repository, "EngineVersion.json")); Metadata.ValidateVersion(metadata);
         var version = metadata.Text("version");
@@ -32,7 +27,6 @@ internal static class EnginePublisher
             foreach (var project in new[] { "Editor/CreatorEditor.vcxproj", "Player/Player.vcxproj", "Tools/AssetCooker/AssetCooker.vcxproj", "Tools/AssetPacker/AssetPacker.vcxproj", "Tools/ProfilerViewer/ProfilerViewer.vcxproj" })
             {
                 var arguments = new List<string> { Path.Combine(repository, project), "/m", "/t:Build", $"/p:Configuration={config}", "/p:Platform=x64", "/nologo", "/verbosity:minimal" };
-                if (!nativeScripts) arguments.Add("/p:CreatorLegacyScriptBaseline=true");
                 if (shipping && project.StartsWith("Player/")) arguments.Add("/p:EngineShipping=true");
                 await context.Run(msbuild, arguments, repository, timeoutSeconds: 0);
             }
@@ -126,33 +120,23 @@ internal static class EnginePublisher
             }
             Copy(viewerRecordPath, Paths.Child(binaryTarget, "Tools/ProfilerViewer/deployment.json"));
             var api = hosts["Player"]!.Int("scriptApi");
-            var expected = nativeScripts ? null : Regex.Match(File.ReadAllText(Path.Combine(repository, "ScriptCore/Native.cs")), @"ExpectedVersion\s*=\s*(\d+)");
             var nativeExpected = Regex.Match(File.ReadAllText(Path.Combine(repository,
                 "Engine/Utility_Framework/Runtime/ScriptApiVersion.h")), @"CreatorScriptApiVersion\s*=\s*(\d+)");
             if (!nativeExpected.Success
-                || (!nativeScripts && (expected == null || !expected.Success || !int.TryParse(expected.Groups[1].Value, out var managedApi) || managedApi != api))
                 || !int.TryParse(nativeExpected.Groups[1].Value, out int nativeApi)
                 || nativeApi != api
                 || hosts.Any(h => h.Value!.Int("scriptApi") != api))
             {
                 throw new BuildException("Native source, managed source and built host script API versions differ. Rebuild the hosts and selected managed runtime together.");
             }
-            if (nativeScripts)
-            {
-                await context.Run("dotnet", ["build", Path.Combine(repository, "ScriptNative.FSharpRuntime/ScriptNative.FSharpRuntime.fsproj"), "-c", config, "-m:1", "-nodeReuse:false"], repository);
-            }
-            else
-            {
-                await context.Run("dotnet", ["build", Path.Combine(repository, "ScriptRuntime/ScriptRuntime.fsproj"), "-c", config, "-m:1", "-nodeReuse:false"], repository);
-                await context.Run("dotnet", ["build", Path.Combine(repository, "ScriptCore.Generators/ScriptCore.Generators.csproj"), "-c", config, "-m:1", "-nodeReuse:false"], repository);
-            }
-            foreach (var name in nativeScripts ? GameCompiler.NativeCoreFiles : GameCompiler.CoreFiles)
+            await context.Run("dotnet", ["build", Path.Combine(repository, "Engine/Scripting/Authoring/ScriptNative.FSharpRuntime.fsproj"), "-c", config, "-m:1", "-nodeReuse:false"], repository);
+            foreach (var name in GameCompiler.CoreFiles)
             {
                 Copy(Path.Combine(binarySource, "Managed", name), Path.Combine(binaryTarget, "Managed", name));
             }
             // Inspect the copied assembly bytes without loading or executing it.
-            // Matching source versions cannot prove an old ScriptCore was rebuilt.
-            if (ReadManagedApiVersion(Path.Combine(binaryTarget, "Managed", nativeScripts ? "CreatorEngine.NativeBindings.dll" : "ScriptCore.dll"), nativeScripts) != api)
+            // Matching source versions cannot prove the deployed assembly was rebuilt.
+            if (ReadManagedApiVersion(Path.Combine(binaryTarget, "Managed", "CreatorEngine.NativeBindings.dll")) != api)
             {
                 throw new BuildException("Built managed script API differs from the native hosts. Rebuild the selected managed runtime before publishing.");
             }
@@ -179,19 +163,9 @@ internal static class EnginePublisher
             await context.Run("dotnet", ["build", Path.Combine(fsharpTools, "src/CreatorEngine.FSharp.Generator/CreatorEngine.FSharp.Generator.fsproj"), "-c", config, "-m:1", "-nodeReuse:false"], fsharpTools);
             Tree(Path.Combine(fsharpTools, $"src/CreatorEngine.FSharp.Generator/bin/{config}/net10.0"), Path.Combine(candidate, "Scripting/FSharpGenerator"));
             Copy(Path.Combine(fsharpTools, $"src/CreatorEngine.FSharp.Generator/bin/{config}/net10.0/FSharp.Core.dll"), Path.Combine(candidate, "Scripting/FSharpReferences/FSharp.Core.dll"));
-            if (!nativeScripts)
-            {
-                await context.Run("dotnet", ["build", Path.Combine(fsharpTools, "src/CreatorEngine.FSharp.Runtime/CreatorEngine.FSharp.Runtime.fsproj"), "-c", config, "-p:CreatorEngineRoot=" + repository, "-p:CreatorLegacyScriptBaseline=true", "-m:1", "-nodeReuse:false"], fsharpTools);
-            }
-            var fsharpRuntime = nativeScripts
-                ? Path.Combine(repository, $"ScriptNative.FSharpRuntime/bin/{config}/net10.0/CreatorEngine.FSharp.Runtime.dll")
-                : Path.Combine(fsharpTools, $"src/CreatorEngine.FSharp.Runtime/bin/{config}/net10.0/CreatorEngine.FSharp.Runtime.dll");
+            var fsharpRuntime = Path.Combine(repository, $"Engine/Scripting/Authoring/bin/{config}/net10.0/CreatorEngine.FSharp.Runtime.dll");
             Copy(fsharpRuntime, Path.Combine(candidate, "Scripting/FSharpRuntime/CreatorEngine.FSharp.Runtime.dll"));
             Tree(Path.Combine(references, "ref/net10.0"), Path.Combine(candidate, "Scripting/References"));
-            if (!nativeScripts)
-            {
-                Copy(Path.Combine(repository, $"Build/Tools/Managed/ScriptCore.Generators/{config}/netstandard2.0/ScriptCore.Generators.dll"), Path.Combine(candidate, "Scripting/ScriptCore.Generators.dll"));
-            }
             var toolSource = Path.Combine(binarySource, "Tools/CreatorBuildTool");
             foreach (var name in new[] { "CreatorBuildTool.exe", "CreatorBuildTool.dll", "CreatorBuildTool.deps.json", "CreatorBuildTool.runtimeconfig.json" })
             {
@@ -214,7 +188,7 @@ internal static class EnginePublisher
             var dirty = (await context.Run("git", ["-C", repository, "status", "--porcelain"], echo: false)).Output.Length > 0;
             var manifest = (JsonObject)metadata.DeepClone();
             var payload = Metadata.Object(new { buildId, payloadDigest = digest, platform = "win-x64", configuration = config, shipping,
-                binaryRoot = $"Bin/x64-{config}", scriptApi = api, scriptBackend = nativeScripts ? "fsharp-native" : "scriptcore", hostAbi = 1, supportedScriptApis = new[] { api },
+                binaryRoot = $"Bin/x64-{config}", scriptApi = api, scriptBackend = "fsharp-native", hostAbi = 1, supportedScriptApis = new[] { api },
                 contentAbiVersion = content.Version, contentAbi = content.Token,
                 source = new { revision, dirty, kind = "build-workspace-observation" },
                 toolchain = new { dotnetRuntime = Path.GetFileName(runtime), compilerSdk = Path.GetFileName(sdk), referencePack = Path.GetFileName(references) },
@@ -244,7 +218,7 @@ internal static class EnginePublisher
         catch { context.Error($"Unpublished engine candidate retained: {candidate}"); throw; }
     }
 
-    internal static int ReadManagedApiVersion(string assemblyPath, bool nativeScripts)
+    internal static int ReadManagedApiVersion(string assemblyPath)
     {
         using var stream = File.OpenRead(assemblyPath);
         using var image = new PEReader(stream);
@@ -253,21 +227,21 @@ internal static class EnginePublisher
             throw new BuildException("The managed binding assembly has no metadata.");
         }
         var metadata = image.GetMetadataReader();
-        if (!metadata.IsAssembly || metadata.GetString(metadata.GetAssemblyDefinition().Name) != (nativeScripts ? "CreatorEngine.NativeBindings" : "ScriptCore"))
+        if (!metadata.IsAssembly || metadata.GetString(metadata.GetAssemblyDefinition().Name) != "CreatorEngine.NativeBindings")
         {
             throw new BuildException("The managed binding assembly has an unexpected identity.");
         }
         foreach (var typeHandle in metadata.TypeDefinitions)
         {
             var type = metadata.GetTypeDefinition(typeHandle);
-            if (metadata.GetString(type.Namespace) != (nativeScripts ? "CreatorEngine.Native" : "CreatorEngine") || metadata.GetString(type.Name) != (nativeScripts ? "reflgen_creator_script_native" : "Native"))
+            if (metadata.GetString(type.Namespace) != "CreatorEngine.Native" || metadata.GetString(type.Name) != "reflgen_creator_script_native")
             {
                 continue;
             }
             foreach (var fieldHandle in type.GetFields())
             {
                 var field = metadata.GetFieldDefinition(fieldHandle);
-                if (metadata.GetString(field.Name) != (nativeScripts ? "ScriptApiVersion" : "ExpectedVersion"))
+                if (metadata.GetString(field.Name) != "ScriptApiVersion")
                 {
                     continue;
                 }

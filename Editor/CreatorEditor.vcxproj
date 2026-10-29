@@ -141,7 +141,7 @@
     </Link>
     <PreBuildEvent>
       <Command>echo [FSharpNative] 관리 어셈블리 빌드
-dotnet build "$(SolutionDir)ScriptNative.GameScripts\ScriptNative.GameScripts.fsproj" -c $(Configuration) --nologo -v quiet</Command>
+dotnet build "$(SolutionDir)Engine\Scripting\GameScripts\ScriptNative.GameScripts.fsproj" -c $(Configuration) --nologo -v quiet</Command>
     </PreBuildEvent>
 </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -172,7 +172,7 @@ dotnet build "$(SolutionDir)ScriptNative.GameScripts\ScriptNative.GameScripts.fs
     </Link>
     <PreBuildEvent>
       <Command>echo [FSharpNative] 관리 어셈블리 빌드
-dotnet build "$(SolutionDir)ScriptNative.GameScripts\ScriptNative.GameScripts.fsproj" -c $(Configuration) --nologo -v quiet</Command>
+dotnet build "$(SolutionDir)Engine\Scripting\GameScripts\ScriptNative.GameScripts.fsproj" -c $(Configuration) --nologo -v quiet</Command>
     </PreBuildEvent>
 </ItemDefinitionGroup>
   <ItemGroup>

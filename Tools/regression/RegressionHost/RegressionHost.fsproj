@@ -1,0 +1,4 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><FSharpCoreImplicitPackageVersion>10.0.112</FSharpCoreImplicitPackageVersion><CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies></PropertyGroup>
+  <ItemGroup><Compile Include="Host.fs" /></ItemGroup>
+</Project>

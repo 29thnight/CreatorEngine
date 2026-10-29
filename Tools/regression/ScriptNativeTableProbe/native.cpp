@@ -1,4 +1,4 @@
-#include "../../../Engine/SceneRuntime/ScriptApiTable.h"
+﻿#include "../../../Engine/SceneRuntime/ScriptApiTable.h"
 #include <cstring>
 #include <cstdio>
 
@@ -21,6 +21,11 @@ namespace
     char logFile[1024]{};
     char logMember[256]{};
     int logLine = 0;
+    int logErrors = 0;
+    bool ownerAlive = true;
+    std::uint64_t bodyIdentity = 101;
+    float bodyVelocity = 0.0f;
+    char bodyRole[37]{};
 
     void __stdcall Unused() {}
     // This ABI fixture does not provide a reflection catalog. Typed stubs keep
@@ -54,7 +59,49 @@ namespace
     }
     int __stdcall IsAlive(ScriptObjectHandle handle)
     {
-        return handle.index == 7 && handle.generation == 3 ? 1 : 0;
+        return ownerAlive && handle.index == 7 && handle.generation == 3 ? 1 : 0;
+    }
+    std::uint64_t __stdcall BodyFind(ScriptObjectHandle owner)
+    {
+        return IsAlive(owner) ? bodyIdentity : 0;
+    }
+    int __stdcall BodyRead(ScriptObjectHandle owner, std::uint64_t identity, ce::script::physics_body_state* output)
+    {
+        *output = {};
+        if (!IsAlive(owner) || identity == 0 || identity != bodyIdentity)
+        {
+            return 3;
+        }
+        output->mass = 1.0f;
+        output->linear_velocity.x = bodyVelocity;
+        return 0;
+    }
+    int __stdcall BodyVelocity(ScriptObjectHandle owner, std::uint64_t identity, vector3 linear, vector3)
+    {
+        if (!IsAlive(owner) || identity == 0 || identity != bodyIdentity)
+        {
+            return 3;
+        }
+        bodyVelocity = linear.x;
+        return 0;
+    }
+    int __stdcall BodyRemove(ScriptObjectHandle owner, std::uint64_t identity)
+    {
+        if (!IsAlive(owner) || identity == 0 || identity != bodyIdentity)
+        {
+            return 3;
+        }
+        bodyIdentity = 0;
+        return 0;
+    }
+    int __stdcall BodyShapeRole(ScriptObjectHandle owner, std::uint64_t identity, unsigned int shape, const char* role)
+    {
+        if (!IsAlive(owner) || identity == 0 || identity != bodyIdentity || shape != 1)
+        {
+            return 3;
+        }
+        std::snprintf(bodyRole, sizeof(bodyRole), "%s", role);
+        return 0;
     }
     int __stdcall ExtraExists(ScriptObjectHandle handle, int kind)
     {
@@ -127,11 +174,15 @@ namespace
     {
         return 0;
     }
-    void __stdcall PrintLog(int, const char*, const char* file, int line, const char* member)
+    void __stdcall PrintLog(int level, const char*, const char* file, int line, const char* member)
     {
         std::snprintf(logFile, sizeof(logFile), "%s", file ? file : "");
         std::snprintf(logMember, sizeof(logMember), "%s", member ? member : "");
         logLine = line;
+        if (level == 3)
+        {
+            ++logErrors;
+        }
     }
     int __stdcall KeyState(int key)
     {
@@ -289,6 +340,11 @@ extern "C" __declspec(dllexport) ScriptApiTable* __cdecl ProbeTable()
         std::memcpy(bytes + offset, &unused, sizeof(unused));
     }
     table.Entity_IsAlive = &IsAlive;
+    table.Body_Find = &BodyFind;
+    table.Body_Read = &BodyRead;
+    table.Body_Velocity = &BodyVelocity;
+    table.Body_Remove = &BodyRemove;
+    table.Body_ShapeRole = &BodyShapeRole;
     table.ExtraComponent_Exists = &ExtraExists;
     table.Bone_GetPinned = &BoneGetPinned;
     table.Bone_SetPinned = &BoneSetPinned;
@@ -357,6 +413,11 @@ extern "C" __declspec(dllexport) ScriptApiTable* __cdecl ProbeHeadlessTable()
     table.NativeReflection_Release = &ReflectionRelease;
     SetCallbackSlots();
     table.Entity_IsAlive = &IsAlive;
+    table.Body_Find = &BodyFind;
+    table.Body_Read = &BodyRead;
+    table.Body_Velocity = &BodyVelocity;
+    table.Body_Remove = &BodyRemove;
+    table.Body_ShapeRole = &BodyShapeRole;
     return &table;
 }
 
@@ -398,4 +459,27 @@ extern "C" __declspec(dllexport) int __cdecl ProbeEntityIsAlive(void* entry, std
 {
     using IsAlive = int (__cdecl*)(std::uint32_t, std::uint32_t);
     return reinterpret_cast<IsAlive>(entry)(index, generation);
+}
+
+extern "C" __declspec(dllexport) void __cdecl ProbeReplaceBody(std::uint64_t identity, float velocity)
+{
+    bodyIdentity = identity;
+    bodyVelocity = velocity;
+}
+extern "C" __declspec(dllexport) float __cdecl ProbeBodyVelocity()
+{
+    return bodyVelocity;
+}
+extern "C" __declspec(dllexport) void __cdecl ProbeSetOwnerAlive(int alive)
+{
+    ownerAlive = alive != 0;
+}
+extern "C" __declspec(dllexport) int __cdecl ProbeErrorCount()
+{
+    return logErrors;
+}
+
+extern "C" __declspec(dllexport) const char* __cdecl ProbeBodyRole()
+{
+    return bodyRole;
 }

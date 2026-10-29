@@ -6,7 +6,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../../ScriptNative/ScriptNative.fsproj" />
+    <ProjectReference Include="../../../Engine/Scripting/Bindings/ScriptNative.fsproj" />
     <Compile Include="FSharpNativeReflectionProductProbe.fs" />
   </ItemGroup>
 </Project>

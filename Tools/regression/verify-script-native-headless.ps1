@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidateSet('Debug','Release')][string]$Configuration = 'Debug',
     [string]$OutputPath = ''
@@ -16,11 +16,7 @@ $cooker = Join-Path $repo "Bin/x64-$Configuration/Tools/AssetCooker/AssetCooker.
 if ($LASTEXITCODE) { throw "Scene cook failed: $OutputPath/cook.log" }
 $cooked = @(Get-ChildItem "$OutputPath/Cooked/Derived/Scenes" -Recurse -File -Filter '*.creator')
 if ($cooked.Count -ne 1) { throw 'Expected exactly one cooked scene' }
-& "$repo/Tools/build/stage-headless.ps1" -Configuration $Configuration -CookedScene $cooked[0].FullName -ManagedDirectory "$repo/Bin/x64-$Configuration/Managed" -OutputPath "$OutputPath/Package" -FSharpNative
-$previous = $env:CREATOR_FSHARP_NATIVE
-try {
-    # A normal product must ignore the legacy comparison setting.
-    $env:CREATOR_FSHARP_NATIVE = '0'
+& "$repo/Tools/build/stage-headless.ps1" -Configuration $Configuration -CookedScene $cooked[0].FullName -ManagedDirectory "$repo/Bin/x64-$Configuration/Managed" -OutputPath "$OutputPath/Package"
     & "$OutputPath/Package/HeadlessHost.exe" --scene "$OutputPath/Package/Scene.cedo" --managed "$OutputPath/Package/Managed" --report "$OutputPath/report.json" --frames 120 --frame-seconds 0.016666666666666666 *> "$OutputPath/host.log"
     if ($LASTEXITCODE) { throw "Headless host failed: $OutputPath/host.log" }
     $report = Get-Content -LiteralPath "$OutputPath/report.json" -Raw | ConvertFrom-Json
@@ -28,9 +24,5 @@ try {
     if ($report.scene.managedErrors -or $report.scene.committedTicks -ne 120 -or $mover.Count -ne 1 -or [Math]::Abs($mover[0].x - 6.0) -gt 0.001) {
         throw "F# movement or lifecycle failed: $OutputPath/report.json"
     }
-    if (Test-Path -LiteralPath "$OutputPath/Package/Managed/ScriptCore.dll") { throw 'Package contains ScriptCore.dll' }
+    if (Test-Path -LiteralPath "$OutputPath/Package/Managed/CreatorEngine.NativeBindings.dll") { throw 'Package contains ScriptCore.dll' }
     Write-Output "SCRIPT_NATIVE_HEADLESS_OK evidence=$OutputPath"
-} finally {
-    if ($null -eq $previous) { Remove-Item Env:CREATOR_FSHARP_NATIVE -ErrorAction SilentlyContinue }
-    else { $env:CREATOR_FSHARP_NATIVE = $previous }
-}

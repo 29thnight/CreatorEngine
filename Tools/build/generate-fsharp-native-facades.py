@@ -21,7 +21,7 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_OUTPUT = ROOT / "ScriptNative" / "GeneratedNative"
+DEFAULT_OUTPUT = ROOT / "Engine/Scripting/Bindings" / "GeneratedNative"
 SOURCE_NAME = "native-surface.json"
 FORMAT = "creator-native-fsharp-facades"
 VERSION = 1

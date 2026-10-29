@@ -1,4 +1,4 @@
-# GCCE: static source-only ownership contract. This script does not build or run the engine.
+﻿# GCCE: static source-only ownership contract. This script does not build or run the engine.
 # Runtime regression source covers lifecycle, DDOL, stale handles, cycles and fenced borrows.
 
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
@@ -22,7 +22,7 @@ foreach ($entityPath in @(
     'Engine\SceneRuntime\Entity.h',
     'Engine\SceneRuntime\Entity.cpp',
     'Engine\SceneRuntime\Entity.inl',
-    'ScriptCore\Entity.cs')) {
+    'Engine\Scripting\Bindings\Components\Entity.fs')) {
     if (-not (Test-Path (Join-Path $repoRoot $entityPath))) {
         $failures += "Entity 파일이 없음: $entityPath"
     }

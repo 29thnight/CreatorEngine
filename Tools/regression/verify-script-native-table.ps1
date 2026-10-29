@@ -9,9 +9,9 @@ $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $project = Join-Path $PSScriptRoot 'ScriptNativeTableProbe/ScriptNativeTableProbe.fsproj'
 $probe = Join-Path $PSScriptRoot 'ScriptNativeTableProbe'
 $output = Join-Path $probe "bin/$Configuration/net10.0"
-$proof = Join-Path $repo "ScriptNative/obj/$Configuration/native-bindings/reflgen_creator_script_native.cpp"
+$proof = Join-Path $repo "Engine/Scripting/Bindings/obj/$Configuration/native-bindings/reflgen_creator_script_native.cpp"
 if (!$ManifestPath) {
-    $ManifestPath = Join-Path $repo "ScriptNative/obj/$Configuration/native-bindings/reflgen_creator_script_native.json"
+    $ManifestPath = Join-Path $repo "Engine/Scripting/Bindings/obj/$Configuration/native-bindings/reflgen_creator_script_native.json"
 }
 
 function Assert-NativeTableContract([string]$Path) {

@@ -1,0 +1,9 @@
+wait 60
+scene.new FSharpEntryGuardProbe
+wait 30
+object.create Probe Empty
+script.add Probe EntryGuardBenchProbe
+play
+wait 300
+log.flush
+quit

@@ -11,7 +11,7 @@ uuid_text=(repo/'Engine/SceneRuntime/ComponentTypeUUID.h').read_text(encoding='u
 uuids={name:re.search(r'"'+name+r'"\s*,\s*"([0-9a-f-]+)"',uuid_text).group(1) for name in types}
 pattern=re.compile(r'\b(?:'+ '|'.join(types)+r')\b|PhysicsManagers->|Physics->|\b(?:Cct_|Rigid_|Collider_)\w*')
 files=[];consumers=[];assets=[]
-for root in ['Engine','ScriptCore','ScriptBinder','Dynamic_CPP','Player','Editor','Tools/AssetCooker','Tools/regression/fixtures/physics-p0']:
+for root in ['Engine','ScriptBinder','Dynamic_CPP','Player','Editor','Tools/AssetCooker','Tools/regression/fixtures/physics-p0']:
     for path in (repo/root).rglob('*'):
         if not path.is_file() or path.suffix.lower() not in ('.h','.hpp','.cpp','.cs','.creator','.prefab'):continue
         if any(x in path.parts for x in ('obj','bin','Library','x64','generated')):continue

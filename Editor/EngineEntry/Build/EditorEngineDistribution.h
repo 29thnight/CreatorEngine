@@ -68,7 +68,7 @@ inline EditorSourceCheckout ResolveEditorSourceCheckout()
             if (std::filesystem::is_regular_file(candidate / L"engine.info")) return {};
         const auto folder = binaryRoot.filename().wstring();
         if (!folder.starts_with(L"x64-") || !std::filesystem::is_regular_file(repository / L"EngineVersion.json") ||
-            !std::filesystem::is_regular_file(repository / L"ScriptNative.GameScripts/ScriptNative.GameScripts.fsproj")) return {};
+            !std::filesystem::is_regular_file(repository / L"Engine/Scripting/GameScripts/ScriptNative.GameScripts.fsproj")) return {};
         const auto configuration = folder.substr(4);
         if (configuration != L"Debug" && configuration != L"Release") return {};
         return { repository, configuration };

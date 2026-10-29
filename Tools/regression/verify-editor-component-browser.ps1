@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$Exe = (Join-Path $PSScriptRoot '../../Bin/x64-Debug/Editor/CreatorEditor.exe'),
     [string]$Work = (Join-Path $PSScriptRoot '../../Artifacts/phase21-add-component/authoring-gate')
@@ -61,7 +61,7 @@ function Call([string]$command, [string[]]$arguments = @(), [string]$expectedCod
 }
 $fixturePrefix = 'ComponentMenuProbe' + [Guid]::NewGuid().ToString('N').Substring(0,8)
 $sourceRoot = Join-Path $project 'Assets/Script'
-$managedRoot = Join-Path (Split-Path (Split-Path $Exe)) 'Managed/Scripts'
+$managedRoot = Join-Path (Split-Path (Split-Path $Exe)) 'Managed/FSharpNative/Scripts'
 $managedBefore = Join-Path $Work 'managed-before'
 $fixtureArchive = Join-Path $Work 'fixture-files'
 New-Item -ItemType Directory -Force -Path $managedBefore,$fixtureArchive,$sourceRoot | Out-Null
@@ -69,7 +69,7 @@ $managedFiles = @(Get-ChildItem -LiteralPath $managedRoot -Filter 'GameScripts.*
 foreach ($file in $managedFiles) { Copy-Item -LiteralPath $file.FullName -Destination $managedBefore -Force }
 
 $configuration = if ($Exe -match 'x64-Debug') { 'Debug' } else { 'Release' }
-& dotnet build "$repo/GameScripts/GameScripts.fsproj" -c $configuration `
+& dotnet build "$repo/Engine/Scripting/GameScripts/ScriptNative.GameScripts.fsproj" -c $configuration `
     "-p:CreatorScriptSourceRoot=$project/Assets/Script" -v:q *> "$Work/fsharp-build.log"
 if ($LASTEXITCODE) { throw "F# fixture build failed: $Work/fsharp-build.log" }
 

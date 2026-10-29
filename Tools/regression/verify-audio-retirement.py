@@ -49,9 +49,9 @@ def main():
         entry = 'Include="Audio\\' + source.name + '"'
         if runtime_project.count(entry) != 1:
             failures.append(f"Audio source must compile exactly once in SceneRuntime: {source.name}")
-    for directory in ("Engine", "Editor", "Player", "ScriptCore"):
+    for directory in ("Engine", "Editor", "Player"):
         for path in (ROOT / directory).rglob("*"):
-            if path.suffix not in {".h", ".hpp", ".cpp", ".cs"}:
+            if path.suffix not in {".h", ".hpp", ".cpp", ".fs"}:
                 continue
             text = path.read_text(encoding="utf-8-sig", errors="replace")
             # History belongs in docs. Comments do not create an SDK dependency.

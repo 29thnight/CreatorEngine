@@ -1,4 +1,4 @@
-"""Validate mandatory regression registration before running any child process."""
+﻿"""Validate mandatory regression registration before running any child process."""
 import json
 import pathlib
 
@@ -10,7 +10,7 @@ REQUIRED = {
     'N3': ('Tools/regression/verify-simulation-exchange.ps1', 'matrix'),
     'PhysicsABI': ('Tools/regression/verify-physics-script-abi.ps1', 'all'),
     'PhysicsIdentity': ('Tools/regression/verify-physics-body-identity.ps1', 'matrix'),
-    'LifecycleEnums': ('ScriptCore/check-lifecycle-enums.ps1', 'none'),
+    'LifecycleEnums': ('Tools/regression/check-script-lifecycle-enums.ps1', 'none'),
 }
 
 

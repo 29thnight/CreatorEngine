@@ -1,4 +1,4 @@
-#include "../Containers/ContainerAPI.h"
+﻿#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #if defined(CE_CONTRACT_STANDALONE)
@@ -17,7 +17,7 @@ import Creator.Core.SpinLock;
 // 설계 문서 02절의 "틱당 한 번만 경계를 넘는다"를 그대로 구현한다.
 // 여기 있는 Tick* 함수가 경계의 전부이고, 스크립트가 몇 개든 호출 횟수는 고정이다.
 //
-// 관리 어셈블리(ScriptCore.dll)는 실행 파일 옆 Managed\ 폴더에서 찾는다.
+// 관리 어셈블리(CreatorEngine.NativeBindings.dll)는 실행 파일 옆 Managed\ 폴더에서 찾는다.
 // 없으면 조용히 비활성 상태로 남는다 — 스크립트 없이도 에디터는 떠야 하기 때문이다.
 class ClrHost
 {
@@ -29,7 +29,6 @@ public:
 	void Shutdown();
 
 	bool IsReady() const { return m_ready; }
-    bool UsesFSharpNative() const { return m_useFSharp; }
     std::uint64_t ManagedErrorCount() const noexcept;
     std::uint64_t SimulationBatchCount() const noexcept { return m_simulationBatches; }
     bool AreScriptsLoaded() const { return m_scriptsLoaded; }
@@ -485,7 +484,6 @@ private:
 	~ClrHost() = default;
 
 	bool BindEntryPoints(const std::filesystem::path& assemblyPath);
-	bool m_useFSharp{ false };
 	using FSharpBindFn = int(__stdcall*)(void*, std::size_t, std::uint64_t, int);
 	using FSharpStartFn = int(__stdcall*)();
 	FSharpBindFn m_fnFSharpBind{ nullptr };
@@ -498,7 +496,6 @@ private:
     std::uint64_t m_simulationBatches = 0;
 
 	// 관리 진입점 함수 포인터 (UnmanagedCallersOnly라 마샬링 스텁이 없다)
-	using InitializeFn      = int(__stdcall*)(void*);
 	using ShutdownFn        = int(__stdcall*)();
 	using TickFn            = int(__stdcall*)(float);
 	using NoArgumentFn      = int(__stdcall*)();
@@ -517,7 +514,6 @@ private:
 	using GetIntFn       = int(__stdcall*)(int, int);
 	using SetIntFn       = void(__stdcall*)(int, int, int);
 
-	InitializeFn m_fnInitialize{ nullptr };
 	ShutdownFn   m_fnShutdown{ nullptr };
 	NoArgumentFn m_fnFlushRegistrations{ nullptr };
 	TickFn       m_fnUpdate{ nullptr };
@@ -618,8 +614,3 @@ private:
 	GetObjectFn m_fnGetFieldObject{ nullptr };
 	SetObjectFn m_fnSetFieldObject{ nullptr };
 };
-
-
-
-
-

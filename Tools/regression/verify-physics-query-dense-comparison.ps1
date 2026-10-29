@@ -52,7 +52,7 @@ foreach($item in $items){
     $receipts+=@{revision=$revision;profile=$state;evidence=$evidence;stressChecks=$stress;denseBatchChecks=$dense;product=(Get-Content "$evidence/result.json" -Raw|ConvertFrom-Json);rows=@(Get-Content "$evidence/query-benchmark.json" -Raw|ConvertFrom-Json);capture=$capture}
     "DENSE_COMPARISON_OK revision=$revision profile=$state evidence=$evidence"
 }
-$hashes=@('Engine/SceneRuntime/ClrHost.cpp','GameScripts/PhysicsB2PlayerProbe.cs','Tools/regression/verify-physics-query-dense-comparison.ps1','Tools/regression/physics_managed_query_capture_probe.cpp')|ForEach-Object {@{path=$_;sha256=(Get-FileHash (Join-Path $repo $_)).Hash}}
+$hashes=@('Engine/SceneRuntime/ClrHost.cpp','GameScripts/PhysicsB2PlayerProbe.fs','Tools/regression/verify-physics-query-dense-comparison.ps1','Tools/regression/physics_managed_query_capture_probe.cpp')|ForEach-Object {@{path=$_;sha256=(Get-FileHash (Join-Path $repo $_)).Hash}}
 $result=@{status='dense_comparison_validated';tieredCompilationDisabled=(!$DefaultJit);queryStress=[bool]$QueryStress;offOnly=[bool]$OffOnly;matchedProbe=$matched;jitEnvironment=$jitEnvironment;receipts=$receipts;beforeStage=$BeforeStage;afterStage=$AfterStage;sourceHashes=$hashes;performanceAccepted=$false;ordering=$(if($OffOnly){'before/after/after/before off processes; inner scalar/batch ABBA ABBA'}else{'before/after/after/before off processes, then after on/on; inner scalar/batch ABBA ABBA'});scope='Fresh before/after Release processes, default CPU placement; JIT override and matched managed probe are recorded explicitly; authored setup outside timing'}
 $result|ConvertTo-Json -Depth 35|Set-Content "$out/result.json" -Encoding utf8
 $after=@($receipts|Where-Object revision -EQ 'after')

@@ -18,7 +18,7 @@ class NativeFacadeMappings(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.generator = GEN.Generator(json.loads(
-            (ROOT / "ScriptNative/GeneratedNative/native-surface.json").read_text(encoding="utf-8")))
+            (ROOT / "Engine/Scripting/Bindings/GeneratedNative/native-surface.json").read_text(encoding="utf-8")))
 
     def mapping(self, spelling):
         return self.generator.mapping(self.generator.resolve(spelling))

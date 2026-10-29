@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>CreatorEngine.FSharp.Runtime</AssemblyName>
+    <FSharpCoreImplicitPackageVersion>10.0.112</FSharpCoreImplicitPackageVersion>
+    <CreatorFSharpToolsRoot Condition="'$(CreatorFSharpToolsRoot)' == ''">$(MSBuildThisFileDirectory)../../../../FSharp_Tool_Pakage_for_CreatorEngine</CreatorFSharpToolsRoot>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Bindings/ScriptNative.fsproj" Private="false" /></ItemGroup>
+  <ItemGroup><Compile Include="$(CreatorFSharpToolsRoot)/src/CreatorEngine.FSharp.Runtime/NativeComponents.fs" Link="NativeComponents.fs" /></ItemGroup>
+</Project>

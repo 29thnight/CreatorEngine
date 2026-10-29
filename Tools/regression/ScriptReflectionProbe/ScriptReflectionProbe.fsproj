@@ -5,7 +5,7 @@
     <FSharpCoreImplicitPackageVersion>10.0.112</FSharpCoreImplicitPackageVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
-  <ItemGroup><ProjectReference Include="../../../ScriptNative/ScriptNative.fsproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../../Engine/Scripting/Bindings/ScriptNative.fsproj" /></ItemGroup>
   <Import Project="$(ScriptReflectionGeneratedProps)" Condition="'$(ScriptReflectionGeneratedProps)' != ''" />
   <ItemGroup><Compile Include="TypedSupportTests.fs" /><Compile Include="TypedFacadeTests.fs" /><Compile Include="CallbackTests.fs" /><Compile Include="OwnedIdentityTests.fs" /><Compile Include="ScalarOutputTests.fs" /><Compile Include="Program.fs" /></ItemGroup>
 </Project>

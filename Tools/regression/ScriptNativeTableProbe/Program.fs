@@ -1,4 +1,4 @@
-open System
+﻿open System
 open System.Runtime.InteropServices
 open System.Reflection
 open System.Collections.Generic
@@ -326,6 +326,9 @@ let main arguments =
     check (registry.ActiveCount = 0) "registry removes destroyed script"
     check (obj.ReferenceEquals(entity.GetComponent<CreatorEngine.Scripts.FSharpNativeMover>(), null)) "destroyed managed component is not returned"
     registry.ClearRegistrations()
+    NativeRuntimeRegression.runFixedUpdate()
+    NativeRuntimeRegression.runBodyIdentity()
+    NativeRuntimeRegression.runContacts()
     let fixturePath = typeof<CreatorEngine.Scripts.FSharpNativeMover>.Assembly.Location
     let copyDir = Path.Combine(Path.GetTempPath(), "creator-fsharp-loader-" + Guid.NewGuid().ToString("N"))
     Directory.CreateDirectory(copyDir) |> ignore

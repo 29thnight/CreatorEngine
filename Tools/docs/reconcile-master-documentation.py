@@ -1,4 +1,4 @@
-"""Write source-grounded current-state sections, preserving dated evidence as history.
+﻿"""Write source-grounded current-state sections, preserving dated evidence as history.
 
 This is a documentation operation. It never manufactures runtime receipts or rewrites
 old measurements/hashes to imply that an old execution tested the current master.
@@ -33,7 +33,7 @@ def read_source(path):
         cache[path]=(raw,text)
     return cache[path][1]
 
-source_paths = {p for p in paths if p.startswith(('Engine/','Editor/','ScriptCore/','BuildTool/','Player/','Lattice/','Tools/','Dynamic_CPP/Assets/Shaders/','ports/')) and pathlib.Path(p).suffix.lower() in ('.h','.hpp','.cpp','.inl','.cs','.slang','.ps1','.py','.mjs','.cmake','.vcxproj','.json')}
+source_paths = {p for p in paths if p.startswith(('Engine/','Editor/','Engine/Scripting/Bindings/','BuildTool/','Player/','Lattice/','Tools/','Dynamic_CPP/Assets/Shaders/','ports/')) and pathlib.Path(p).suffix.lower() in ('.h','.hpp','.cpp','.inl','.cs','.slang','.ps1','.py','.mjs','.cmake','.vcxproj','.json')}
 by_name = collections.defaultdict(list)
 by_stem = collections.defaultdict(list)
 for p in sorted(source_paths): by_name[pathlib.PurePosixPath(p).name].append(p)
@@ -92,7 +92,7 @@ def norm(file, link):
 
 def sources_for(file,text,g):
     found=[]
-    for path in re.findall(r'(?:Engine|Editor|ScriptCore|BuildTool|Player|Lattice|Tools|Dynamic_CPP|ports)/[\w./+ -]+\.(?:h|hpp|cpp|inl|cs|slang|ps1|py|mjs|cmake|json)',text):
+    for path in re.findall(r'(?:Engine|Editor|ScriptNative|BuildTool|Player|Lattice|Tools|Dynamic_CPP|ports)/[\w./+ -]+\.(?:h|hpp|cpp|inl|cs|slang|ps1|py|mjs|cmake|json)',text):
         if path in source_paths and path not in found: found.append(path)
     for link in re.findall(r'\]\(([^)\s]+)\)',text):
         p=norm(file,urlsplit(link).path)
@@ -153,7 +153,7 @@ def resolve(file,link):
     replacement=aliases.get(dest)
     if not replacement:
         same=by_name.get(pathlib.PurePosixPath(dest).name,[])
-        if len(same)==1 and dest.startswith(('Engine/','Editor/','ScriptCore/','Tools/','ScriptBinder/')):replacement=same[0]
+        if len(same)==1 and dest.startswith(('Engine/','Editor/','Engine/Scripting/Bindings/','Tools/','ScriptBinder/')):replacement=same[0]
     if replacement:
         new=posixpath.relpath(replacement,posixpath.dirname(file))
         if u.fragment:new+='#'+u.fragment

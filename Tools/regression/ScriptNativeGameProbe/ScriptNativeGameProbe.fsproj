@@ -5,7 +5,7 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <CreatorFSharpToolsRoot Condition="'$(CreatorFSharpToolsRoot)' == ''">$(MSBuildThisFileDirectory)../../../../FSharp_Tool_Pakage_for_CreatorEngine</CreatorFSharpToolsRoot>
   </PropertyGroup>
-  <ItemGroup><ProjectReference Include="../../../ScriptNative/ScriptNative.fsproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../../Engine/Scripting/Bindings/ScriptNative.fsproj" /></ItemGroup>
   <ItemGroup>
     <Compile Include="../../../Dynamic_CPP/Assets/Script/FSharpNativeMover.fs" Link="FSharpNativeMover.fs" />
     <Compile Include="../../../Dynamic_CPP/Assets/Script/Phase22ProductAudioProbe.fs" Link="Phase22ProductAudioProbe.fs" />

@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([Parameter(Mandatory)][string]$EngineDistribution, [Parameter(Mandatory)][string]$SourceGlb,
     [ValidateSet('Debug','Release')][string]$Configuration='Debug', [Parameter(Mandatory)][string]$Work, [switch]$Shipping, [switch]$Shear, [string]$SceneSource)
 $ErrorActionPreference='Stop'
@@ -23,11 +23,10 @@ if($SceneSource){
 Copy-Item "$PSScriptRoot/fixtures/PhysicsDaggerConvex.cegeometry","$PSScriptRoot/fixtures/PhysicsDaggerConvex.cegeometry.meta" $assets
 Copy-Item -LiteralPath $SourceGlb -Destination "$assets/Models/PhysicsDagger.glb"
 Copy-Item "$PSScriptRoot/fixtures/PhysicsDagger.glb.meta" "$assets/Models"
-Copy-Item "$repo/GameScripts/PhysicsB2PlayerProbe.cs" "$assets/Script"
-Copy-Item "$repo/GameScripts/PhysicsB2DynamicQueryProbe.cs" "$assets/Script"
-Copy-Item "$repo/GameScripts/PhysicsB2MixedQueryProbe.cs" "$assets/Script"
+$scriptOrder=@('PhysicsB2MixedQueryProbe.fs','PhysicsB2DynamicQueryProbe.fs','PhysicsB2BatchChecks.fs','PhysicsB2QueryBenchmark.fs','PhysicsB2PlayerProbe.fs','PhysicsB2ShearProbe.fs')
+foreach($source in $scriptOrder){Copy-Item "$repo/GameScripts/$source" "$assets/Script"}
+Set-Content "$assets/Script/compile.order" $scriptOrder -Encoding utf8
 if($Shear){
-    Copy-Item "$repo/GameScripts/PhysicsB2ShearProbe.cs" "$assets/Script"
     $scenePath="$assets/Scenes/PhysicsB2Player.creator"
     $sceneText=Get-Content $scenePath -Raw
     $pattern=[regex]'m_scriptType: PhysicsB2PlayerProbe'

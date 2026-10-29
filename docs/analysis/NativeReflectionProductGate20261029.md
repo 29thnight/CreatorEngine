@@ -1,8 +1,36 @@
-# API 49 네이티브 리플렉션 제품 게이트 — 2026-10-29
+# F# 전용 스크립팅 및 API 49 제품 게이트 — 2026-10-29
 
-## 현재 판정
+## F# 전용 전환 완료 — Windows Release
 
-현재 네이티브 계약은 API 49다. API 48에서 도입한 재귀 리플렉션 전송에 API 49의 게임 스레드 콜백 등록·세대 폐기 계약이 추가됐다. 실제 Editor·cooked Player용 게이트는 소스와 바인딩에서 버전을 읽어 현재 API를 검사한다. **이 작업 환경에서는 Windows 제품 실행을 하지 않았으며 제품 통과 결과는 아직 없다.** 기존 [API 46/47 검증 기록](FSharpNativeBindingAcceptance20261029.md)은 이전 실행의 증거이며 이 게이트의 실행을 대신하지 않는다.
+게임 스크립트와 `Tools/regression`의 C# 소스·프로젝트를 제거했다. 남은 구현은 F#으로 이식했고, 사용되지 않던 비교 도구와 미호출 레거시 fixture는 삭제했다. `ScriptCore`, `ScriptCore.Generators`, 기존 `ScriptRuntime`, 구 `GameScripts.csproj`·`GameScripts.fsproj` 디렉터리/프로젝트도 제거했다. 솔루션, CLRHost, Editor의 자동 컴파일, 배포·패키징·headless 도구는 F# 전용 경로를 사용한다. 구 관리 어셈블리 출력은 `Build/Verification/RetiredManagedArtifacts-*`로 옮겨 현재 Bin에서 제외했다.
+
+현재 런타임은 `Engine/Scripting/Bindings`, 값 형식은 `Engine/Scripting/AudioValues`, F# 작성 보조는 `Engine/Scripting/Authoring`, 게임 스크립트 빌드는 `Engine/Scripting/GameScripts`가 담당한다. 바인딩 소스는 `Components`, `Services`, `Interop`, `Runtime`, `Values`, `GeneratedNative`로 구분한다. [소스 배치 안내](../../Engine/Scripting/README.md)를 따른다. 배포 입력은 `scriptBackend=fsharp-native`만 받는다. 빌드 도구와 값 생성자 보정 도구는 게임 스크립트 런타임에 포함되지 않는다.
+
+회귀 이식 중 확인한 두 오류도 수정했다. `PhysicsBodyComponent.SetShapeRole`은 Guid 메모리가 아니라 네이티브 계약에 맞는 NUL 종료 UTF-8 UUID 문자열을 넘긴다. 센서 접촉 키는 같은 식별 필드를 유지하면서 두 개의 5항목 구조체 튜플로 나눠 긴 튜플의 해시 할당을 없앴다.
+
+| 검증 | 결과 | 원본 |
+|---|---|---|
+| 엔진 Release 빌드 | reflgen 1.3.0, Editor·Player·AssetCooker·AssetPacker·ProfilerViewer 빌드 및 배포 생성 성공 | `Build/Verification/fsharp-only-publish.log` |
+| 최종 배포본 | `scriptBackend=fsharp-native`, API 49 | `Build/Verification/FSharpOnlyVerifiedDistribution/local-0.0.0.0-win-x64-Release-888e3945-88e9-4ec8-ade1-562b6392954f` |
+| 최종 Editor·cooked Player | 각각 컴포넌트 27개·타입 682개·동작 검사 21개, 고정 틱 30회, 이동 0.65, 이전 컴포넌트 핸들 거부, 오디오·렌더링·정상 종료 통과 | `Build/Verification/NativeReflectionProduct-84a774d557f04d2f93e55bf9b6226261/result.json` |
+| 전체 F# 스크립트 | 78개 컴파일, ScriptCore 의존성 없음 | `Build/Verification/NativeCorpus-9d57b03e60b14676b6647429100cc38e` |
+| 런타임 단위 회귀 | 고정 틱 16개·바디 식별/역할 문자열 16개·접촉 76개, API 슬롯 220개, hostfxr 호출 통과; 정상상태 접촉 할당 0 | `Build/Verification/fsharp-runtime-regressions.log` |
+| 물리 ABI | 레이아웃·호출 계약 70개 및 슬롯 순서 220개 통과 | `Build/Obj/Phase19M0Script/abi-Release.log` |
+| 접촉 제품 회귀 | 기본·그룹화·늦은 관찰자·솔리드·객체/컴포넌트 제거·바디 교체/연속 교체·센서 전환·구독자 활성화·역할 변경/명시적 바인딩·용량 초과·고의 예외 14가지 모두 Editor·Player 통과 | `Build/Verification/FSharpContactMigration-db61e56eb81a48a28eee9be80b4cfe7d/results.json`, `Build/Verification/FSharpContactMigration-e2578249312d4ae582e82ecf430a3be7/results.json` |
+| 자동 F# 작성·핫리로드 | 109개 검사 통과, 추가·삭제·이름 변경·실패 시 이전 코드 유지·재생 중 교체·필드 보존 | `Build/Verification/fsharp-only-authoring-product.log` |
+| 오디오 Player | 재생/정지/완료 100회, GC 이후 핸들 유지, 패키지 불변 통과 | `Build/Verification/fsharp-audio-player-product.log` |
+| 오디오 Editor | Play/Stop 100회·관리 시작 100회·정리 100회 통과 | `Build/Verification/fsharp-audio-editor-product.log` |
+| CurveIndicator Editor | 실제 재질 그래프와 사본 생성·알파·없는 상수 검사 4개 통과 | `Build/Verification/NativeUi-1e16dcb998214b2e90e685698b60bea6` |
+| 배포 도구 | 189개 검사, 퇴역 백엔드 배포 입력 거부 포함 | `Build/Verification/fsharp-only-buildtool-tests-isolated.log` |
+| 소스/도구 정리 | `FSHARP_ONLY_LAYOUT_OK`, PowerShell 구문·Python 구문·NetworkHandoff 등록 검사 통과 | `Tools/regression/verify-fsharp-only-layout.ps1` |
+
+B2·Dagger F# 이식 코드는 위 78개 컴파일에 포함된다. 해당 제품 fixture의 원본 GLB가 없어 실행 검증은 사용자의 지시에 따라 제외했다. 이하 내용은 이 최종 정리 이전의 API 49 전환 기록이다.
+
+## 이전 API 49 전환 검증
+
+현재 네이티브 계약은 API 49다. API 48에서 도입한 재귀 리플렉션 전송에 API 49의 게임 스레드 콜백 등록·세대 폐기 계약이 추가됐다. 실제 Editor·cooked Player용 게이트는 소스와 바인딩에서 버전을 읽어 현재 API를 검사한다. 기존 [API 46/47 검증 기록](FSharpNativeBindingAcceptance20261029.md)은 이전 실행의 증거다.
+
+2026-10-29 Windows Release 후속 실행: reflgen 1.3.0으로 엔진 배포물 빌드와 검증을 완료했고 실제 Editor 및 cooked Player에서 제품 게이트가 통과했다. 원본은 `Build/Verification/NativeReflectionProduct-d665e4c1f67c4d4897e9b562b372679c/result.json`이다. 각 실행은 컴포넌트 27개와 타입 682개를 확인하고 고정 틱 30회, 캐릭터 이동 0.65, 라이트·데칼 값과 오디오 재생·완료를 검사했다. Editor에서 제거한 컴포넌트의 이전 핸들도 거부됐다. Editor·Player 오디오 콜백은 각각 586회·384회이고 백엔드 실패는 0이다. 원본 결과에는 각 검사와 종료 기록이 포함되며 모든 네이티브 멤버를 개별 실행한 결과는 아니다. 아래 표는 이 후속 실행 이전의 기록이다.
 
 현재 로컬에서 확인한 범위는 다음과 같다.
 
@@ -14,7 +42,7 @@
 | `verify-native-reflection-product-results.ps1` | PowerShell 7.4.7에서 결과 소비자·네이티브 파일 검증 35개 검사와 제품 실행 스크립트 구문 검사 성공 | 합성 결과·파일의 거부 검사 |
 | 계약·제품 workflow | YAML 및 PowerShell 블록 구문 검사 성공 | 제품 workflow 미실행 |
 | 새 codegen·release workflow | YAML 2개, PowerShell 블록 3개, bash 블록 2개, Python 블록 3개 구문 검사 성공 | 게시·호스트 동작을 구문 검사에서 실행하지 않음 |
-| `verify-fsharp-native-product.ps1` | 실제 제품용 절차 구현 | Windows 실행 대기 |
+| `verify-fsharp-native-product.ps1` | 후속 Windows Release 실행에서 `NATIVE_REFLECTION_PRODUCT_OK` | 실제 Editor·cooked Player 실행 |
 
 계약 실행의 원본 기록은 로컬 작업공간 `.build/probe-debug/Testing/Temporary/LastTest.log`, `.build/probe-debug/managed/Debug/managed-run.log`에 있다. 63개 타입은 서비스 fixture의 타입 수이며 실제 엔진 전체 카탈로그의 크기로 해석하지 않는다. 추가 workflow 구문 검사 기록은 `.build/workflow-review-20261029/syntax-results.log`다.
 
@@ -87,4 +115,4 @@ workflow는 BuildTool로 실제 Editor·Player·쿠킹 도구를 빌드하고 �
 
 [`native-reflection-codegen.yml`](../../.github/workflows/native-reflection-codegen.yml)은 별도의 Windows 작업 checkout에서 production 헤더를 읽어 생성물을 갱신하고, 생성 결과 일치 검사와 F# 제품 프로브 컴파일을 수행한다. 생성물과 소스 커밋·reflgen 커밋·workflow URL을 아티팩트로 보존한다. 저장소 ref를 직접 수정하지 않으며 Editor/Player 실행은 포함하지 않는다.
 
-비공개 의존성과 장치가 준비된 runner에서 새 제품 workflow가 실제로 끝나고 `NATIVE_REFLECTION_PRODUCT_OK`를 남겨야 API 49 제품 검증 완료로 기록할 수 있다. 이번 제품 프로브의 FSM 검사는 이름 왕복과 없는 이름 조회까지다. 상태·전이의 ID, 이름 변경·삭제·재생성, 콜백 등록·호출, Animator 출력 인자와 Terrain의 bounded view 검사는 생산 서비스·어댑터 fixture에서 실행했으며, 실제 Editor/Player에서 이 시나리오들이 완료됐다고 확대해 기록하지 않는다.
+Windows 로컬 제품 게이트는 통과했으며 별도의 제품 workflow 실행은 이 결과에 포함되지 않는다. 이번 제품 프로브의 FSM 검사는 이름 왕복과 없는 이름 조회까지다. 상태·전이의 ID, 이름 변경·삭제·재생성, 콜백 등록·호출, Animator 출력 인자와 Terrain의 bounded view 검사는 생산 서비스·어댑터 fixture에서 실행했으며, 실제 Editor/Player에서 이 시나리오들이 완료됐다고 확대해 기록하지 않는다.

@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([Parameter(Mandatory)][string]$EngineDistribution, [Parameter(Mandatory)][string]$SourceGlb,
     [ValidateSet('Debug','Release')][string]$Configuration='Debug', [Parameter(Mandatory)][string]$Work, [switch]$Shipping, [string]$MigratedScene='')
 $ErrorActionPreference='Stop'
@@ -24,7 +24,8 @@ if($MigratedScene){
 Copy-Item "$PSScriptRoot/fixtures/PhysicsDaggerConvex.cegeometry","$PSScriptRoot/fixtures/PhysicsDaggerConvex.cegeometry.meta" $assets
 Copy-Item -LiteralPath $SourceGlb -Destination "$assets/Models/PhysicsDagger.glb"
 Copy-Item "$PSScriptRoot/fixtures/PhysicsDagger.glb.meta" "$assets/Models"
-Copy-Item "$repo/GameScripts/DaggerConvexPlayerProbe.cs" "$assets/Script"
+Copy-Item "$repo/GameScripts/DaggerConvexPlayerProbe.fs" "$assets/Script"
+Set-Content "$assets/Script/compile.order" "DaggerConvexPlayerProbe.fs" -Encoding utf8
 $tool=Join-Path $EngineDistribution "Bin/x64-$Configuration/Tools/CreatorBuildTool/CreatorBuildTool.exe"
 & $tool select-engine --engine-distribution $EngineDistribution --project $project
 if($LASTEXITCODE){throw 'Engine selection failed'}

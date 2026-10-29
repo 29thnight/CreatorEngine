@@ -4,12 +4,10 @@ param(
     [string]$Dependencies = '',
     [string]$FSharpToolsRoot = '',
     [string]$OutputPath = '',
-    [switch]$SkipBuild,
-    [switch]$FSharpNative = $true
+    [switch]$SkipBuild
 )
 $ErrorActionPreference = 'Stop'
 $previousResourceProbe = $env:CE_PHYSICS_RESOURCE_PROBE
-$previousFSharpNative = $env:CREATOR_FSHARP_NATIVE
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if (-not $OutputPath) { $OutputPath = Join-Path $repo ('Build/Verification/Headless/Run-' + [guid]::NewGuid().ToString('N')) }
 $OutputPath = [IO.Path]::GetFullPath($OutputPath)
@@ -27,8 +25,7 @@ try {
     if (-not $SkipBuild) {
         foreach ($project in 'Tools/AssetCooker/AssetCooker.vcxproj','HeadlessHost/HeadlessHost.vcxproj') {
             $name = [IO.Path]::GetFileNameWithoutExtension($project)
-            $baseline = if ($FSharpNative) { @() } else { @('/p:CreatorLegacyScriptBaseline=true') }
-            & $msbuild $project /m:4 "/p:Configuration=$Configuration" /p:Platform=x64 "/p:SolutionDir=$repo\" /p:VcpkgManifestInstall=false /v:minimal /nologo @baseline *> "$OutputPath/$name-build.log"
+            & $msbuild $project /m:4 "/p:Configuration=$Configuration" /p:Platform=x64 "/p:SolutionDir=$repo\" /p:VcpkgManifestInstall=false /v:minimal /nologo *> "$OutputPath/$name-build.log"
             if ($LASTEXITCODE) { throw "Native build failed: $OutputPath/$name-build.log" }
         }
     }
@@ -38,8 +35,7 @@ try {
     if ($LASTEXITCODE) { throw 'Native import inventory failed' }
     Copy-Item -LiteralPath "$repo/Bin/x64-$Configuration/HeadlessHost/HeadlessHost.map" -Destination "$OutputPath/link.map"
     $fixtureKey = 'Headless-' + [guid]::NewGuid().ToString('N')
-    $managedProject = if ($FSharpNative) { 'ScriptNative.GameScripts/ScriptNative.GameScripts.fsproj' } else { 'GameScripts/GameScripts.fsproj' }
-    & dotnet build "$repo/$managedProject" -c $Configuration "-p:CreatorScriptBuildKey=$fixtureKey" "-p:CreatorScriptSourceRoot=$PSScriptRoot/fixtures/headless" "-p:CreatorFSharpToolsRoot=$FSharpToolsRoot" "-p:EngineManagedOutDir=$OutputPath/Managed/" -v:q *> "$OutputPath/managed-build.log"
+    & dotnet build "$repo/Engine/Scripting/GameScripts/ScriptNative.GameScripts.fsproj" -c $Configuration "-p:CreatorScriptBuildKey=$fixtureKey" "-p:CreatorScriptSourceRoot=$PSScriptRoot/fixtures/headless" "-p:CreatorFSharpToolsRoot=$FSharpToolsRoot" "-p:EngineManagedOutDir=$OutputPath/Managed/" -v:q *> "$OutputPath/managed-build.log"
     if ($LASTEXITCODE) { throw "F# build failed: $OutputPath/managed-build.log" }
     $assets = Join-Path $OutputPath 'Source/Assets'
     New-Item -ItemType Directory -Path "$assets/Scenes" -Force | Out-Null
@@ -49,17 +45,14 @@ try {
     if ($LASTEXITCODE) { throw "Actual scene cook failed: $OutputPath/cook.log" }
     $cooked = @(Get-ChildItem "$OutputPath/Cooked/Derived/Scenes" -Recurse -File -Filter *.creator)
     if ($cooked.Count -ne 1) { throw 'Expected exactly one cooked scene' }
-    & "$repo/Tools/build/stage-headless.ps1" -Configuration $Configuration -CookedScene $cooked[0].FullName -ManagedDirectory "$OutputPath/Managed" -OutputPath "$OutputPath/Package" -Dependencies $Dependencies -FSharpNative:$FSharpNative
+    & "$repo/Tools/build/stage-headless.ps1" -Configuration $Configuration -CookedScene $cooked[0].FullName -ManagedDirectory "$OutputPath/Managed" -OutputPath "$OutputPath/Package" -Dependencies $Dependencies
     if ($LASTEXITCODE) { throw 'Headless staging failed' }
     $env:CE_PHYSICS_RESOURCE_PROBE = '1'
-    if ($FSharpNative) { Remove-Item Env:CREATOR_FSHARP_NATIVE -ErrorAction SilentlyContinue } else { $env:CREATOR_FSHARP_NATIVE = '0' }
     & python "$PSScriptRoot/headless_scene.py" --root $repo --package "$OutputPath/Package" --cooker $cooker --output "$OutputPath/result.json" --imports "$OutputPath/imports.txt" --map "$OutputPath/link.map"
     if ($LASTEXITCODE) { throw "Headless product acceptance failed: $OutputPath/result.json" }
     Write-Output "HEADLESS_SCENE_ACCEPTANCE_OK evidence=$OutputPath"
 } finally {
     if ($null -eq $previousResourceProbe) { Remove-Item Env:CE_PHYSICS_RESOURCE_PROBE -ErrorAction SilentlyContinue }
     else { $env:CE_PHYSICS_RESOURCE_PROBE = $previousResourceProbe }
-    if ($null -eq $previousFSharpNative) { Remove-Item Env:CREATOR_FSHARP_NATIVE -ErrorAction SilentlyContinue }
-    else { $env:CREATOR_FSHARP_NATIVE = $previousFSharpNative }
     Pop-Location
 }

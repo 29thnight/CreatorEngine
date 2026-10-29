@@ -1,5 +1,5 @@
-[CmdletBinding()]
-param([ValidateSet('Debug','Release')][string]$Configuration='Release',[int[]]$Rates=@(30,60,144),[switch]$RecordOnly,[switch]$MovingQuality,[switch]$CSharpControl,[switch]$Profile)
+﻿[CmdletBinding()]
+param([ValidateSet('Debug','Release')][string]$Configuration='Release',[int[]]$Rates=@(30,60,144),[switch]$RecordOnly,[switch]$MovingQuality,[switch]$Profile)
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if(Get-Process CreatorEditor -ErrorAction SilentlyContinue){throw 'The pacing gate owns its Editor session'}
@@ -8,21 +8,10 @@ $project=Join-Path $out 'Project'
 New-Item -ItemType Directory -Force "$project/Assets/Script"|Out-Null
 Copy-Item "$repo/Dynamic_CPP/ProjectSetting" $project -Recurse
 Copy-Item "$repo/Dynamic_CPP/Assets/Shaders" "$project/Assets/Shaders" -Recurse
-if($CSharpControl){
- # Isolated benchmark control only; Editor/SDK authoring remains F# only.
- Copy-Item "$repo/GameScripts/N3PacingProbe.cs" "$project/Assets/Script"
- $control=@"
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework><AssemblyName>GameScripts</AssemblyName><EnableDefaultCompileItems>false</EnableDefaultCompileItems><ImplicitUsings>enable</ImplicitUsings><OutputPath>$repo/Bin/x64-$Configuration/Managed/Scripts/</OutputPath><AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath></PropertyGroup><ItemGroup><Compile Include="Assets/Script/N3PacingProbe.cs" /><Reference Include="ScriptCore"><HintPath>$repo/Bin/x64-$Configuration/Managed/ScriptCore.dll</HintPath><Private>false</Private></Reference><Analyzer Include="$repo/Build/Tools/Managed/ScriptCore.Generators/$Configuration/netstandard2.0/ScriptCore.Generators.dll" /></ItemGroup></Project>
-"@
- $control|Set-Content "$project/Control.csproj" -Encoding utf8
- & dotnet build "$project/Control.csproj" -c $Configuration -v:q *> "$out/managed-build.log"
- if($LASTEXITCODE){throw 'C# diagnostic control build failed'}
-}else{
 Copy-Item "$repo/GameScripts/N3PacingProbe.fs" "$project/Assets/Script"
 Set-Content "$project/Assets/Script/compile.order" "N3PacingProbe.fs" -Encoding utf8
-& dotnet build "$repo/GameScripts/GameScripts.fsproj" -c $Configuration "-p:CreatorScriptSourceRoot=$project/Assets/Script" -v:q *> "$out/managed-build.log"
+& dotnet build "$repo/Engine/Scripting/GameScripts/ScriptNative.GameScripts.fsproj" -c $Configuration "-p:CreatorScriptSourceRoot=$project/Assets/Script" -v:q *> "$out/managed-build.log"
 if($LASTEXITCODE){throw "F# pacing probe build failed: $out/managed-build.log"}
-}
 & python "$PSScriptRoot/new-n3-pacing-fixture.py" "$project/Assets/Models"
 if($LASTEXITCODE){throw 'Fixture generation failed'}
 $floor=Join-Path $out 'floor.json'
@@ -32,7 +21,7 @@ $runtime=Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll'
 foreach($source in @('Editor/EngineGUIWindow/ViewportHostWindow.cpp','Editor/EngineEntry/Bootstrap/App.cpp','Editor/EngineEntry/Project/EditorPreferences.h','Editor/EngineEntry/Commands/N3PacingCapture.h','Editor/EngineEntry/Commands/RenderTestCommands.cpp','Editor/EngineEntry/Commands/RenderDebugCommands.cpp','Engine/SceneRuntime/CharacterMovementComponent.cpp','Engine/SceneRuntime/CameraComponent.h','Engine/SceneRuntime/Scene.cpp','Engine/SceneRuntime/Scene.h','Engine/SceneRuntime/ScenePhysicsSimulation.cpp','Engine/SceneRuntime/ScenePhysicsSimulation.h','Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h')){
  if((Get-Item "$repo/$source").LastWriteTimeUtc -gt (Get-Item $runtime).LastWriteTimeUtc){throw "Fresh N3 runtime build required: $source"}
 }
-$managedDll="$repo/Bin/x64-$Configuration/Managed/Scripts/GameScripts.dll"
+$managedDll="$repo/Bin/x64-$Configuration/Managed/FSharpNative/Scripts/GameScripts.dll"
 if((Get-Item "$repo/GameScripts/N3PacingProbe.fs").LastWriteTimeUtc -gt (Get-Item $managedDll).LastWriteTimeUtc){throw 'Fresh N3 managed probe build required'}
 $hash=(Get-FileHash $runtime).Hash
 $prior=$env:CREATOR_DX12_VALIDATION;$env:CREATOR_DX12_VALIDATION='basic'
@@ -129,7 +118,7 @@ try {
  Command 'quit'|Out-Null
  if(!$p.WaitForExit(30000) -or $p.ExitCode -ne 0){throw 'Editor shutdown failed'}
  if((Get-FileHash $runtime).Hash -ne $hash){throw 'Runtime changed during pacing acceptance'}
- @{result='N3_PACING_RECORDED';rates=$Rates;runtimeHash=$hash;configuration=$Configuration;movingQuality=[bool]$MovingQuality;csharpControl=[bool]$CSharpControl;managedHash=(Get-FileHash $managedDll).Hash}|ConvertTo-Json|Set-Content "$out/recorded.json"
+ @{result='N3_PACING_RECORDED';rates=$Rates;runtimeHash=$hash;configuration=$Configuration;movingQuality=[bool]$MovingQuality;managedHash=(Get-FileHash $managedDll).Hash}|ConvertTo-Json|Set-Content "$out/recorded.json"
  if(!$RecordOnly){
   & python "$PSScriptRoot/verify-n3-pacing.py" --work $out
   if($LASTEXITCODE){throw "Independent N3 pacing oracle failed: $out"}

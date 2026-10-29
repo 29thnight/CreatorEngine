@@ -1,4 +1,4 @@
-"""Render-free product acceptance: inspect structured reports, never log markers."""
+﻿"""Render-free product acceptance: inspect structured reports, never log markers."""
 import argparse
 import hashlib
 import json
@@ -261,7 +261,7 @@ def product(root, package, cooker, output, imports, link_map):
             'DDOL reconstructed the script or duplicated simulation hooks')
     require(state['added'] == state['removing'] == 2 and state['failures'] == 0, 'DDOL owner handle/hook mismatch')
 
-    script_dir = 'Managed/FSharpNative/Scripts' if (package / 'Managed/CreatorEngine.NativeBindings.dll').is_file() else 'Managed/Scripts'
+    script_dir = 'Managed/FSharpNative/Scripts'
     missing = package / script_dir / 'GameScripts.dll'
     hidden = missing.with_suffix('.held')
     missing.rename(hidden)

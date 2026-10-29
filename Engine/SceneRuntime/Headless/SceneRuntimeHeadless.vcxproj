@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
@@ -48,10 +48,7 @@
       <AdditionalDependencies>nethost.lib;PhysX_64.lib;PhysXCommon_64.lib;PhysXFoundation_64.lib;PhysXCooking_64.lib;PhysXExtensions_static_64.lib;PhysXCharacterKinematic_static_64.lib;PhysXPvdSDK_static_64.lib;psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(CreatorLegacyScriptBaseline)'=='true'">
-    <ClCompile><PreprocessorDefinitions>CREATOR_LEGACY_SCRIPT_BASELINE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
-  </ItemDefinitionGroup>
-  <ItemGroup>
+<ItemGroup>
     <ClCompile Include="..\Scene.cpp" />
     <ClCompile Include="..\SceneManager.cpp" />
     <ClCompile Include="..\Entity.cpp" />
@@ -103,6 +100,6 @@
     <ScriptNativeProofDir>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntDir)', 'ScriptNative'))</ScriptNativeProofDir>
   </PropertyGroup>
   <Target Name="GenerateScriptNativeProof" BeforeTargets="SetModuleDependencies;ClCompile" DependsOnTargets="$(_EngineRequireReflgenAfter)" Condition="'$(DesignTimeBuild)' != 'true'">
-    <Exec Command="dotnet msbuild &quot;$(MSBuildProjectDirectory)\..\..\..\ScriptNative\ScriptNative.fsproj&quot; /t:GenerateScriptNativeBindings /p:Configuration=$(Configuration) /p:ScriptNativeOutput=&quot;$(ScriptNativeProofDir)&quot; /nologo /v:quiet" />
+    <Exec Command="dotnet msbuild &quot;$(MSBuildProjectDirectory)\..\..\..\Engine\Scripting\Bindings\ScriptNative.fsproj&quot; /t:GenerateScriptNativeBindings /p:Configuration=$(Configuration) /p:ScriptNativeOutput=&quot;$(ScriptNativeProofDir)&quot; /nologo /v:quiet" />
   </Target>
 </Project>

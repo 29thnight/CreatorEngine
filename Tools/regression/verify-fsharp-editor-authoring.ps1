@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param()
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -10,7 +10,7 @@ Copy-Item "$repo/Dynamic_CPP/ProjectSetting" "$project/ProjectSetting" -Recurse
 Copy-Item "$repo/Dynamic_CPP/Assets/Shaders" "$project/Assets/Shaders" -Recurse
 Set-Content "$project/Assets/Script/compile.order" '' -Encoding utf8
 $exe="$repo/Bin/x64-Release/Editor/CreatorEditor.exe"
-$managedScriptsDirectory="$repo/Bin/x64-Release/Managed/Scripts"
+$managedScriptsDirectory="$repo/Bin/x64-Release/Managed/FSharpNative/Scripts"
 $gameScriptsBackup=Join-Path $out 'managed-before'
 New-Item -ItemType Directory -Force $gameScriptsBackup|Out-Null
 Get-ChildItem $managedScriptsDirectory -File -Filter 'GameScripts*' | Copy-Item -Destination $gameScriptsBackup
@@ -22,7 +22,7 @@ function RestoreGameScripts {
 # makes repeated runs independent of successful or failed earlier authoring.
 Set-Content "$project/Assets/Script/AuthoringGateBootstrap.fs" "namespace CreatorEngine.AuthoringGate`nmodule Bootstrap =`n    let value = 0" -Encoding utf8
 Set-Content "$project/Assets/Script/compile.order" 'AuthoringGateBootstrap.fs' -Encoding utf8
-& dotnet build "$repo/GameScripts/GameScripts.fsproj" -c Release "-p:CreatorScriptSourceRoot=$project/Assets/Script" -v:q *> "$out/initial-build.log"
+& dotnet build "$repo/Engine/Scripting/GameScripts/ScriptNative.GameScripts.fsproj" -c Release "-p:CreatorScriptSourceRoot=$project/Assets/Script" -v:q *> "$out/initial-build.log"
 if($LASTEXITCODE){RestoreGameScripts;throw "Initial F# catalog build failed: $out/initial-build.log"}
 $p=$null
 try {

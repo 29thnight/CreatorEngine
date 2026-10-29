@@ -1,12 +1,12 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <FSharpCoreImplicitPackageVersion>10.0.112</FSharpCoreImplicitPackageVersion>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../../ScriptNative/ScriptNative.fsproj" />
+    <ProjectReference Include="../../../Engine/Scripting/Bindings/ScriptNative.fsproj" />
     <ProjectReference Include="../ScriptNativeGeneratorProbe/ScriptNativeGeneratorProbe.fsproj" />
   </ItemGroup>
-  <ItemGroup><Compile Include="Program.fs" /></ItemGroup>
+  <ItemGroup><Compile Include="NativeRuntimeRegression.fs" /><Compile Include="Program.fs" /></ItemGroup>
 </Project>

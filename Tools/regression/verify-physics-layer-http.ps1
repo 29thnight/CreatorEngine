@@ -1,4 +1,4 @@
-param([string]$EditorExe='')
+﻿param([string]$EditorExe='')
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if(!$EditorExe){$EditorExe=Join-Path $repo 'Bin/x64-Release/Editor/CreatorEditor.exe'}
@@ -218,7 +218,7 @@ try {
     $evidence.replay=WaitActors $true
     StopAndCheck
     $evidence.authoredFilesImmutable=$true
-    @{result='PHYSICS_LAYER_HTTP_OK';checks=$script:checks;commands=$script:sequence;scene=$scene;evidence=$evidence;runtimeDllHash=(Get-FileHash $runtimePath).Hash;probeSourceHash=(Get-FileHash (Join-Path $repo 'GameScripts/PhysicsLayerProbe.cs')).Hash}|ConvertTo-Json -Depth 30|Set-Content "$out/result.json" -Encoding utf8
+    @{result='PHYSICS_LAYER_HTTP_OK';checks=$script:checks;commands=$script:sequence;scene=$scene;evidence=$evidence;runtimeDllHash=(Get-FileHash $runtimePath).Hash;probeSourceHash=(Get-FileHash (Join-Path $repo 'GameScripts/PhysicsLayerProbe.fs')).Hash}|ConvertTo-Json -Depth 30|Set-Content "$out/result.json" -Encoding utf8
     "PHYSICS_LAYER_HTTP_OK checks=$script:checks evidence=$out"
     $null=Command 'quit'
 } catch {

@@ -1,4 +1,4 @@
-{
+﻿{
   "schemaVersion": 1,
   "suite": "NetworkHandoff",
   "gates": [
@@ -34,7 +34,7 @@
     },
     {
       "id": "LifecycleEnums",
-      "script": "ScriptCore/check-lifecycle-enums.ps1",
+      "script": "Tools/regression/check-script-lifecycle-enums.ps1",
       "configuration": "none"
     },
     {

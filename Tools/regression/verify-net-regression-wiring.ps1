@@ -3,7 +3,7 @@ param([Parameter(Mandatory)][string]$EvidenceRoot)
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $root=Join-Path $EvidenceRoot 'RunnerCanary'
-New-Item -ItemType Directory -Force "$root/Tools/regression","$root/ScriptCore"|Out-Null
+New-Item -ItemType Directory -Force "$root/Tools/regression","$root/Engine/Scripting/Bindings"|Out-Null
 foreach($name in @('run-all.ps1','network_handoff_suite.py','network-handoff.suite.json')){Copy-Item "$PSScriptRoot/$name" "$root/Tools/regression"}
 $manifest=Get-Content "$root/Tools/regression/network-handoff.suite.json" -Raw|ConvertFrom-Json
 foreach($gate in $manifest.gates) {

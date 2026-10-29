@@ -1,4 +1,4 @@
-"""Reconcile authored standalone reports without altering their dated receipts."""
+﻿"""Reconcile authored standalone reports without altering their dated receipts."""
 import hashlib
 import html
 import json
@@ -12,11 +12,11 @@ file=ROOT/'docs/analysis/MasterDocumentationAudit20261020.json'
 data=json.loads(file.read_text(encoding='utf-8'));sha=data['master']
 committed=set(subprocess.check_output(['git','ls-tree','-r','--name-only',sha],cwd=ROOT,text=True).splitlines())
 graph=['Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h','Engine/RenderEngine/RHI/RHICommandTranslator.cpp','Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.cpp']
-scene=['Engine/SceneRuntime/SceneManager.h','Engine/SceneRuntime/Scene.cpp','ScriptCore/Component.cs']
+scene=['Engine/SceneRuntime/SceneManager.h','Engine/SceneRuntime/Scene.cpp','Engine/Scripting/Bindings/Components/Entity.fs']
 rules={
 'EngineStructureAnalysis':(scene+graph,['현재 제품 경로는 C++23·DX12/Vulkan·CoreCLR/.NET 10과 miniaudio/Null이다. 아래 7월의 DX11·C++20·C++ 스크립팅·FMOD 설명과 파일 수는 현재 구조를 나타내지 않는다.','SceneManager의 GCCE domain/root, Scene→Entity→Component trace, 세대 핸들과 별도 자산 owner가 현재 수명 경계다. 리플렉션 서술 정본은 reflgen이다.'], 'docs/TechnicalGuide.html'),
 'RectTransformAnalysis':(['Engine/SceneRuntime/RectTransformComponent.h','Engine/SceneRuntime/RectTransformComponent.cpp','Engine/SceneRuntime/Canvas.cpp','Engine/SceneRuntime/UIManager.h'],['RectTransform은 MarkDirty로 Scene layout dirty를 게시하고 부모·화면 rect와 canvas 배율을 사용한다. m_worldRect와 m_layoutScale은 reflgen::ignore 파생값이다. 과거 F-1/F-2의 고정 해상도·파생값 직렬화 진단을 현행 결함으로 재사용하지 않는다.','현재 UIManager는 여전히 Singleton이다. scene-local 입력·dirty propagation·값 UIDrawSnapshot과 전역 UIManager 퇴역의 남은 범위는 PHASE 16 계획으로 통일한다.'],'docs/plans/UISystemRedesignPlan.html'),
-'ResourceOwnershipDesign':(['Engine/SceneRuntime/EntityHandle.h','Engine/SceneRuntime/SceneManager.h','ScriptCore/ObjectHandle.cs','ScriptCore/Component.cs'],['ObjectHandle/EntityHandle과 Component·Entity 기반 managed 표면은 구현돼 있다. 별도 핸들 도입·CoreCLR 전환을 미착수 계획으로 다시 사용하지 않는다.','GCCE 객체 root/trace, native 자원 owner, CLR GC, Scope 취소와 GPU retirement는 서로 다른 수명이다. 과거 17항목 probe 통과는 당시 실행에만 유효하다.'],'docs/design/GCCEIntegration.html'),
+'ResourceOwnershipDesign':(['Engine/SceneRuntime/EntityHandle.h','Engine/SceneRuntime/SceneManager.h','Engine/Scripting/Bindings/Values/Values.fs','Engine/Scripting/Bindings/Components/Entity.fs'],['ObjectHandle/EntityHandle과 Component·Entity 기반 managed 표면은 구현돼 있다. 별도 핸들 도입·CoreCLR 전환을 미착수 계획으로 다시 사용하지 않는다.','GCCE 객체 root/trace, native 자원 owner, CLR GC, Scope 취소와 GPU retirement는 서로 다른 수명이다. 과거 17항목 probe 통과는 당시 실행에만 유효하다.'],'docs/design/GCCEIntegration.html'),
 'FrameLifecycle':(scene+graph,['시뮬레이션과 immutable frame 게시, render queue 소비·graph 기록/제출, 완료된 슬롯의 표시를 구분한다. frame ID와 CPU·GPU·Present 관측은 같은 시각이 아니다.','현재 소프트웨어 RHI는 frozen target의 병렬 번역과 sealed batch 조기 handoff를 지원한다. 아래 10월 5일 그림의 고정 작업자 수·용량·순서가 변경 뒤 모든 경로를 보증하지 않는다.'],'docs/plans/RenderGraphDependencySchedulingPlan.html'),
 'LiveRenderWiring20261012':(graph+['Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp'],['현재 live pipeline은 C++ Pass·명시적 버전/슬롯·dependency order를 소비한다. 선언 metadata 재사용과 독립 target 병렬 번역·조기 제출이 구현 기반이다.','아래 노드 수·카메라/그림자 배선 그림과 CPU/GPU 수치는 명시된 스냅샷이다. 전체 비용·overlap·오류 수용은 최신 RG8 계획을 따른다. SRP/C# 저작 전환은 취소됐다.'],'docs/plans/RenderGraphDependencySchedulingPlan.html'),
 'EngineWiringAudit20261020':(scene,['이 대장은 26영역·78작업의 객체별 엔진 감사 원장이다. 문서 전수 검증 완료가 이 대장의 객체별 실행·비용·수명 감사 완료를 뜻하지 않는다.','최신 master는 사용하지 않는 Scene 종류별 registry를 정리하고 proxy dispatch generation 확인과 실패 dirty 재시도를 유지한다. 파일 해시·검사 상태는 원래 감사 신원으로 보존한다.'],'docs/plans/MasterPlanAudit20261020.html'),

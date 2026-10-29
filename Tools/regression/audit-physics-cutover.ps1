@@ -18,7 +18,7 @@ foreach($project in @('Engine/Physics/Physics.vcxproj','Engine/Physics/Physics.v
 $pattern='\b(?:PhysicX|PhysicsManager|PhysicsManagers|RigidBodyComponent|BoxColliderComponent|SphereColliderComponent|CapsuleColliderComponent|MeshColliderComponent|TerrainColliderComponent|CharacterControllerComponent|CharacterControllerSystem|RagdollComponent)\b|\bPhysics->|\b(?:Cct_|Rigid_|Collider_)\w+'
 $pattern+='|\b(?:DynamicRigidBody|StaticRigidBody|PhysicsEventCallback|PhysicsDebug|ICollider|CharacterController|CharacterMovement|RagdollLink|RagdollJoint|RagdollPhysics|ResourceBase|TriangleMeshResource|ConvexMeshResource|HeightFieldResource)\b'
 $consumers=@()
-foreach($root in @('Engine','ScriptCore','GameScripts','ScriptBinder','Dynamic_CPP','Editor','Player','Tools/AssetCooker')) {
+foreach($root in @('Engine','GameScripts','ScriptBinder','Dynamic_CPP','Editor','Player','Tools/AssetCooker')) {
     Get-ChildItem (Join-Path $repo $root) -File -Recurse | Where-Object {
         $_.Extension -in '.h','.hpp','.cpp','.cs' -and $_.FullName -notmatch '[\\/](obj|bin|Library|generated)[\\/]'
     } | ForEach-Object {

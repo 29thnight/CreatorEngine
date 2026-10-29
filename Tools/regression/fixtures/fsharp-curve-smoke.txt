@@ -1,0 +1,7 @@
+wait 60
+scene.switch "__CURVE_SCENE__"
+wait 120
+play
+wait 200
+log.flush
+quit

@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([Parameter(Mandatory)][string]$Stage, [ValidatePattern('^[0-9a-fA-F-]{36}$')][string]$ExpectedSceneGuid='5703e1d4-b1f5-4a32-b047-dd351c713483', [switch]$Shipping, [switch]$Shear, [switch]$QueryBenchmark, [switch]$QueryStress, [switch]$QueryDynamic, [switch]$QueryMixed, [switch]$TraceCounterLoss, [switch]$WaitForRenderedCapture, [switch]$BoundedDenseCapture, [switch]$RequireMaximumBatch, [switch]$DisableTieredCompilation, [switch]$IsolateGameThread, [switch]$PreferLastCore, [switch]$RequireCpuAccounting, [ValidateSet('none','off','on')][string]$QueryProfile='none', [ValidateRange(0,100000)][int]$CaptureTailFrames=0, [int]$TimeoutSeconds=600, [ValidateRange(2000,1000000)][int]$SmokeFrames=12000)
 $ErrorActionPreference='Stop'
 if($BoundedDenseCapture -and (!$QueryStress -or !$QueryBenchmark -or $QueryProfile -ne 'on')){throw 'Bounded dense capture requires profiled stress benchmark'}
@@ -18,19 +18,12 @@ function FileSet($root){
 if(Get-ChildItem -LiteralPath $Stage -Force -Recurse|Where-Object {$_.Attributes -band [IO.FileAttributes]::ReparsePoint}){throw 'Stage contains reparse points'}
 $before=FileSet $Stage
 if (-not ('PhysicsB2ProbeWindow' -as [type])) {
-    Add-Type @'
-using System;
-using System.Runtime.InteropServices;
-public static class PhysicsB2ProbeWindow {
-    [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
-    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
-}
-'@
+    & dotnet build "$PSScriptRoot/RegressionHost/RegressionHost.fsproj" -c Release --nologo -v:q *> "$out/host-build.log"
+    if($LASTEXITCODE){throw "F# regression host build failed: $out/host-build.log"}
+    [void][Reflection.Assembly]::LoadFrom("$PSScriptRoot/RegressionHost/bin/Release/net10.0/FSharp.Core.dll")
+    Add-Type -Path "$PSScriptRoot/RegressionHost/bin/Release/net10.0/RegressionHost.dll"
 }
 if($IsolateGameThread -and ($QueryProfile -eq 'none' -or !$QueryBenchmark)){throw 'CPU isolation requires a gated query benchmark'}
-if($IsolateGameThread -and -not ('PhysicsQueryCpuPlacement' -as [type])){
-    Add-Type -Path "$PSScriptRoot/PhysicsQueryCpuPlacement.cs"
-}
 if($QueryProfile -ne 'none' -and !$QueryBenchmark -and !$QueryMixed){throw 'QueryProfile requires QueryBenchmark'}
 $launchArgs=@("--smoke", "$SmokeFrames", "--smoke-promotions", "8")
 if($QueryProfile -ne 'none'){$launchArgs+='--command-service'}

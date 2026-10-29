@@ -1,5 +1,5 @@
-#Requires -Version 7.0
-param([ValidateSet('Debug','Release')][string]$Configuration = 'Debug', [switch]$FSharpNative = $true, [switch]$LegacyPreferenceProbe)
+﻿#Requires -Version 7.0
+param([ValidateSet('Debug','Release')][string]$Configuration = 'Debug')
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -13,7 +13,7 @@ Copy-Item (Join-Path $repo 'Dynamic_CPP/ProjectSetting/*') (Join-Path $project '
 Copy-Item (Join-Path $repo 'Dynamic_CPP/Assets/Shaders/DefaultPassShader/*') (Join-Path $project 'Assets/Shaders/DefaultPassShader') -Recurse
 & (Join-Path $PSScriptRoot 'sync-material-editor-scale.ps1') -Project $project
 $exe = Join-Path $repo "Bin/x64-$Configuration/Editor/CreatorEditor.exe"
-$managed = Join-Path $repo $(if ($FSharpNative) { "Bin/x64-$Configuration/Managed/FSharpNative/Scripts" } else { "Bin/x64-$Configuration/Managed/Scripts" })
+$managed = Join-Path $repo "Bin/x64-$Configuration/Managed/FSharpNative/Scripts"
 $backup = Join-Path $root 'ScriptsBackup'
 Copy-Item -LiteralPath $managed -Destination $backup -Recurse
 $originalManaged = @((Get-ChildItem $managed -File).Name)
@@ -38,7 +38,6 @@ type AutoScriptGate() as this =
 '@
 $script:checks = 0
 $process = $null
-$previousFSharpNative = $env:CREATOR_FSHARP_NATIVE
 function Assert([bool]$condition, [string]$message) {
     if (!$condition) { throw $message }
     $script:checks++
@@ -82,7 +81,6 @@ function Check-Fields {
     }
 }
 try {
-    if ($FSharpNative -and !$LegacyPreferenceProbe) { Remove-Item Env:CREATOR_FSHARP_NATIVE -ErrorAction SilentlyContinue } else { $env:CREATOR_FSHARP_NATIVE = '0' }
     $process = Start-Process $exe -WorkingDirectory (Split-Path $exe) -WindowStyle Hidden -PassThru -ArgumentList @('--development-project', ('"'+$project+'"'), '--command-service', '--allow-user-code', '--smoke-offscreen') -RedirectStandardOutput (Join-Path $root 'editor.out') -RedirectStandardError (Join-Path $root 'editor.err')
     $endpointPath = Join-Path $project 'Library/CommandService/endpoint.json'
     $deadline = [DateTime]::UtcNow.AddSeconds(180)
@@ -175,6 +173,4 @@ finally {
         if ($file.Name -notin $originalManaged) { Remove-Item -LiteralPath $file.FullName }
     }
     Copy-Item (Join-Path $backup '*') $managed -Force
-    if ($null -eq $previousFSharpNative) { Remove-Item Env:CREATOR_FSHARP_NATIVE -ErrorAction SilentlyContinue }
-    else { $env:CREATOR_FSHARP_NATIVE = $previousFSharpNative }
 }

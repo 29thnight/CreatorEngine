@@ -1,0 +1,104 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../../EngineOutput.props" />
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>CreatorEngine.NativeBindings</AssemblyName>
+    <FSharpCoreImplicitPackageVersion>10.0.112</FSharpCoreImplicitPackageVersion>
+    <OutputPath>$(EngineManagedOutDir)</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <ScriptNativeOutput>$(MSBuildProjectDirectory)/obj/$(Configuration)/native-bindings</ScriptNativeOutput>
+    <ScriptNativeGenerator Condition="'$(ScriptNativeGenerator)' == ''">$(MSBuildProjectDirectory)/../../../vcpkg_installed/x64-windows/x64-windows/tools/reflgen/reflgen.exe</ScriptNativeGenerator>
+    <ScriptNativeHeader>$(MSBuildProjectDirectory)/../../../Engine/SceneRuntime/ScriptApiTable.h</ScriptNativeHeader>
+    <ScriptNativeClangArguments Condition="'$(ScriptNativeClangArguments)' == ''">-std=c++20 -target x86_64-pc-windows-msvc</ScriptNativeClangArguments>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AudioValues/ScriptNative.AudioValues.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <_ScriptNativeInput Include="$(ScriptNativeHeader);$(MSBuildProjectDirectory)/../../../Engine/SceneRuntime/ScriptBindingValues.h;$(MSBuildProjectDirectory)/../../../Engine/SceneRuntime/ScriptPhysicsValues.h;$(MSBuildProjectDirectory)/../../../Engine/SceneRuntime/SimulationExchangeABI.h;$(MSBuildProjectDirectory)/../../../Engine/Utility_Framework/Runtime/ScriptApiVersion.h;$(ScriptNativeGenerator);$(ScriptNativeOutput)/generator-options.txt" />
+    <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="$(ScriptNativeOutput)/reflgen_creator_script_native.fs" />
+    <Compile Include="Interop/FastNativeCalls.fs" />
+    <Compile Include="Interop/NativeBootstrap.fs" />
+    <Compile Include="Interop/NativeLog.fs" />
+    <Compile Include="Services/Debug.fs" />
+    <Compile Include="Services/Profiler.fs" />
+    <Compile Include="Values/Values.fs" />
+    <Compile Include="Interop/NativeReflection.fs" />
+    <Compile Include="Interop/NativeTypedSupport.fs" />
+    <Compile Include="Values/KeyCode.fs" />
+    <Compile Include="Interop/NativeApi.fs" />
+    <Compile Include="Services/Assets.fs" />
+    <Compile Include="Runtime/ComponentLifetime.fs" />
+    <Compile Include="Components/Entity.fs" />
+    <Compile Include="Interop/NativeReflectionCallbacks.fs" />
+    <Compile Include="Interop/NativeReflectionExtensions.fs" />
+    <Compile Include="Interop/ReflectedNativeComponent.fs" />
+    <Compile Include="Components/ScriptComponent.fs" />
+    <Compile Include="Runtime/InvalidScriptComponent.fs" />
+    <Compile Include="Interop/ReflectedComponentBindings.fs" />
+    <Compile Include="Services/Simulation.fs" />
+    <Compile Include="Services/Audio.fs" />
+    <Compile Include="Components/Sound.fs" />
+    <Compile Include="Services/Input.fs" />
+    <Compile Include="Runtime/ContactStream.fs" />
+    <Compile Include="Components/PhysicsComponents.fs" />
+    <Compile Include="Components/Camera.fs" />
+    <Compile Include="Components/Light.fs" />
+    <Compile Include="Components/ExtraComponents.fs" />
+    <Compile Include="Components/BehaviorTreeComponent.fs" />
+    <Compile Include="Components/BoneComponent.fs" />
+    <Compile Include="Components/DecalComponent.fs" />
+    <Compile Include="Components/FoliageComponent.fs" />
+    <Compile Include="Components/PlayerInputComponent.fs" />
+    <Compile Include="Components/SceneRenderProfileComponent.fs" />
+    <Compile Include="Components/SpriteRenderer.fs" />
+    <Compile Include="Components/SpriteSheetComponent.fs" />
+    <Compile Include="Components/StateMachineComponent.fs" />
+    <Compile Include="Components/TerrainComponent.fs" />
+    <Compile Include="Interop/ExtraBindings.fs" />
+    <Compile Include="Components/Animator.fs" />
+    <Compile Include="Components/RectTransformComponent.fs" />
+    <Compile Include="Components/UIComponent.fs" />
+    <Compile Include="Services/UINavigation.fs" />
+    <Compile Include="Components/ImageComponent.fs" />
+    <Compile Include="Components/UIButton.fs" />
+    <Compile Include="Components/TextComponent.fs" />
+    <Compile Include="Components/Canvas.fs" />
+    <Compile Include="Interop/UIBindings.fs" />
+    <Compile Include="Components/MeshRenderer.fs" />
+    <Compile Include="GeneratedNative/EnumTags.fs" />
+    <Compile Include="GeneratedNative/Types.fs" />
+    <Compile Include="GeneratedNative/Values/*.fs" />
+    <Compile Include="GeneratedNative/Components/*.fs" />
+    <Compile Include="Interop/NativeTypedComponentExtensions.fs" />
+    <Compile Include="Services/Prefab.fs" />
+    <Compile Include="Services/BlackBoard.fs" />
+    <Compile Include="Runtime/BehaviorContracts.fs" />
+    <Compile Include="Runtime/RuntimeContracts.fs" />
+    <Compile Include="Runtime/Contacts.fs" />
+    <Compile Include="Services/Physics.fs" />
+    <Compile Include="Runtime/AuxiliaryFactories.fs" />
+    <Compile Include="Services/Trees.fs" />
+    <Compile Include="Runtime/AuxiliaryRuntime.fs" />
+    <Compile Include="Interop/NativeBT.fs" />
+    <Compile Include="Runtime/Continuations.fs" />
+    <Compile Include="Runtime/Registry.fs" />
+    <Compile Include="Runtime/Loader.fs" />
+    <Compile Include="Runtime/InvokeOutcome.fs" />
+    <Compile Include="Runtime/Callable.fs" />
+    <Compile Include="Runtime/GcControl.fs" />
+    <Compile Include="Runtime/RuntimeBootstrap.fs" />
+  </ItemGroup>
+  <Target Name="WriteScriptNativeGeneratorOptions" BeforeTargets="GenerateScriptNativeBindings">
+    <MakeDir Directories="$(ScriptNativeOutput)" />
+    <WriteLinesToFile File="$(ScriptNativeOutput)/generator-options.txt" Lines="$(ScriptNativeGenerator);$(ScriptNativeClangArguments)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
+  <Target Name="GenerateScriptNativeBindings" BeforeTargets="CoreCompile" Inputs="@(_ScriptNativeInput)" Outputs="$(ScriptNativeOutput)/reflgen_creator_script_native.fs;$(ScriptNativeOutput)/reflgen_creator_script_native.cpp;$(ScriptNativeOutput)/reflgen_creator_script_native.json">
+    <Error Condition="!Exists('$(ScriptNativeGenerator)')" Text="reflgen not found: $(ScriptNativeGenerator). Install the engine vcpkg manifest or set ScriptNativeGenerator." />
+    <MakeDir Directories="$(ScriptNativeOutput)" />
+    <Exec Command="&quot;$(ScriptNativeGenerator)&quot; --module creator_script --output &quot;$(ScriptNativeOutput)&quot; --fsharp-table --fsharp-namespace CreatorEngine.Native &quot;$(ScriptNativeHeader)&quot; -- $(ScriptNativeClangArguments)" />
+  </Target>
+</Project>

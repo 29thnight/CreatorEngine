@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([Parameter(Mandatory)][string]$EngineDistribution, [Parameter(Mandatory)][string]$EditorResult, [string]$ReuseWork='', [switch]$Shipping,[string]$ReuseProject='', [ValidateSet('Debug','Release')][string]$Configuration='Release')
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -16,19 +16,21 @@ Get-ChildItem -LiteralPath "$repo/Dynamic_CPP/Assets/Shaders" | Copy-Item -Desti
 Copy-Item "$repo/Dynamic_CPP/ProjectSetting" "$project/ProjectSetting" -Recurse
 Copy-Item -LiteralPath $editor.scene -Destination "$project/Assets/Scenes/ContactStream.creator"
 Copy-Item -LiteralPath ($editor.scene+'.meta') -Destination "$project/Assets/Scenes/ContactStream.creator.meta"
-Copy-Item "$repo/GameScripts/PhysicsContactStreamProbe.cs" "$project/Assets/Script"
-if($editor.solidContacts){Copy-Item "$repo/GameScripts/PhysicsSolidContactProbe.cs" "$project/Assets/Script"}
-if($editor.contactFault){Copy-Item "$repo/GameScripts/PhysicsContactFaultProbe.cs" "$project/Assets/Script"}
-if($editor.roleTransition){Copy-Item "$repo/GameScripts/PhysicsRoleContactProbe.cs" "$project/Assets/Script"}
-if($editor.subscriberLifetime){Copy-Item "$repo/GameScripts/PhysicsSubscriberContactProbe.cs" "$project/Assets/Script"}
-if($editor.sensorTransition){Copy-Item "$repo/GameScripts/PhysicsSensorTransitionProbe.cs" "$project/Assets/Script"}
-if($editor.topology){Copy-Item "$repo/GameScripts/PhysicsTopologyContactProbe.cs" "$project/Assets/Script"}
+Copy-Item "$repo/GameScripts/PhysicsContactStreamProbe.fs" "$project/Assets/Script"
+if($editor.solidContacts){Copy-Item "$repo/GameScripts/PhysicsSolidContactProbe.fs" "$project/Assets/Script"}
+if($editor.contactFault){Copy-Item "$repo/GameScripts/PhysicsContactFaultProbe.fs" "$project/Assets/Script"}
+if($editor.roleTransition){Copy-Item "$repo/GameScripts/PhysicsRoleContactProbe.fs" "$project/Assets/Script"}
+if($editor.subscriberLifetime){Copy-Item "$repo/GameScripts/PhysicsSubscriberContactProbe.fs" "$project/Assets/Script"}
+if($editor.sensorTransition){Copy-Item "$repo/GameScripts/PhysicsSensorTransitionProbe.fs" "$project/Assets/Script"}
+if($editor.topology){Copy-Item "$repo/GameScripts/PhysicsTopologyContactProbe.fs" "$project/Assets/Script"}
 if($editor.latePrefab){
     New-Item -ItemType Directory -Force "$project/Assets/Prefabs"|Out-Null
     Copy-Item -LiteralPath $editor.latePrefab,($editor.latePrefab+'.meta') -Destination "$project/Assets/Prefabs"
-    Copy-Item "$repo/GameScripts/PhysicsLateContactProbe.cs" "$project/Assets/Script"
+    Copy-Item "$repo/GameScripts/PhysicsLateContactProbe.fs" "$project/Assets/Script"
 }
 }
+$orderedSources = @('PhysicsContactStreamProbe.fs') + @(Get-ChildItem "$project/Assets/Script" -File -Filter '*.fs' | Where-Object { $_.Name -ne 'PhysicsContactStreamProbe.fs' } | Sort-Object Name | ForEach-Object Name)
+Set-Content "$project/Assets/Script/compile.order" $orderedSources -Encoding utf8
 # Debug cooker validates a model corpus even for physics-only scenes.
 # This small packaging input is not instantiated in the contact test scene.
 if($Configuration -eq 'Debug' -and !(Get-ChildItem "$project/Assets" -Recurse -File -Filter '*.glb' | Select-Object -First 1)) {
