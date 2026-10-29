@@ -179,11 +179,11 @@
 
 <figure>
 <div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
-<a class="map-row" href="#집계와-범위"><span class="ve-label">§00</span><span class="map-name">집계와 범위</span><span class="map-bar"><i style="width:29.1%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span></span></a>
-<a class="map-row" href="#전환-경계"><span class="ve-label">§01</span><span class="map-name">전환 경계</span><span class="map-bar"><i style="width:29.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#집계와-범위"><span class="ve-label">§00</span><span class="map-name">집계와 범위</span><span class="map-bar"><i style="width:28.5%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span></span></a>
+<a class="map-row" href="#전환-경계"><span class="ve-label">§01</span><span class="map-name">전환 경계</span><span class="map-bar"><i style="width:28.7%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#확인한-경계와-보존할-계약"><span class="ve-label">§02</span><span class="map-name">확인한 경계와 보존할 계약</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#실행-배치-권고"><span class="ve-label">§03</span><span class="map-name">실행 배치 권고</span><span class="map-bar"><i style="width:17.2%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#재현과-검증"><span class="ve-label">§04</span><span class="map-name">재현과 검증</span><span class="map-bar"><i style="width:25.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실행-배치-권고"><span class="ve-label">§03</span><span class="map-name">실행 배치 권고</span><span class="map-bar"><i style="width:16.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#재현과-검증"><span class="ve-label">§04</span><span class="map-name">재현과 검증</span><span class="map-bar"><i style="width:25%"></i></span><span class="map-marks"></span></a>
 </div>
 <figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「확인한 경계와 보존할 계약」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
 </figure>
@@ -235,7 +235,7 @@
 </ul>
 <p>문자열 키를 유지할 때는 기존 해시·동등성 또는 명시적 어댑터를 선택해야 한다. 정본의 기본 <code>ce::hash&lt;T&gt;</code>가 임의의 <code>std::string</code>, path, GUID 사용자 타입에 그대로 맞는다고 가정하지 않는다. 뷰 조회를 임시 소유 문자열 생성으로 바꿔 무할당 조건을 깨뜨리지 않는다.</p>
 <h3 id="정렬-계열은-현재-구현의-빈-범위">정렬 계열은 현재 구현의 빈 범위</h3>
-<p><a href="../../Engine/Containers/modules/Creator.Containers.ixx">정본 모듈 export 목록</a>과 헤더를 확인했다. 현재 합격 정본에는 ordered map/set/multi 계열이 없다. 355건 모두 해시 컨테이너로 바꿀 수 있다는 결론은 내리지 않았다.</p>
+<p>정본 모듈 export 목록 (<code>Engine/Containers/modules/Creator.Containers.ixx</code>, 로컬 기록)과 헤더를 확인했다. 현재 합격 정본에는 ordered map/set/multi 계열이 없다. 355건 모두 해시 컨테이너로 바꿀 수 있다는 결론은 내리지 않았다.</p>
 <ul>
 <li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">RHIPersistentHeapPolicy.h:137</a>: offset 정렬 맵·size 중복 맵·allocated 맵이 함께 동작한다. 구현의 <code>lower_bound</code>, <code>equal_range</code>, 앞뒤 블록 병합이 실제 정렬 의미를 사용한다.</li>
 <li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Lattice/ImGui/LXStyle.cpp" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">LXStyle.cpp:423</a>: 정렬 맵 순회로 저장 내용을 쓴다. 해시 순회로 바꾸려면 출력 순서가 바뀌므로 직렬화 계약 검증이 필요하다.</li>

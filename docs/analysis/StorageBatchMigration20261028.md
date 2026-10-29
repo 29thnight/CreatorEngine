@@ -6,7 +6,7 @@
 
 ## 구현 정본과 표준 라이브러리 경계
 
-- 정본: [Creator.Containers.Storage.ixx](../../Engine/Containers/storage/Creator.Containers.Storage.ixx)
+- 정본: `Engine/Containers/storage/Creator.Containers.Storage.ixx` (로컬 기록)
 - 생성 헤더: [storage.h](../../Engine/Containers/storage/storage.h), sync-storage.ps1로 동기화
 - 엔진 별칭: [EngineStorage.h](../../Engine/Utility_Framework/Foundation/EngineStorage.h)
 - 독립 테스트 입구: 외부 CreatorContainers/storage/StorageValidation.proj. 엔진 정본과 테스트 프로젝트를 직접 참조하며 구현 복사본은 없다.

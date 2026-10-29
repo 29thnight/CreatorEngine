@@ -56,7 +56,7 @@
 
 ### 정렬 계열은 현재 구현의 빈 범위
 
-[정본 모듈 export 목록](../../Engine/Containers/modules/Creator.Containers.ixx)과 헤더를 확인했다. 현재 합격 정본에는 ordered map/set/multi 계열이 없다. 355건 모두 해시 컨테이너로 바꿀 수 있다는 결론은 내리지 않았다.
+정본 모듈 export 목록 (`Engine/Containers/modules/Creator.Containers.ixx`, 로컬 기록)과 헤더를 확인했다. 현재 합격 정본에는 ordered map/set/multi 계열이 없다. 355건 모두 해시 컨테이너로 바꿀 수 있다는 결론은 내리지 않았다.
 
 - [RHIPersistentHeapPolicy.h:137](../../Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h): offset 정렬 맵·size 중복 맵·allocated 맵이 함께 동작한다. 구현의 `lower_bound`, `equal_range`, 앞뒤 블록 병합이 실제 정렬 의미를 사용한다.
 - [LXStyle.cpp:423](../../Lattice/ImGui/LXStyle.cpp): 정렬 맵 순회로 저장 내용을 쓴다. 해시 순회로 바꾸려면 출력 순서가 바뀌므로 직렬화 계약 검증이 필요하다.
