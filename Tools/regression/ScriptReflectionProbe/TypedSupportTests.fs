@@ -111,6 +111,15 @@ let run (check: bool -> string -> unit) (rejected: (unit -> unit) -> string -> s
         [|"ce::func_detail::owning_func<void,false,true,false,0x30ui64,0x8ui64,ce::heap_allocator,std::basic_string<char> const &>";
           "std::string"|], [|"const_reference"; "const_reference"|])
     check (msvcTextCallback.Resolve().Name = "RunTextCallback") "typed selector normalizes qualified nested callback strings without losing reference identity"
+    let compactMsvcTextCallback = NativeMethodSpec("ProbeComponent", "RunTextCallback", true,
+        [|"ce::func_detail::owning_func<void,0,1,0,48,8,ce::heap_allocator,std::basic_string<char,std::char_traits<char>,std::allocator<char>>const&>";
+          "std::basic_string<char,std::char_traits<char>,std::allocator<char>>"|], [|"const_reference"; "const_reference"|])
+    check (compactMsvcTextCallback.Resolve().Name = "RunTextCallback") "typed selector accepts the observed MSVC template-close const reference spelling"
+    let compactMutableTextCallback = NativeMethodSpec("ProbeComponent", "RunTextCallback", true,
+        [|"ce::func_detail::owning_func<void,0,1,0,48,8,ce::heap_allocator,std::basic_string<char,std::char_traits<char>,std::allocator<char>>&>";
+          "std::basic_string<char,std::char_traits<char>,std::allocator<char>>"|], [|"const_reference"; "const_reference"|])
+    check (rejected (fun () -> compactMutableTextCallback.Resolve() |> ignore) "compact callback mutable reference is not const reference" = "method_not_found")
+        "template-close qualifier normalization preserves callback pointee constness"
     let mutableTextCallback = NativeMethodSpec("ProbeComponent", "RunTextCallback", true,
         [|"ce::func_detail::owning_func<void,false,true,false,48,8,ce::heap_allocator,std::basic_string<char>&>";
           "std::string"|], [|"const_reference"; "const_reference"|])

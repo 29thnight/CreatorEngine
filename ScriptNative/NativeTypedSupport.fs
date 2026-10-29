@@ -33,7 +33,7 @@ module internal NativeTypedJson =
             | '*' | '&' when depth = 0 && finish = text.Length -> finish <- index
             | _ -> ()
         let baseType = text.Substring(0, finish).TrimEnd()
-        let trailing = Regex.Match(baseType, @"\s+((?:const|volatile)(?:\s+(?:const|volatile))*)$")
+        let trailing = Regex.Match(baseType, @"(?:\s+|(?<=>))((?:const|volatile)(?:\s+(?:const|volatile))*)$")
         if trailing.Success then
             trailing.Groups.[1].Value + " " + baseType.Substring(0, trailing.Index) + text.Substring(finish)
         else text

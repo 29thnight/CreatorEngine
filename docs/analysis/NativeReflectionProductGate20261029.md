@@ -8,7 +8,7 @@
 
 | 검사 | 확인한 결과 | 제품 실행 여부 |
 |---|---|---|
-| 네이티브 서비스/F# 계약 fixture | `SCRIPT_REFLECTION_OK checks=709 types=63 api=49 bridge=C#-free`; 콜백의 libclang bool 표기와 MSVC 숫자 표기 대응 및 다른 bool 플래그 거절 포함 | 실제 서비스 코드, FSM 자식 저장소·Animator 출력 어댑터와 fixture 타입을 실행; Editor/Player 실행 아님 |
+| 네이티브 서비스/F# 계약 fixture | `SCRIPT_REFLECTION_OK checks=712 types=63 api=49 bridge=C#-free`; 콜백의 libclang/MSVC bool·중첩 const 참조 표기 대응 및 다른 bool 플래그·constness 거절 포함 | 실제 서비스 코드, FSM 자식 저장소·Animator 출력 어댑터와 fixture 타입을 실행; Editor/Player 실행 아님 |
 | 네이티브 콜백 fixture | `NATIVE_REFLECTION_CALLBACKS_OK checks=129 signatures=5` | 콜백 계약 실행; GPU·오디오 제품 실행 아님 |
 | `NativeReflectionProduct.Compile.fsproj` | API 49 Windows codegen 실행 `40806497136`에서 실제 엔진 헤더로 생성한 F# 바인딩과 제품 프로브 컴파일 성공; 오류 0개, 기존 `ScriptNative` 경고 63개 | 컴파일만 수행; Editor/Player 실행 아님 |
 | `verify-native-reflection-product-results.ps1` | PowerShell 7.4.7에서 결과 소비자·네이티브 파일 검증 35개 검사와 제품 실행 스크립트 구문 검사 성공 | 합성 결과·파일의 거부 검사 |
