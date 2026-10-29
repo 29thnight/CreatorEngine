@@ -93,6 +93,14 @@ class NativeFacadeMappings(unittest.TestCase):
         self.assertIn("JsonSerializer.SerializeToElement(true)", emitted)
         self.assertNotIn("static member Create()", emitted)
 
+    def test_state_machine_children_cannot_be_constructed_from_empty_json(self):
+        for name in ("FSM::FSMState", "FSM::Transition"):
+            with self.subTest(name=name):
+                self.assertFalse(self.mapping(name).argument_safe)
+                emitted = self.generator.emit_record(self.generator.classes[name])
+                self.assertNotIn("static member Create(", emitted)
+                self.assertNotIn("static member FromJson(", emitted)
+
     def test_unsafe_scalar_inputs_do_not_emit_native_view_members(self):
         for spelling in ("std::atomic<bool>", "ce::delegate_handle", "std::strong_ordering", "ce::string_view"):
             with self.subTest(spelling=spelling):
@@ -122,6 +130,20 @@ class NativeFacadeMappings(unittest.TestCase):
         self.assertIn("NativeCallback<single>", emitted)
         self.assertIn("NativeCallArgument.FromCallback(``value``.Token)", emitted)
         self.assertNotIn(".AsNativeArgument()", emitted)
+
+    def test_state_machine_pointer_results_capture_identity_without_replaying_lookup(self):
+        for spelling in ("FSM::FSMState *", "FSM::Transition *"):
+            with self.subTest(spelling=spelling):
+                method = self.method("const std::string &")
+                method["return_type"] = self.generator.resolve(spelling)
+                method["is_const"] = True
+                analysis = self.generator.method_analysis(method)
+                self.assertEqual(analysis[2:], ("invoke_identity", ""))
+                emitted = "\n".join(self.generator.emit_method(
+                    self.generator.classes["Scene"], method, "FindProbe", "probeSpec", analysis))
+                self.assertIn("let response, value = this.InvokeBoundReference(probeSpec, arguments)", emitted)
+                self.assertNotIn("this.Borrow(", emitted)
+                self.assertNotIn("FromSnapshot(response.ReturnValue)", emitted)
 
 
 if __name__ == "__main__":

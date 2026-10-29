@@ -27,8 +27,11 @@ add_custom_command(
         "${generated}/reflgen_script_reflection_probe.declarations.json"
     COMMAND "${REFLGEN_EXECUTABLE}" --module script_reflection_probe --output "${generated}"
         --declarations-json "${generated}/reflgen_script_reflection_probe.declarations.json"
-        --registration-header "${CMAKE_CURRENT_SOURCE_DIR}/types.h" "${CMAKE_CURRENT_SOURCE_DIR}/types.h" -- ${clang_arguments}
+        --registration-header "${CMAKE_CURRENT_SOURCE_DIR}/types.h" "${CMAKE_CURRENT_SOURCE_DIR}/types.h"
+        "${ENGINE_ROOT}/Engine/SceneRuntime/FSMState.h" "${ENGINE_ROOT}/Engine/SceneRuntime/Transition.h" -- ${clang_arguments}
     DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/types.h" "${REFLGEN_EXECUTABLE}"
+        "${ENGINE_ROOT}/Engine/SceneRuntime/FSMState.h" "${ENGINE_ROOT}/Engine/SceneRuntime/Transition.h"
+        "${ENGINE_ROOT}/Engine/SceneRuntime/StateMachineChildren.h"
     VERBATIM)
 add_custom_command(
     OUTPUT "${table}/reflgen_creator_script_native.cpp" "${table}/reflgen_creator_script_native.fs" "${table}/reflgen_creator_script_native.json"
@@ -80,6 +83,17 @@ else()
 endif()
 add_test(NAME script_reflection_callbacks COMMAND ScriptReflectionCallbacksProbe)
 set_tests_properties(script_reflection_callbacks PROPERTIES TIMEOUT 30)
+add_executable(StateMachineChildrenProbe "${CMAKE_CURRENT_SOURCE_DIR}/../state_machine_children_probe.cpp")
+target_compile_features(StateMachineChildrenProbe PRIVATE cxx_std_23)
+target_compile_definitions(StateMachineChildrenProbe PRIVATE CE_CONTRACT_STANDALONE=1)
+target_include_directories(StateMachineChildrenProbe PRIVATE "${REFLGEN_INCLUDE_DIR}" "${math_include}")
+if(MSVC)
+    target_compile_options(StateMachineChildrenProbe PRIVATE /utf-8 /EHsc /bigobj /permissive- /Zc:__cplusplus /wd5030)
+else()
+    target_compile_options(StateMachineChildrenProbe PRIVATE -Wno-attributes)
+endif()
+add_test(NAME state_machine_children COMMAND StateMachineChildrenProbe)
+set_tests_properties(state_machine_children PROPERTIES TIMEOUT 30)
 add_test(NAME script_reflection_facade_mapping
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../test_fsharp_native_facades.py")
 add_test(NAME script_reflection_fsharp

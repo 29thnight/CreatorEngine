@@ -95,6 +95,19 @@ let run (check: bool -> string -> unit) (rejected: (unit -> unit) -> string -> s
         [|"ce::func_detail::owning_func<void,false,true,false,0x40ui64,0x8ui64,ce::heap_allocator,float>"|], [|"value"|])
     check (rejected (fun () -> differentCallback.Resolve() |> ignore) "different callback inline storage retains a distinct native type" = "method_not_found")
         "callback numeric spelling normalization preserves unequal layout identity"
+    let differentCallbackAlignment = NativeMethodSpec("ProbeComponent", "SetTickCallback", false,
+        [|"ce::func_detail::owning_func<void,false,true,false,0x30ui64,0x10ui64,ce::heap_allocator,float>"|], [|"value"|])
+    check (rejected (fun () -> differentCallbackAlignment.Resolve() |> ignore) "different callback alignment retains a distinct native type" = "method_not_found")
+        "callback numeric spelling normalization preserves unequal alignment identity"
+    let msvcTextCallback = NativeMethodSpec("ProbeComponent", "RunTextCallback", true,
+        [|"ce::func_detail::owning_func<void,false,true,false,0x30ui64,0x8ui64,ce::heap_allocator,std::basic_string<char> const &>";
+          "std::string"|], [|"const_reference"; "const_reference"|])
+    check (msvcTextCallback.Resolve().Name = "RunTextCallback") "typed selector normalizes qualified nested callback strings without losing reference identity"
+    let mutableTextCallback = NativeMethodSpec("ProbeComponent", "RunTextCallback", true,
+        [|"ce::func_detail::owning_func<void,false,true,false,48,8,ce::heap_allocator,std::basic_string<char>&>";
+          "std::string"|], [|"const_reference"; "const_reference"|])
+    check (rejected (fun () -> mutableTextCallback.Resolve() |> ignore) "mutable callback reference is not const reference" = "method_not_found")
+        "nested callback normalization retains pointee constness"
     let wrongExtent = NativeMethodSpec("ProbeComponent", "ChooseSpan", true, [|"std::span<int,0x3>"|], [|"value"|])
     check (rejected (fun () -> root.Invoke(wrongExtent, [|spanInput|]) |> ignore) "fixed extent cannot become dynamic" = "method_not_found") "typed selector preserves unequal extent identity"
     let trailingPointee = NativeMethodSpec("ProbeComponent", "EchoCString", true, [|"char const *"|], [|"value"|])

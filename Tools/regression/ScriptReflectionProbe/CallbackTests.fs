@@ -2,9 +2,13 @@ module CallbackTests
 
 open System
 open System.Runtime.CompilerServices
+open System.Runtime.InteropServices
 open System.Threading.Tasks
 open CreatorEngine
 open CreatorEngine.ProbeNativeTypes
+
+[<DllImport("ScriptReflectionProvider", CallingConvention = CallingConvention.Cdecl)>]
+extern void ProbeReflectionResetCallbacks()
 
 type private CallbackOwner() =
     inherit Component()
@@ -103,6 +107,15 @@ let run (entity: Entity, check: bool -> string -> unit) =
     check (reloadWasBlocked && reloadCalls = 2 && not reloadGuard.IsDisposed)
         "reentrant generation unload is rejected without disabling the live generation"
 
+    let validationRejected =
+        use pause = NativeCallbackRuntime.SuspendRegistration()
+        try
+            use unexpected = NativeCallbacks.Void(owner, ignore)
+            false
+        with :? NativeReflectionException as error -> error.Code = "callback_retiring"
+    check (validationRejected && not reloadGuard.IsDisposed)
+        "candidate script validation cannot install callbacks into the retained live generation"
+
     let workerRejected = Task.Run(fun () ->
         try
             use unexpected = NativeCallbacks.Void(owner, ignore)
@@ -137,6 +150,20 @@ let run (entity: Entity, check: bool -> string -> unit) =
     view.SetTickCallback(fresh)
     view.TriggerTick(1.0f)
     check (freshCalls = 1) "new generation callback executes after the retirement barrier"
+
+    // Simulate host-owned session invalidation before managed teardown. Every
+    // old GC root still requires a native retirement notification; the stale
+    // generation can then end and a later binding can register fresh callbacks.
+    ProbeReflectionResetCallbacks()
+    NativeCallbackRuntime.EndGeneration()
+    check fresh.IsDisposed "native session invalidation retires the old managed callback roots"
+    view.TriggerTick(1.0f)
+    check (freshCalls = 1) "native copies stay inert across a binding session reset"
+    NativeCallbackRuntime.PrepareGeneration()
+    use rebound = NativeCallbacks.Float(owner, fun _ -> freshCalls <- freshCalls + 1)
+    view.SetTickCallback(rebound)
+    view.TriggerTick(1.0f)
+    check (freshCalls = 2) "callback registration recovers after the previous session retires"
     view.ClearTickCallback()
     owner.Lifetime.End()
     NativeCallbackRuntime.EndGeneration()

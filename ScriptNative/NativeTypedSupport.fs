@@ -66,9 +66,28 @@ module internal NativeTypedJson =
             else text
         let text = canonicalBaseCv text
         let first = text.IndexOf('<')
-        if first >= 0 && text.EndsWith(">", StringComparison.Ordinal) then
-            let name = Regex.Replace(text.Substring(0, first), @"\s+", "")
-            let inner = text.Substring(first + 1, text.Length - first - 2)
+        let mutable closing = -1
+        if first >= 0 then
+            let mutable depth = 0
+            for index = first to text.Length - 1 do
+                if closing < 0 then
+                    match text.[index] with
+                    | '<' -> depth <- depth + 1
+                    | '>' ->
+                        depth <- depth - 1
+                        if depth = 0 then closing <- index
+                    | _ -> ()
+        if closing >= 0 then
+            // Nested callback parameters retain their qualifiers and indirection,
+            // but still need default template arguments and ABI namespaces removed.
+            // For example, const basic_string<char, traits, allocator>& and
+            // basic_string<char> const& describe the same callback parameter.
+            let head = text.Substring(0, first).Trim()
+            let qualifiers = Regex.Match(head, @"^(?:(?:const|volatile)\s+)+")
+            let prefix = Regex.Replace(qualifiers.Value, @"\s+", "")
+            let name = Regex.Replace(head.Substring(qualifiers.Length), @"\s+", "")
+            let suffix = Regex.Replace(text.Substring(closing + 1), @"\s+", "")
+            let inner = text.Substring(first + 1, closing - first - 1)
             let parts = ResizeArray<string>()
             let mutable depth = 0
             let mutable start = 0
@@ -107,10 +126,12 @@ module internal NativeTypedJson =
             if name = "ce::dynamic_array" && parts.Count = 3 && parts.[2] = "false" && parts.[1] = "ce::heap_allocator" then
                 parts.RemoveAt(2)
             while parts.Count > required && defaults parts.[parts.Count - 1] do parts.RemoveAt(parts.Count - 1)
-            match name, Seq.toArray parts with
-            | "std::basic_string", [| "char" |] -> "std::string"
-            | "std::basic_string_view", [| "char" |] -> "std::string_view"
-            | _ -> name + "<" + String.Join(",", parts) + ">"
+            let normalized =
+                match name, Seq.toArray parts with
+                | "std::basic_string", [| "char" |] -> "std::string"
+                | "std::basic_string_view", [| "char" |] -> "std::string_view"
+                | _ -> name + "<" + String.Join(",", parts) + ">"
+            prefix + normalized + suffix
         else
             let text = Regex.Replace(text, @"\s+", " ")
             let text =
@@ -331,6 +352,20 @@ type NativeTypeView private (backing: NativeTypedBacking, validate: unit -> unit
                 arguments |> Array.map (fun argument -> box argument.Value),
                 arguments |> Array.map _.Binding, ?discardResult = discardResult,
                 callbackTokens = (arguments |> Array.map _.Callback))
+    /// Capture only a host-registered child identity. The engine resolves its
+    /// membership again on every access; no returned native address is stored.
+    member _.InvokeBoundReference(spec: NativeMethodSpec, arguments: NativeCallArgument array) =
+        validate ()
+        match backing with
+        | Snapshot _ -> NativeTypedJson.fail "read_only" "Detached native snapshots cannot capture owned native objects."
+        | Live value ->
+            let method = spec.Resolve()
+            if not method.CanInvokeBound then NativeTypedJson.fail "unsupported" method.BoundUnavailableReason
+            let response = value.InvokeBoundOverload(method.Name, method.Signature,
+                arguments |> Array.map (fun argument -> box argument.Value),
+                arguments |> Array.map _.Binding,
+                callbackTokens = (arguments |> Array.map _.Callback), captureResult = true)
+            response, NativeTypeView.FromNative(value.CapturedResult(response))
     member _.Borrow(spec: NativeMethodSpec, arguments: JsonElement array) =
         validate ()
         match backing with

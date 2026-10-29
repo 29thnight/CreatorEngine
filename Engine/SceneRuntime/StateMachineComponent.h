@@ -9,6 +9,7 @@ import Creator.Core.Ownership;
 #include "Component.h"
 #include "IAIComponent.h"
 #include "BlackBoard.h"
+#include "StateMachineChildren.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 //
 namespace FSM
@@ -48,12 +49,12 @@ public:
 	FSM::Transition* AddTransition(FSM::FSMState* from, FSM::FSMState* to, ConditionFunc condition);
 	void RemoveTransition(FSM::Transition* transition);
 	FSM::FSMState* FindStateByName(const std::string& name) const;
+	// Transport adapter access; not an authoring or reflected script API.
+	[[reflgen::ignore]]
+	const FSM::StateMachineChildren& ScriptChildren() const noexcept { return m_children; }
 private:
 	[[reflgen::ignore]]
-	ce::dynamic_array<own::shared_owner<FSM::FSMState>> m_states;
-
-	[[reflgen::ignore]]
-	ce::dynamic_array<own::shared_owner<FSM::Transition>> m_transitions;
+	FSM::StateMachineChildren m_children;
 
 	[[reflgen::ignore]]
 	FSM::FSMState* m_currentState = nullptr;

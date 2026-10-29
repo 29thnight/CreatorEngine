@@ -53,24 +53,12 @@ void StateMachineComponent::OnRemovingFromScene()
 
 FSM::FSMState* StateMachineComponent::AddState(const std::string& name)
 {
-	m_states.emplace_back(own::make_shared<FSM::FSMState>(name));
-	return m_states.back().operator->(); // Return the raw pointer to the state
+	return m_children.AddState(name);
 }
 
 void StateMachineComponent::RemoveState(FSM::FSMState* state)
 {
-	m_transitions.erase(
-		std::remove_if(m_transitions.begin(), m_transitions.end(),
-			[state](const own::shared_owner<FSM::Transition>& transition) {
-				return transition->GetFrom() == state || transition->GetTo() == state;
-			}),
-		m_transitions.end());
-	m_states.erase(
-		std::remove_if(m_states.begin(), m_states.end(),
-			[state](const own::shared_owner<FSM::FSMState>& s) {
-				return s.operator->() == state;
-			}),
-		m_states.end());
+	m_children.RemoveState(state);
 	if (m_currentState == state)
 	{
 		m_currentState = nullptr; // Reset current state if it was removed
@@ -81,29 +69,16 @@ void StateMachineComponent::RemoveState(FSM::FSMState* state)
 
 FSM::Transition* StateMachineComponent::AddTransition(FSM::FSMState* from, FSM::FSMState* to, ConditionFunc condition)
 {
-	m_transitions.push_back(own::make_shared<FSM::Transition>(from, to, condition));
-	return m_transitions.back().operator->(); // Return the raw pointer to the transition
+	return m_children.AddTransition(from, to, std::move(condition));
 }
 
 void StateMachineComponent::RemoveTransition(FSM::Transition* transition)
 {
-	m_transitions.erase(
-		std::remove_if(m_transitions.begin(), m_transitions.end(),
-			[transition](const own::shared_owner<FSM::Transition>& t) {
-				return t.operator->() == transition;
-			}),
-		m_transitions.end());
+	m_children.RemoveTransition(transition);
 }
 
 
 FSM::FSMState* StateMachineComponent::FindStateByName(const std::string& name) const
 {
-	for (const auto& state : m_states)
-	{
-		if (state->GetName() == name)
-		{
-			return state.operator->();
-		}
-	}
-	return nullptr; // Return nullptr if no state with the given name is found
+	return m_children.FindStateByName(name);
 }

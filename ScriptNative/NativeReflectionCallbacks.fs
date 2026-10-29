@@ -194,7 +194,8 @@ type internal NativeCallbackRuntime private () =
 
 /// A game-thread callback registration with a typed native signature. Dispose
 /// disables all native copies synchronously; its managed root is freed only
-/// after the last in-flight call returns. The owning component also disposes it.
+/// after the last in-flight call returns. The owning managed script component's
+/// lifetime also disposes it.
 [<Sealed>]
 type NativeCallback<'T> internal (owner: Component, token: uint64) as this =
     do owner.Lifetime.RegisterCleanup(Action(fun () -> this.Dispose()))
@@ -209,7 +210,9 @@ type NativeCallback<'T> internal (owner: Component, token: uint64) as this =
 
 /// F# functions registered directly with the native callback ABI. Keep a
 /// registration while it is installed; early Dispose disconnects its native
-/// copies, and component destruction/reload disconnects it automatically.
+/// copies. Pass the managed script component (this) as owner so its destruction
+/// disconnects the callback. Reload retires every registration, including ones
+/// explicitly owned outside a registered script lifetime.
 [<AbstractClass; Sealed>]
 type NativeCallbacks private () =
     static member private Create<'T>(owner: Component, kind: int, invoke) =

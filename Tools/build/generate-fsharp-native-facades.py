@@ -348,7 +348,7 @@ class Generator:
         self.snapshot = snapshot
         self.components = set(snapshot["components"])
         self.classes = {item["qualified_name"]: item for item in snapshot["classes"]}
-        for name in ("RHITextureHandle", "RHIBufferHandle"):
+        for name in ("RHITextureHandle", "RHIBufferHandle", "FSM::FSMState", "FSM::Transition"):
             if name in self.classes:
                 self.classes[name] = dict(self.classes[name], native_view_only=True)
         for record in manual_schemas():
@@ -761,6 +761,13 @@ class Generator:
             # results are copied to immutable snapshots inside that request;
             # mutating methods are never replayed as a getter path.
             operation = "invoke_bound"
+        native_return = method["return_type"]
+        if (native_return["kind"] == "pointer" and native_return.get("pointee")
+                and self.qualify(unqualified(native_return["pointee"]["canonical_spelling"]))
+                    in {"FSM::FSMState", "FSM::Transition"}):
+            # These exact types have a native component-owned identity adapter.
+            # Names and pointer addresses never serve as stable identities.
+            operation = "invoke_identity"
         return result, parameters, operation, reason
 
     def emit_method(self, record: dict, method: dict, fs_name: str, spec_name: str,
@@ -786,7 +793,7 @@ class Generator:
             declarations.append(identifier(name) + ": " + fs_type)
             if is_mutable:
                 mutable.append((index, identifier(name), mapping))
-        if operation == "invoke_bound":
+        if operation in ("invoke_bound", "invoke_identity"):
             bound_arguments = []
             for parameter, mapping, name in zip(method["parameters"], parameters, names):
                 if mapping.argument_safe:
@@ -804,6 +811,11 @@ class Generator:
         if operation == "borrow":
             lines += [f"            let value = this.Borrow({spec_name}, arguments)",
                       f"            ({result.codec}).Decode(value)"]
+        elif operation == "invoke_identity":
+            lines.append(f"            let response, value = this.InvokeBoundReference({spec_name}, arguments)")
+            for index, name, mapping in mutable:
+                lines.append(f"            {name} <- ({mapping.codec}).Decode(NativeTypeView.FromSnapshot(response.Arguments.[{index}]))")
+            lines.append(f"            ({result.codec}).Decode(value)")
         else:
             operation_name = "InvokeBound" if operation == "invoke_bound" else "Invoke"
             discard = ", discardResult = true" if operation == "invoke_bound" and result.shape == "void" else ""
@@ -817,7 +829,8 @@ class Generator:
         lines.append("")
         self.add_entry(record, "method", method, fs_name, result, nativeSignature=method["signature"],
                        nativeReturn=method["return_type"]["canonical_spelling"], operation=operation,
-                       resultLifetime="live_path" if operation == "borrow" else "snapshot",
+                       resultLifetime=("owned_identity" if operation == "invoke_identity" else
+                                       "live_path" if operation == "borrow" else "snapshot"),
                        parameters=[{"nativeName": parameter.get("name", ""), "nativeType": parameter["type"]["canonical_spelling"],
                                     "fsharpType": mapping.fs_type, "passing": self.passing(parameter["type"]),
                                     "nativeBinding": not mapping.argument_safe}

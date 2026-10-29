@@ -157,21 +157,68 @@ let value = terrain.BorrowOverload(methodInfo.Name, methodInfo.Signature).Derefe
 정확한 타입, const 상태와 생존 여부를 검증한 뒤 메서드를 한 번 호출한다.
 분리된 JSON 스냅샷을 기존 네이티브 객체처럼 넘길 수 없다.
 
-인자 경로는 필드·원소·키·역참조로만 구성한다. 인자 안의 getter 실행은 앞서
-해석한 객체를 무효화할 수 있으므로 허용하지 않는다. 이 규칙 때문에 임의
-조회 결과를 저장한 것처럼 사용하려면 별도의 안정된 신원 API가 필요하다.
-콜백은 아래의 등록 토큰으로 별도 해석한다.
+인자 경로는 필드·원소·키·역참조와 호스트가 지원하는 소유 객체 ID로 구성한다.
+인자 안의 getter 실행은 앞서 해석한 객체를 무효화할 수 있으므로 허용하지
+않는다. 임의 조회 결과를 저장한 것처럼 사용하려면 아래 FSM 자식 객체와 같이
+호스트가 수명을 확인하는 ID 경로가 필요하다. 콜백은 등록 토큰으로 별도 해석한다.
 
 호출의 반환값과 JSON으로 생성한 mutable 참조 인자 출력은 요청 안에서
 직렬화한다. 기존 네이티브 객체를 넘긴 인자의 출력 슬롯은 `null`이다.
 메서드가 그 객체를 제거했을 수 있으므로 호출 뒤 다시 읽지 않는다.
-반환된 값은 읽기 전용 스냅샷이며 살아 있는 가변 객체 핸들이 아니다.
-`AddState` 같은 생성 메서드의 포인터 반환도 이 규칙을 따른다.
+기본 반환값은 읽기 전용 스냅샷이다. FSM 상태·전이의 포인터 반환에는 별도의
+소유 객체 ID 경로를 사용하므로 다음 호출에서도 같은 객체를 사용할 수 있다.
+
+### FSM 상태와 전이의 안정된 ID
+
+`StateMachineComponent.AddState`, `AddTransition`, `FindStateByName`과
+`Transition.GetFrom`·`GetTo`는 메서드를 한 번 실행하고 반환된 자식 객체의
+ID를 캡처한다. 생성된 F# 뷰는 객체 주소나 상태 이름 대신 엔티티 generation,
+컴포넌트 instance, 자식 타입과 ID를 보관한다. 같은 이름의 상태를 만들거나
+상태 이름을 바꾸어도 기존 뷰는 원래 객체를 가리킨다.
+
+```fsharp
+let machine = StateMachineComponentView.From(entity)
+let idle = machine.AddState("Idle")
+idle.Value.SetName("Rest")
+let walk = machine.AddState("Walk")
+let condition =
+    NativeCallbacks.Condition(this, fun board -> board.GetValueAsBool("isMoving"))
+let transition = machine.AddTransition(idle, walk, condition)
+machine.RemoveState(idle)
+```
+
+각 요청은 현재 컴포넌트에서 ID를 다시 확인하고 요청이 끝날 때까지 객체를
+유지한다. 제거된 ID는 재사용하지 않으며, `RemoveState`는 그 상태에 연결된
+전이 ID도 즉시 무효화한다. 위 예제의 `idle`과 `transition`은 제거 이후
+`stale_object` 오류를 반환하고 `walk`는 계속 유효하다. 요청 중 객체를
+유지하는 것과 제거된 객체를 다시 조회할 수 있는지는 별개의 규칙이다.
+다른 상태 머신의 상태를 전이의 끝점으로 넘기거나 다른 타입의 ID를 사용하는
+요청도 거절한다. 조회에 실패한 포인터의 null 상태는 그대로 표현한다.
+
+서비스는 첫 경로 요소의 `owned` 선택자로 이 ID를 해석한다. `captureResult`
+요청은 호스트의 정확한 반환 타입 지원 여부와 쓰기 가능 여부를 호출 전에
+검사하며, 결과 투영이나 결과 버리기 옵션과 함께 사용할 수 없다. 엔진의
+`StateMachineChildren` 저장소와 동일한 어댑터를 계약 fixture에서도 사용한다.
 
 `reflgen::script_once`는 인자가 없는 소유권 소비 메서드도 재실행되는 getter
-경로에서 제외한다. `TakePreparedTextureImagePins`가 이 표기를 사용한다.
+경로에서 제외한다. 이 표기만으로 엔진 내부의 소유권 이전을 스크립트에
+허용하지는 않는다. 호출이 스크립트에 공개되어 있고 반환값을 유용한 데이터로
+복사할 수 있을 때만 한 번 호출한 결과를 읽기 전용 스냅샷으로 제공한다.
+계약 fixture의 `TakeShared`는 소유자를 한 번 소비하고 `Settings.count`를
+스냅샷에서 읽으며, 결과 재조회와 거부된 `Borrow`가 메서드를 다시 실행하지
+않는 것을 검사한다.
 결과를 읽기 전에 쓰기 알림을 발행하면 알림이 반환 저장소를 무효화할 수 있어,
 응답을 먼저 캡처하고 `NotifyPropertyChanged`를 호출한다.
+
+`Scene.SetPreparedTextureImagePins`와 `TakePreparedTextureImagePins`는
+`script_internal`이다. SceneManager가 준비한 이미지 소유권을 첫 renderer
+frame packet에 넘기는 내부 인계이며, `PublishLiveFrame`의 제출 거부 시 복구와
+frame 병합 시 보존, renderer의 exact-generation image demand로 이전한 뒤
+`ReleaseImages`하는 과정이 하나의 수명 규약을 이룬다. 스크립트가 이를 먼저
+소비하거나 교체하면 렌더러가 받아야 할 preload payload를 빼앗는다. 메서드만
+있는 `TextureFramePins`를 `{}` JSON 스냅샷으로 돌려주는 것도 이 소유권을
+전달하거나 복구하지 못한다. 비소비 조회인 `PreparedTextureImagePins`와 해당
+live view의 `Size`, `Borrow`, `Owners`는 안전한 읽기 경로로 남긴다.
 
 ## F# 콜백 등록과 해제
 
@@ -179,12 +226,15 @@ let value = terrain.BorrowOverload(methodInfo.Name, methodInfo.Signature).Derefe
 `void()`, `void(float)`, `void(math::vector2)`, `void(const std::string&)`,
 `bool(const BlackBoard&)`에 맞는 `NativeCallback<'T>`를 만든다. 등록할 때
 관리 컴포넌트를 지정하며 해당 컴포넌트 수명에 해제를 연결한다.
+자동 해제의 소유자로 관리 스크립트 컴포넌트인 `this`를 전달한다. 별도로 조회한
+네이티브 컴포넌트 래퍼는 관리 스크립트 registry가 수명을 추적하지 않으므로
+명시적인 `Dispose` 또는 세대 종료로 해제해야 한다.
 조건 콜백은 네이티브 BlackBoard 주소 대신 해당 호출의 읽기 전용 값 스냅샷을
 받는다. 지원 서명에 맞는 메서드 인자에만 이 래퍼를 생성한다.
 
 ```fsharp
 let button = entity.GetComponent<UIButton>()
-let click = NativeCallbacks.Void(button, fun () -> printfn "clicked")
+let click = NativeCallbacks.Void(this, fun () -> printfn "clicked")
 button.Native.SetClickFunction(click)
 // 필요할 때 click.Dispose()로 해제할 수 있다.
 ```

@@ -6,6 +6,7 @@
 #include "../../../Engine/Utility_Framework/Reflection/ScriptReflectionOwnership.h"
 #include "../../../Engine/Utility_Framework/Reflection/ScriptReflectionContainers.h"
 #include "../../../Engine/SceneRuntime/BlackBoard.h"
+#include "../../../Engine/SceneRuntime/StateMachineChildren.h"
 #include <array>
 #include <expected>
 #include <map>
@@ -120,6 +121,7 @@ namespace reflection_probe
         int calls = 0;
         mutable int lookupCalls = 0;
         [[reflgen::ignore]] ce::owned_func<void(float)> tickCallback;
+        [[reflgen::ignore]] FSM::StateMachineChildren stateMachine;
 
         [[reflgen::reflect]] int Increase(int amount) { ++calls; settings.count += amount; return settings.count; }
         [[reflgen::reflect]] void Adjust(int& value) const { value += settings.count; }
@@ -212,6 +214,47 @@ namespace reflection_probe
             values["ready"] = ready;
             return callback(board);
         }
+        [[reflgen::reflect]] FSM::FSMState* AddState(const std::string& name)
+        {
+            auto* result = stateMachine.AddState(name);
+            ++calls;
+            return result;
+        }
+        [[reflgen::reflect]] void RemoveState(FSM::FSMState* state)
+        {
+            stateMachine.RemoveState(state);
+            ++calls;
+        }
+        [[reflgen::reflect]] FSM::Transition* AddTransition(FSM::FSMState* from, FSM::FSMState* to,
+                                                          ConditionFunc condition)
+        {
+            auto* result = stateMachine.AddTransition(from, to, std::move(condition));
+            ++calls;
+            return result;
+        }
+        [[reflgen::reflect]] void RemoveTransition(FSM::Transition* transition)
+        {
+            stateMachine.RemoveTransition(transition);
+            ++calls;
+        }
+        [[reflgen::reflect]] bool EvaluateTransition(FSM::Transition* transition) const
+        {
+            if (!transition || stateMachine.IdentifyTransition(transition) == 0)
+                throw std::invalid_argument("transition does not belong to the fixture state machine");
+            BlackBoard board;
+            auto& values = const_cast<ce::engine_node_map<std::string, BlackBoardValue>&>(board.GetValues());
+            BlackBoardValue ready{};
+            ready.Type = BlackBoardType::Bool;
+            ready.BoolValue = true;
+            values["ready"] = ready;
+            return (*transition)(board);
+        }
+        [[reflgen::reflect]] FSM::FSMState* FindStateByName(const std::string& name) const
+        {
+            ++lookupCalls;
+            return stateMachine.FindStateByName(name);
+        }
+        [[reflgen::reflect]] const Component& GetReadOnlySelf() const { return *this; }
     };
 }
 
@@ -220,6 +263,22 @@ namespace reflection_probe
 // non-deserializable and the selected object can never be made writable.
 namespace reflgen
 {
+    // Match the production raw reflected-record policy without pulling the
+    // unrelated authoring/YAML adapters into this portable runtime fixture.
+    template<class T> requires (std::is_same_v<std::remove_cv_t<T>, FSM::FSMState>
+                            || std::is_same_v<std::remove_cv_t<T>, FSM::Transition>)
+    struct runtime_value_traits<T*>
+    {
+        static constexpr value_shape shape = value_shape::pointer;
+        using children = type_list<T>;
+        static constexpr bool mutable_borrow = !std::is_const_v<T>;
+        static constexpr bool retained_borrow = true;
+        static constexpr bool serializable = false;
+        static constexpr bool deserializable = false;
+        static constexpr bool assignment_safe = false;
+        static const T* get(T* const& value) noexcept { return value; }
+        static T* get(T*& value) noexcept { return value; }
+    };
     template<> struct runtime_value_traits<reflection_probe::Settings*>
     {
         static constexpr value_shape shape = value_shape::pointer;

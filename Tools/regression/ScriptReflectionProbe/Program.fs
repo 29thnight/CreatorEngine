@@ -280,6 +280,7 @@ let main _ =
     let staleTypedPath = TypedSupportTests.run check rejected reflected
     let staleTypedGetter = TypedFacadeTests.run check rejected entity
     CallbackTests.run(entity, check)
+    let staleOwnedIdentity = OwnedIdentityTests.run check rejected entity
     ProbeReflectionEnablePhysics()
     let body = wrapper<PhysicsBodyComponent> owner reflected.InstanceId
     let movement = wrapper<CharacterMovementComponent> owner reflected.InstanceId
@@ -300,6 +301,8 @@ let main _ =
     let oldNested = reflected.["settings"].["count"]
     let oldNativeArgument = CreatorEngine.ProbeNativeTypes.reflection_probe_ComponentView.From(entity).shared
     ProbeReflectionReplace()
+    check (rejected staleOwnedIdentity "owned child rejects component replacement" = "stale_component")
+        "owned object identity remains anchored to its original component instance"
     rejected staleTypedPath "typed field view rejects removed or replaced component identity" |> ignore
     rejected staleTypedGetter "generated typed getter rejects removed or replaced component identity" |> ignore
     rejected (fun () -> oldNested.Read<int>() |> ignore) "old component view is rejected after remove/re-add" |> ignore

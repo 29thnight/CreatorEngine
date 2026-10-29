@@ -302,6 +302,8 @@ private:
     own::shared_owner<TextureFramePins> m_preparedTextureImagePins;
 public:
     // Scene-owner handoff only. The first queued packet owns these preload pins.
+    // Scripts must not replace/consume the renderer's preparation payload.
+    [[reflgen::script_internal]]
     void SetPreparedTextureImagePins(own::shared_owner<TextureFramePins> pins)
     {
         m_preparedTextureImagePins = std::move(pins);
@@ -310,7 +312,7 @@ public:
     {
         return m_preparedTextureImagePins;
     }
-    [[reflgen::script_once]]
+    [[reflgen::script_internal]]
     own::shared_owner<TextureFramePins> TakePreparedTextureImagePins()
     {
         return std::exchange(m_preparedTextureImagePins, {});

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Generate and compile the actual native reflection surface with the Windows toolchain.
 
-This is a compile gate for real RenderEngine/SceneRuntime registration sources
-and ScriptReflectionBindings.cpp. It deliberately does not link or run the Editor.
+This is a compile gate for real RenderEngine/SceneRuntime registration sources,
+the script adapters, and StateMachineComponent.cpp. It does not link or run the Editor.
 ReflgenGenerate supplies the project's real headers, registration includes,
 standalone module adapters, preprocessor definitions and include search paths.
 """
@@ -171,6 +171,8 @@ def compile_surfaces(engine: Path, work: Path, generated: dict[str, Path], confi
                    generated["SceneRuntime"] / "reflgen_SceneRuntime.args",
                    [directory / ("reflgen_" + module + ".h") for module, directory in generated.items()]))
     inputs.append(("ScriptReflectionCallbacks", engine / "Engine/SceneRuntime/ScriptReflectionCallbacks.cpp",
+                   generated["SceneRuntime"] / "reflgen_SceneRuntime.args", []))
+    inputs.append(("StateMachineComponent", engine / "Engine/SceneRuntime/StateMachineComponent.cpp",
                    generated["SceneRuntime"] / "reflgen_SceneRuntime.args", []))
     results: list[dict] = []
     for name, source, arguments, injections in inputs:

@@ -2,6 +2,8 @@
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "ScriptReflectionBindings.h"
 #include "ScriptReflectionCallbacks.h"
+#include "ScriptReflectionStateMachineChildren.h"
+#include "StateMachineComponent.h"
 #include "ScriptReflectionService.h"
 #include "ScriptObjectRegistry.h"
 #include "Component.h"
@@ -77,6 +79,11 @@ namespace
                     }
                 },
                 std::move(alive)});
+            if (component->GetTypeID() == type_guid(StateMachineComponent))
+            {
+                auto* machine = static_cast<StateMachineComponent*>(component);
+                BindStateMachineChildren(result.back(), machine->ScriptChildren());
+            }
         }
         return result;
     }

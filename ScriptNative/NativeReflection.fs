@@ -146,6 +146,9 @@ type NativeTypeDescriptor internal (metadata: JsonElement) =
 type NativeInvocationResult internal (response: JsonElement) =
     member _.ReturnValue = response.GetProperty("result").Clone()
     member _.Arguments = ReflectionJson.array "arguments" response
+    member internal _.LivePath =
+        let mutable value = Unchecked.defaultof<JsonElement>
+        if response.TryGetProperty("livePath", &value) then Some(value.Clone()) else None
     member this.Read<'T>() = this.ReturnValue.Deserialize<'T>(ReflectionJson.options)
 
 /// A live path rooted in a specific native component instance.
@@ -157,6 +160,13 @@ type NativeValue internal (owner: ObjectHandle, componentName: string, instance:
     member internal _.ComponentName = componentName
     member internal _.NativeInstance = instance
     member internal _.Path = path
+    member internal _.CapturedResult(response: NativeInvocationResult) =
+        match response.LivePath with
+        | Some value when value.ValueKind = JsonValueKind.Array && value.GetArrayLength() = 1 ->
+            let captured = value.Deserialize<Dictionary<string, obj> array>(ReflectionJson.options)
+            NativeValue(owner, componentName, instance, captured)
+        | _ ->
+            raise (NativeReflectionException("invalid_response", "The native invocation did not return an owned object identity."))
     member internal _.Request(operation: string, extras: (string * obj) list) =
         let request = ReflectionJson.fields [ "op", box operation; "component", box componentName;
                                              "instance", box instance; "path", box path ]
@@ -218,12 +228,13 @@ type NativeValue internal (owner: ObjectHandle, componentName: string, instance:
         NativeInvocationResult(this.Request("invoke", [ "method", box methodName; "signature", box signature;
                                                         "arguments", box arguments ]))
     /// Resolve native arguments by generation-checked paths and invoke exactly once.
-    /// Results are detached snapshots. A bound argument's output slot is null,
-    /// because the method may have removed or relocated that native object.
+    /// Results are snapshots unless the host supports captureResult for an owned child.
+    /// A bound argument's output slot is null, because the method may have removed
+    /// or relocated that native object.
     member this.InvokeBoundOverload(methodName: string, signature: string, arguments: obj array,
                                     bindings: NativeValue option array, ?discardResult: bool,
                                     ?resultPath: Dictionary<string, obj> array,
-                                    ?callbackTokens: uint64 option array) =
+                                    ?callbackTokens: uint64 option array, ?captureResult: bool) =
         ArgumentException.ThrowIfNullOrEmpty(methodName)
         ArgumentException.ThrowIfNullOrEmpty(signature)
         ArgumentNullException.ThrowIfNull(arguments)
@@ -249,7 +260,8 @@ type NativeValue internal (owner: ObjectHandle, componentName: string, instance:
                         "path", box value.Path ])) bindings callbacks
         let extras = [ "method", box methodName; "signature", box signature
                        "arguments", box arguments; "bindings", box wireBindings
-                       "discardResult", box (defaultArg discardResult false) ]
+                       "discardResult", box (defaultArg discardResult false)
+                       "captureResult", box (defaultArg captureResult false) ]
         let extras = match resultPath with Some path -> ("resultPath", box path) :: extras | None -> extras
         NativeInvocationResult(this.Request("invoke_bound", extras))
 

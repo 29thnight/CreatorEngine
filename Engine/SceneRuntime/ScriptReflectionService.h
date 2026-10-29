@@ -205,6 +205,12 @@ namespace ce::script::reflection
         // destroyed when this request completes.
         std::function<void(std::string_view)> notify;
         std::function<bool()> alive;
+        // Explicitly registered child-object identity adapters. They resolve
+        // logical membership on every request and pin the child only for that
+        // request. IDs are never native addresses or mutable object names.
+        std::function<bool(const reflgen::value_descriptor&)> child_supported;
+        std::function<std::uint64_t(const reflgen::value_view&)> child_identify;
+        std::function<reflgen::value_view(std::uint64_t, std::uint64_t)> child_resolve;
     };
 
     struct host
@@ -386,22 +392,23 @@ namespace ce::script::reflection
 
     private:
         static json_value perform(const host& environment, const json_value& request);
-        static void validate_path(const json_value::array& path, bool allowMethods);
+        static void validate_path(const json_value::array& path, bool allowMethods, bool allowOwned = true);
         static reflgen::value_view resolve_path(reflgen::value_view current, const json_value::array& path,
-            std::string& rootField, const std::function<bool()>& alive);
+            std::string& rootField, const std::function<bool()>& alive, const component_view* owner = nullptr);
         static json_value read_value(reflgen::value_view value, std::size_t depth,
             std::set<std::pair<std::uint64_t, const void*>>& visiting, std::size_t& nodes);
         static void write_value(reflgen::value_view value, const json_value& replacement);
     };
 
-    inline void service::validate_path(const json_value::array& path, bool allowMethods)
+    inline void service::validate_path(const json_value::array& path, bool allowMethods, bool allowOwned)
     {
         if (path.size() > MaximumPathLength)
         {
             throw protocol_error("limit_exceeded", "member path exceeds 64 segments");
         }
-        for (const auto& segment : path)
+        for (std::size_t ordinal = 0; ordinal < path.size(); ++ordinal)
         {
+            const auto& segment = path[ordinal];
             const auto& fields = segment.as_object();
             const auto* member = segment.find("field");
             const auto* index = segment.find("index");
@@ -410,15 +417,23 @@ namespace ce::script::reflection
             const auto* method = segment.find("method");
             const auto* signature = segment.find("signature");
             const auto* arguments = segment.find("arguments");
+            const auto* owned = segment.find("owned");
             if ((member != nullptr) + (index != nullptr) + (key != nullptr) + (dereference != nullptr)
-                + (method != nullptr) != 1 || fields.size() != 1u + (signature ? 1u : 0u) + (arguments ? 1u : 0u)
+                + (method != nullptr) + (owned != nullptr) != 1 || fields.size() != 1u + (signature ? 1u : 0u) + (arguments ? 1u : 0u)
                 || ((signature || arguments) && !method))
             {
-                throw protocol_error("invalid_request", "a path segment must select exactly one field, index, key, deref or method");
+                throw protocol_error("invalid_request", "a path segment must select exactly one field, index, key, deref, method or owned object");
             }
             if (method && !allowMethods)
             {
                 throw protocol_error("unstable_argument", "native arguments require a field/container path; getter evaluation could invalidate an earlier binding");
+            }
+            if (owned)
+            {
+                if (!allowOwned || ordinal != 0 || owned->as_object().size() != 2
+                    || owned->require("typeId").as_unsigned() == 0)
+                    throw protocol_error("invalid_request", "owned object identity must be the first component-rooted path segment");
+                (void)owned->require("id").as_unsigned();
             }
             if (member) (void)member->as_string();
             if (key) (void)key->as_string();
@@ -438,10 +453,10 @@ namespace ce::script::reflection
     }
 
     inline reflgen::value_view service::resolve_path(reflgen::value_view current,
-        const json_value::array& path, std::string& rootField, const std::function<bool()>& alive)
+        const json_value::array& path, std::string& rootField, const std::function<bool()>& alive,
+        const component_view* owner)
     {
-        if (path.size() > MaximumPathLength)
-            throw protocol_error("limit_exceeded", "member path exceeds 64 segments");
+        validate_path(path, true, owner != nullptr);
         for (const auto& segment : path)
         {
             if (alive && !alive()) throw protocol_error("stale_component", "the component was removed while resolving its member path");
@@ -453,12 +468,23 @@ namespace ce::script::reflection
             const auto* methodName = segment.find("method");
             const auto* signature = segment.find("signature");
             const auto* arguments = segment.find("arguments");
+            const auto* owned = segment.find("owned");
             if ((member != nullptr) + (index != nullptr) + (key != nullptr) + (dereference != nullptr)
-                + (methodName != nullptr) != 1 || fields.size() != 1u + (signature ? 1u : 0u) + (arguments ? 1u : 0u)
+                + (methodName != nullptr) + (owned != nullptr) != 1 || fields.size() != 1u + (signature ? 1u : 0u) + (arguments ? 1u : 0u)
                 || ((signature || arguments) && !methodName))
-                throw protocol_error("invalid_request", "a path segment must select exactly one field, index, key, deref or method");
+                throw protocol_error("invalid_request", "a path segment must select exactly one field, index, key, deref, method or owned object");
             if (!current) throw protocol_error("null_value", "cannot traverse a null native value");
-            if (member)
+            if (owned)
+            {
+                if (!owner || !owner->child_resolve)
+                    throw protocol_error("unsupported", "this component has no owned object identity adapter");
+                auto next = owner->child_resolve(owned->require("typeId").as_unsigned(), owned->require("id").as_unsigned());
+                if (!next) throw protocol_error("stale_object", "the owned native object no longer belongs to this component");
+                next.retain_parent(current);
+                current = std::move(next);
+                rootField = "*";
+            }
+            else if (member)
             {
                 if (rootField.empty()) rootField = member->as_string();
                 current = current.select_member(member->as_string());
@@ -704,7 +730,7 @@ namespace ce::script::reflection
         const auto* pathValue = request.find("path");
         const auto& path = pathValue ? pathValue->as_array() : emptyPath;
         std::string rootField;
-        auto selected = resolve_path(root->type->value().view(root->address), path, rootField, root->alive);
+        auto selected = resolve_path(root->type->value().view(root->address), path, rootField, root->alive, root);
         if (root->alive && !root->alive())
             throw protocol_error("stale_component", "the component was removed while resolving its member path");
         if (operation == "describe")
@@ -757,11 +783,28 @@ namespace ce::script::reflection
                 if (!flag) throw protocol_error("invalid_request", "discardResult must be a boolean");
                 discard = *flag;
             }
+            bool capture = false;
+            if (const auto* captureValue = request.find("captureResult"))
+            {
+                const auto* flag = std::get_if<bool>(&captureValue->data);
+                if (!flag) throw protocol_error("invalid_request", "captureResult must be a boolean");
+                capture = *flag;
+            }
+            if (capture)
+            {
+                if (discard) throw protocol_error("invalid_request", "a discarded result cannot also be captured");
+                if (!selected.is_writable())
+                    throw protocol_error("read_only", "a readonly receiver cannot grant a mutable owned object identity");
+                if (!root->child_supported || !root->child_identify || !root->child_resolve
+                    || !root->child_supported(method.result()))
+                    throw protocol_error("unsupported", "this result type has no registered owned object identity adapter");
+            }
             const auto* resultPath = request.find("resultPath");
             if (resultPath)
             {
                 if (discard) throw protocol_error("invalid_request", "a discarded result cannot also have a projection");
-                validate_path(resultPath->as_array(), true);
+                if (capture) throw protocol_error("invalid_request", "a captured result cannot also have a snapshot projection");
+                validate_path(resultPath->as_array(), true, false);
             }
             for (const auto& binding : bindings)
             {
@@ -839,7 +882,7 @@ namespace ce::script::reflection
                     throw protocol_error("stale_component", "the native argument component instance no longer exists");
                 }
                 nativeArguments[index] = resolve_path(bindingRoot->type->value().view(bindingRoot->address),
-                    binding.require("path").as_array(), boundFields[index], bindingRoot->alive);
+                    binding.require("path").as_array(), boundFields[index], bindingRoot->alive, bindingRoot);
             }
             // A later argument getter may remove an earlier owner/component.
             // Recheck all roots immediately before invoking native code.
@@ -897,7 +940,17 @@ namespace ce::script::reflection
                 outputArguments.push_back(read_value(argument, 0, visiting, nodes));
             }
             json_value result;
-            if (!discard && call.result)
+            json_value::array livePath;
+            if (capture)
+            {
+                if (root->alive && !root->alive())
+                    throw protocol_error("stale_component", "the receiver was removed before its result could be identified");
+                if (!call.result) throw protocol_error("unsupported", "the native method did not return an identifiable value");
+                const auto identity = root->child_identify(call.result);
+                livePath.push_back(json_value::object{{"owned", json_value::object{
+                    {"typeId", method.result().id().value()}, {"id", identity}}}});
+            }
+            else if (!discard && call.result)
             {
                 if (root->alive && !root->alive())
                 {
@@ -920,6 +973,7 @@ namespace ce::script::reflection
                 result = read_value(value, 0, visiting, nodes);
             }
             auto response = json_value::object{{"result", std::move(result)}, {"arguments", std::move(outputArguments)}};
+            if (capture) response.emplace("livePath", std::move(livePath));
             notification.pending = false;
             notify();
             return response;

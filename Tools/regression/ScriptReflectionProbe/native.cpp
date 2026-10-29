@@ -3,6 +3,7 @@
 #include "../../../Engine/SceneRuntime/ScriptApiTable.h"
 #include "../../../Engine/SceneRuntime/ScriptReflectionService.h"
 #include "../../../Engine/SceneRuntime/ScriptReflectionCallbacks.h"
+#include "../../../Engine/SceneRuntime/ScriptReflectionStateMachineChildren.h"
 #include <memory>
 #include <thread>
 
@@ -23,6 +24,7 @@ namespace
     reflection_probe::Script script;
     reflection_probe::InvalidScript invalidScript;
     bool physicsEnabled = false;
+    bool ownedChildrenEnabled = true;
     std::uint64_t instance = FirstInstance;
     std::uint32_t generation = 3;
     int notifications = 0;
@@ -55,6 +57,8 @@ namespace
                         if (component && instance == expected) { ++notifications; lastField.assign(field); }
                     },
                     [expected] { return component && instance == expected; }});
+                if (ownedChildrenEnabled)
+                    protocol::BindStateMachineChildren(values.back(), component->stateMachine);
                 if (physicsEnabled)
                 {
                     const auto alive = [expected] { return component && instance == expected; };
@@ -110,6 +114,7 @@ PROBE_EXPORT ScriptApiTable* ProbeReflectionTable()
     instance = FirstInstance;
     notifications = 0;
     physicsEnabled = false;
+    ownedChildrenEnabled = true;
     script = {};
     invalidScript = {};
     lastField.clear();
@@ -139,6 +144,8 @@ PROBE_EXPORT void ProbeReflectionReplace()
     component->cycle.next = &component->cycle;
 }
 PROBE_EXPORT void ProbeReflectionRemove() { component.reset(); }
+PROBE_EXPORT void ProbeReflectionResetCallbacks() { ce::script::binding::RegisterReflectionCallbackApi(table); }
+PROBE_EXPORT void ProbeReflectionEnableOwnedChildren(int enabled) { ownedChildrenEnabled = enabled != 0; }
 PROBE_EXPORT void ProbeReflectionEnablePhysics() { physicsEnabled = true; }
 PROBE_EXPORT void ProbeReflectionDestroyOwner() { ++generation; }
 PROBE_EXPORT int ProbeReflectionNotifications() { return notifications; }

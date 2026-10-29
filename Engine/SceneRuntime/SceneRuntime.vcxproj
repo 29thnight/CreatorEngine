@@ -363,6 +363,8 @@
     <ClInclude Include="ScriptBindingRegistry.h" />
     <ClInclude Include="ScriptReflectionBindings.h" />
     <ClInclude Include="ScriptReflectionCallbacks.h" />
+    <ClInclude Include="ScriptReflectionStateMachineChildren.h" />
+    <ClInclude Include="StateMachineChildren.h" />
     <ClInclude Include="ScriptReflectionService.h" />
     <ClInclude Include="ScriptPhysicsValues.h" />
     <ClInclude Include="ScriptApiTable.h" />

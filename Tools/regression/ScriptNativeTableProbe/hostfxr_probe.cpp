@@ -95,15 +95,15 @@ int wmain(int argc, wchar_t** argv)
         return 7;
     }
     constexpr std::size_t tableSize = sizeof(ce::script::binding::ScriptApiTable);
-    const auto* api = static_cast<ce::script::binding::ScriptApiTable*>(table());
-    if (!api || api->version != CreatorScriptApiVersion || api->version < 49 || api->structSize != tableSize ||
+    auto* api = static_cast<ce::script::binding::ScriptApiTable*>(table());
+    if (!api || api->version != CreatorScriptApiVersion || api->version < 49 || api->structSize != static_cast<int>(tableSize) ||
         !api->NativeCallback_BeginGeneration || !api->NativeCallback_Register || !api->NativeCallback_Disable ||
         !api->NativeCallback_TakeRetired || !api->NativeCallback_EndGeneration)
     {
         return 19;
     }
-    if (initialize(const_cast<ce::script::binding::ScriptApiTable*>(api), tableSize, fingerprint() ^ 1, 0) != -1 ||
-        initialize(const_cast<ce::script::binding::ScriptApiTable*>(api), tableSize, fingerprint(), 0) != 0 ||
+    if (initialize(api, tableSize, fingerprint() ^ 1, 0) != -1 ||
+        initialize(api, tableSize, fingerprint(), 0) != 0 ||
         isAlive(7, 3) != 1 || isAlive(7, 4) != 0)
     {
         return 8;
