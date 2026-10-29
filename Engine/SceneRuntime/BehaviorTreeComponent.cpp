@@ -83,6 +83,11 @@ void BehaviorTreeComponent::InternalAIUpdate(float deltaSecond)
     ClrHost::Get().QueueAITick(m_treeInstanceId, deltaSecond);
 }
 
+BlackBoard* BehaviorTreeComponent::GetBlackBoard()
+{
+    return m_blackboard.borrow().unsafe_get();
+}
+
 void BehaviorTreeComponent::OnUninitializing()
 {
     m_blackboard.reset();

@@ -1,4 +1,34 @@
 . (Join-Path $PSScriptRoot 'RuntimeResults.ps1')
+Import-Module (Join-Path $PSScriptRoot '../runtime/RuntimeLayout.psm1') -DisableNameChecking
+
+function Assert-NativeReflectionEditorClosure(
+    [string]$BinaryRoot, [string]$DistributionBinaryRoot, [string]$Configuration, [int]$ApiVersion) {
+    # The caller has verified the immutable distribution. Its deployment record,
+    # not the mutable repository record, defines the native files to compare.
+    $recordPath = Assert-EngineChildPath (Join-Path $DistributionBinaryRoot 'Runtime/Manifests/CreatorEditor.json') $DistributionBinaryRoot
+    $record = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+    Assert-ResultInteger $record.schemaVersion 'native deployment schemaVersion' 1
+    Assert-ResultInteger $record.abi.scriptApi 'native deployment scriptApi' 48
+    $entries = @($record.entries)
+    if ($record.schemaVersion -ne 1 -or $record.host -cne 'CreatorEditor' -or
+        $record.configuration -cne $Configuration -or $record.abi.scriptApi -ne $ApiVersion -or
+        (Get-EngineDigest $entries) -cne $record.digest) {
+        throw 'The validated distribution has an incompatible Editor native deployment record.'
+    }
+    foreach ($required in @('Editor/CreatorEditor.exe', 'Editor/CreatorEditor.runtime.dll', 'Runtime/layout.version')) {
+        if (@($entries | Where-Object path -CEQ $required).Count -ne 1) {
+            throw "Editor native deployment record is incomplete: $required"
+        }
+    }
+    # CreatorEditor.exe is only a launcher. Match the actual runtime DLL and
+    # every recorded shared native dependency before running the repository host.
+    Test-EngineEntries $BinaryRoot $entries
+    $runtime = @($entries | Where-Object path -CEQ 'Editor/CreatorEditor.runtime.dll')[0]
+    return [pscustomobject]@{
+        schemaVersion = 1; host = 'CreatorEditor'; configuration = $Configuration; nativeApi = $ApiVersion
+        digest = $record.digest; files = $entries.Count; runtimeSha256 = $runtime.sha256
+    }
+}
 
 function Assert-NativeReflectionAudioDevice($Results) {
     $audio = Get-RuntimeResult $Results 'audio.host'

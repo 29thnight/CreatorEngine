@@ -8,23 +8,23 @@
 
 | 검사 | 확인한 결과 | 제품 실행 여부 |
 |---|---|---|
-| 네이티브 서비스/F# 계약 fixture | `SCRIPT_REFLECTION_OK checks=612 types=58 api=49 bridge=C#-free`; CTest 6/6 성공 | 실제 서비스 코드, FSM 자식 저장소·어댑터와 fixture 타입을 실행; Editor/Player 실행 아님 |
+| 네이티브 서비스/F# 계약 fixture | `SCRIPT_REFLECTION_OK checks=702 types=63 api=49 bridge=C#-free`; CTest 6/6 성공 | 실제 서비스 코드, FSM 자식 저장소·Animator 출력 어댑터와 fixture 타입을 실행; Editor/Player 실행 아님 |
 | 네이티브 콜백 fixture | `NATIVE_REFLECTION_CALLBACKS_OK checks=129 signatures=5` | 콜백 계약 실행; GPU·오디오 제품 실행 아님 |
 | `NativeReflectionProduct.Compile.fsproj` | API 49 Windows codegen 실행 `40800052310`에서 실제 엔진 헤더로 생성한 F# 바인딩과 제품 프로브 컴파일 성공 | 컴파일만 수행; Editor/Player 실행 아님 |
-| `verify-native-reflection-product-results.ps1` | PowerShell 7.4.7에서 결과 소비자 30개 검사와 제품 실행 스크립트 구문 검사 성공 | 합성 결과의 거부 검사 |
+| `verify-native-reflection-product-results.ps1` | PowerShell 7.4.7에서 결과 소비자·네이티브 파일 검증 35개 검사와 제품 실행 스크립트 구문 검사 성공 | 합성 결과·파일의 거부 검사 |
 | 계약·제품 workflow | YAML 및 PowerShell 블록 구문 검사 성공 | 제품 workflow 미실행 |
 | 새 codegen·release workflow | YAML 2개, PowerShell 블록 3개, bash 블록 2개, Python 블록 3개 구문 검사 성공 | 게시·호스트 동작을 구문 검사에서 실행하지 않음 |
 | `verify-fsharp-native-product.ps1` | 실제 제품용 절차 구현 | Windows 실행 대기 |
 
-계약 실행의 원본 기록은 로컬 작업공간 `.build/probe-debug/Testing/Temporary/LastTest.log`, `.build/probe-debug/managed/Debug/managed-run.log`에 있다. 58개 타입은 서비스 fixture의 타입 수이며 실제 엔진 전체 카탈로그의 크기로 해석하지 않는다. 추가 workflow 구문 검사 기록은 `.build/workflow-review-20261029/syntax-results.log`다.
+계약 실행의 원본 기록은 로컬 작업공간 `.build/probe-debug/Testing/Temporary/LastTest.log`, `.build/probe-debug/managed/Debug/managed-run.log`에 있다. 63개 타입은 서비스 fixture의 타입 수이며 실제 엔진 전체 카탈로그의 크기로 해석하지 않는다. 추가 workflow 구문 검사 기록은 `.build/workflow-review-20261029/syntax-results.log`다.
 
 초기 제품 프로브의 로컬 컴파일은 Linux에서 `-std=c++20 -D__stdcall= -D__cdecl=`로 생성한 API 선언을 사용했다. Windows 호출 규약 검증은 별도의 Windows 계약 게이트가 맡는다. F# 프로브 자체에는 경고를 오류로 처리하며, 이 초기 빌드에서 참조하는 기존 `ScriptNative` 프로젝트의 경고 63개는 그대로 보고됐다.
 
-작업 브랜치 `work/fsharp-native-completion-20261029`의 커밋 `48384fed66def58083e55a494060a33204b7cf49`에 대한 [Windows codegen 실행 40800052310](https://github.com/29thnight/CreatorEngine/actions/runs/40800052310)이 성공했다. 실제 Windows 엔진 헤더로 생성한 RenderEngine·SceneRuntime 등록 코드와 ScriptReflectionBindings·ScriptReflectionCallbacks의 네 개 object를 컴파일했으며, 새 F# 생성 파일 369개와 제품 프로브도 컴파일했다. 이 실행 이후 추가한 FSM 자식 ID 경로와 StateMachineComponent.cpp의 컴파일은 최종 소스의 후속 Windows 실행에서 검증한다. Editor/Player 실행과 구분한다.
+작업 브랜치의 커밋 `8b0e585a5aff5edaf9271e926ff4621d2ed9cba7`에 대한 [Windows codegen 실행 40802933859](https://github.com/29thnight/CreatorEngine/actions/runs/40802933859)이 성공했다. 실제 Windows 엔진 헤더로 생성한 RenderEngine·SceneRuntime 등록 코드, ScriptReflectionBindings·ScriptReflectionCallbacks와 StateMachineComponent.cpp의 다섯 object를 컴파일했으며, F# 생성 파일 369개와 제품 프로브도 컴파일했다. 이 실행 이후 추가한 BlackBoard native-only 인자 정책, Animator 출력 저장소, Terrain bounded getter와 BehaviorTreeComponent.cpp의 컴파일은 후속 Windows 실행에서 검증한다. Editor/Player 실행과 구분한다.
 
 ## 실제 제품 게이트가 요구하는 증거
 
-[`verify-fsharp-native-product.ps1`](../../Tools/regression/verify-fsharp-native-product.ps1)은 검증한 엔진 배포물을 입력으로 받는다. 배포물의 구성·소스 커밋·native API가 현재 체크아웃과 일치하고 저장소 Editor 실행 파일이 배포본과 같은지 먼저 확인한다. 별도 작업 디렉터리에 기존 캐릭터 물리 장면, F# 프로브, 직접 생성한 PCM WAV와 셰이더를 구성한다.
+[`verify-fsharp-native-product.ps1`](../../Tools/regression/verify-fsharp-native-product.ps1)은 검증한 엔진 배포물을 입력으로 받는다. 배포물의 구성·소스 커밋·native API가 현재 체크아웃과 일치하는지 먼저 확인한다. 이어서 검증 배포물의 `Runtime/Manifests/CreatorEditor.json`을 기준으로 launcher, 실제 `CreatorEditor.runtime.dll`, 공유 네이티브 의존성 전체의 크기와 SHA-256을 저장소 실행 경로와 대조한다. 동일한 launcher에 오래된 runtime DLL만 섞인 경우도 거부하며, 비교한 digest·runtime hash·파일 수를 `editor.native-closure.json`과 최종 결과에 기록한다. 별도 작업 디렉터리에 기존 캐릭터 물리 장면, F# 프로브, 직접 생성한 PCM WAV와 셰이더를 구성한다.
 
 버전은 성공 문자열에 고정하지 않는다. F# 프로브가 바인딩 검증 이후의 `NativeReflection.ApiVersion`을 보고하고, runner는 `ScriptApiVersion.h`와 Editor·Player 배포 매니페스트의 버전에 같은 값을 요구한다. 현재 소스가 49이므로 API 48 결과는 현재 제품 게이트를 통과하지 못한다. 결과 reader의 최솟값 48과 API 48 합성 fixture는 전송 프로토콜의 최소 지원 범위를 검사하며 실제 실행 버전 판정은 정확한 일치 검사로 수행한다.
 
@@ -73,4 +73,4 @@ workflow는 BuildTool로 실제 Editor·Player·쿠킹 도구를 빌드하고 �
 
 [`native-reflection-codegen.yml`](../../.github/workflows/native-reflection-codegen.yml)은 별도의 Windows 작업 checkout에서 production 헤더를 읽어 생성물을 갱신하고, 생성 결과 일치 검사와 F# 제품 프로브 컴파일을 수행한다. 생성물과 소스 커밋·reflgen 커밋·workflow URL을 아티팩트로 보존한다. 저장소 ref를 직접 수정하지 않으며 Editor/Player 실행은 포함하지 않는다.
 
-비공개 의존성과 장치가 준비된 runner에서 새 제품 workflow가 실제로 끝나고 `NATIVE_REFLECTION_PRODUCT_OK`를 남겨야 API 49 제품 검증 완료로 기록할 수 있다. 이번 제품 프로브의 대표 동작에는 실제 호스트에서의 콜백 등록·호출 시나리오가 아직 없으므로, 콜백의 실제 제품 사용까지 별도로 완료됐다고 확대해 기록하지 않는다.
+비공개 의존성과 장치가 준비된 runner에서 새 제품 workflow가 실제로 끝나고 `NATIVE_REFLECTION_PRODUCT_OK`를 남겨야 API 49 제품 검증 완료로 기록할 수 있다. 이번 제품 프로브의 FSM 검사는 이름 왕복과 없는 이름 조회까지다. 상태·전이의 ID, 이름 변경·삭제·재생성, 콜백 등록·호출, Animator 출력 인자와 Terrain의 bounded view 검사는 생산 서비스·어댑터 fixture에서 실행했으며, 실제 Editor/Player에서 이 시나리오들이 완료됐다고 확대해 기록하지 않는다.

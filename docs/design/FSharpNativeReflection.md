@@ -82,6 +82,11 @@ if state.HasValue then
 네이티브 객체를 생성하거나 기존 객체를 수정하지 않는다. 지원 가능한 필드
 구성에만 `Create`를 생성하고, 나머지 타입은 명시적 JSON 값 또는 기존 뷰를
 사용한다. 네이티브 `x/y/z/w`와 관리 값의 `X/Y/Z/W`는 전용 codec으로 구분한다.
+씬 서비스·렌더 핸들·FSM 자식 객체·`BlackBoard`처럼 신원이나 비공개 상태를
+가진 타입에는 `FromJson`이나 빈 생성자를 제공하지 않는다. 특히 BlackBoard의
+공개 필드 스키마만 복사하면 비공개 값 맵이 사라지므로 기존 네이티브 뷰를
+인자로 전달한다. 콜백에서 받는 `NativeBlackBoardSnapshot`은 별도의 명시적 값
+복사 규약을 사용한다.
 각 뷰의 `Codec`과 `NativeArray<'T>.FromArray(values, codec)` / `Empty(codec)`로
 배열 인자도 F# 값에서 만들 수 있다. mutable 참조와 `span<T>` 출력 버퍼는
 F# `byref` 인자로 생성하며, 호출 뒤의 네이티브 인자 배열을 새 값에 반영한다.
@@ -133,6 +138,20 @@ mutable/out 참조, rvalue 참조, mutable span, 주소·callback 입력은 이 
 거절한다. `AddState`처럼 객체를 생성하는 비const 메서드의 포인터 반환값을
 재실행되는 getter 경로로 가장하지 않는다.
 
+`TerrainComponent.GetHeightSamples()`는 실제 높이 벡터의 크기로 제한된
+`span<const float>`를 읽기 전용 경로로 제공한다. F#의 `Count`와 원소 접근은
+요청할 때마다 현재 저장소를 다시 확인하므로 큰 높이 맵 전체를 한 JSON 응답으로
+복사하지 않으며, `Resize` 이후에도 이전 버퍼 주소를 사용하지 않는다. 높이 수정은
+geometry·normal 갱신을 함께 수행하는 `ApplyBrush`를 사용한다. 길이가 없는 원래
+`GetHeightMap()`의 가변 포인터는 여전히 명시적 미지원이다.
+
+```fsharp
+let terrain = TerrainComponentView.From(entity)
+let heights = terrain.GetHeightSamples()
+if heights.Count > 0 then
+    printfn "first height: %f" heights.[0]
+```
+
 오버로드는 서술자의 정확한 `Signature`를 사용한다.
 
 ```fsharp
@@ -167,6 +186,30 @@ let value = terrain.BorrowOverload(methodInfo.Name, methodInfo.Signature).Derefe
 메서드가 그 객체를 제거했을 수 있으므로 호출 뒤 다시 읽지 않는다.
 기본 반환값은 읽기 전용 스냅샷이다. FSM 상태·전이의 포인터 반환에는 별도의
 소유 객체 ID 경로를 사용하므로 다음 호출에서도 같은 객체를 사용할 수 있다.
+
+### Animator의 동기 출력 인자
+
+클립·본 조회 여덟 개와 `BuildAvatarBoneMasks`의 `bool* outViaExperiment`,
+`AnimatorDataPath* outPath`는 F# `byref` 출력으로 제공한다. 호스트가 해당 호출의
+정확한 메서드·인자 위치·포인터 타입을 검사하고 bool·enum 저장소를 만든다.
+초깃값을 넣은 뒤 메서드를 한 번 실행하고, 호출이 끝나면 값을 `Arguments`에서
+관리 변수로 돌려쓴다. 이 저장소는 요청이 끝날 때 해제한다.
+
+```fsharp
+let animator = AnimatorView.From(entity)
+let mutable viaExperiment = false
+let mutable dataPath = AnimatorDataPathValues.``None``
+let clipCount = animator.GetClipCount(&viaExperiment, &dataPath)
+if clipCount > 0UL then
+    let name = animator.GetClipName(0, &viaExperiment, &dataPath)
+    printfn "%s" name
+```
+
+JSON 프로토콜의 `{ "output": <initial-value> }`는 등록된 동기 출력 인자에만
+사용할 수 있다. 원래 컴포넌트와 같은 주소·타입의 수신자만 허용하며, const 조회의
+출력은 독립된 임시 저장소에 기록한다. 다른 포인터나 버퍼, getter가 반환한 별도
+복사본에는 이 경로를 적용하지 않는다. 기존 네이티브 객체 인자의 출력 슬롯은
+계속 `null`이며, 요청이 직접 소유한 출력 저장소만 호출 뒤 다시 읽는다.
 
 ### FSM 상태와 전이의 안정된 ID
 

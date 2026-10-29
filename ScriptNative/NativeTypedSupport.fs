@@ -219,20 +219,24 @@ type private NativeTypedBacking =
     | Live of NativeValue
     | Snapshot of JsonElement
 
-/// One serialized value or a live native path. Native paths are resolved and
-/// type-checked by the engine; they never encode a process address.
+/// A serialized value, live path, callback token, or host-owned scalar output.
+/// Native bindings are resolved and type-checked without encoding a process address.
 [<Sealed>]
-type NativeCallArgument private (value: JsonElement, binding: NativeValue option, callback: uint64 option) =
+type NativeCallArgument private (value: JsonElement, binding: NativeValue option, callback: uint64 option,
+                                 output: JsonElement option) =
     member internal _.Value = value.Clone()
     member internal _.Binding = binding
     member internal _.Callback = callback
-    static member FromJson(value: JsonElement) = NativeCallArgument(value.Clone(), None, None)
+    member internal _.Output = output |> Option.map _.Clone()
+    static member FromJson(value: JsonElement) = NativeCallArgument(value.Clone(), None, None, None)
     static member FromNative(value: NativeValue) =
         ArgumentNullException.ThrowIfNull(value)
-        NativeCallArgument(NativeTypedJson.nullValue, Some value, None)
+        NativeCallArgument(NativeTypedJson.nullValue, Some value, None, None)
     static member FromCallback(token: uint64) =
         if token = 0UL then invalidArg "token" "Callback tokens must be nonzero."
-        NativeCallArgument(NativeTypedJson.nullValue, None, Some token)
+        NativeCallArgument(NativeTypedJson.nullValue, None, Some token, None)
+    static member FromOutput(initialValue: JsonElement) =
+        NativeCallArgument(NativeTypedJson.nullValue, None, None, Some(initialValue.Clone()))
 
 /// Shared backing for generated native types. Live paths retain component identity;
 /// detached invocation results are immutable JSON snapshots.
@@ -351,7 +355,8 @@ type NativeTypeView private (backing: NativeTypedBacking, validate: unit -> unit
             value.InvokeBoundOverload(method.Name, method.Signature,
                 arguments |> Array.map (fun argument -> box argument.Value),
                 arguments |> Array.map _.Binding, ?discardResult = discardResult,
-                callbackTokens = (arguments |> Array.map _.Callback))
+                callbackTokens = (arguments |> Array.map _.Callback),
+                outputValues = (arguments |> Array.map _.Output))
     /// Capture only a host-registered child identity. The engine resolves its
     /// membership again on every access; no returned native address is stored.
     member _.InvokeBoundReference(spec: NativeMethodSpec, arguments: NativeCallArgument array) =
@@ -364,7 +369,8 @@ type NativeTypeView private (backing: NativeTypedBacking, validate: unit -> unit
             let response = value.InvokeBoundOverload(method.Name, method.Signature,
                 arguments |> Array.map (fun argument -> box argument.Value),
                 arguments |> Array.map _.Binding,
-                callbackTokens = (arguments |> Array.map _.Callback), captureResult = true)
+                callbackTokens = (arguments |> Array.map _.Callback),
+                outputValues = (arguments |> Array.map _.Output), captureResult = true)
             response, NativeTypeView.FromNative(value.CapturedResult(response))
     member _.Borrow(spec: NativeMethodSpec, arguments: JsonElement array) =
         validate ()

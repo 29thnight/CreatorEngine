@@ -115,6 +115,12 @@ public:
     int GetWidth()  const { return m_width; }
     int GetHeight() const { return m_height; }
     float* GetHeightMap() { return m_heightMap.data(); }
+    // Bound the read view by actual storage; writes go through ApplyBrush so
+    // terrain geometry and normals remain synchronized with the height samples.
+    std::span<const float> GetHeightSamples() const
+    {
+        return {m_heightMap.data(), m_heightMap.size()};
+    }
 
     // Mesh 접근자
     own::shared_owner<TerrainMesh> GetMesh() const { return m_pTerrainMesh; }

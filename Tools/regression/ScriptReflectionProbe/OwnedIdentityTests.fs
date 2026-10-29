@@ -59,6 +59,18 @@ let run (check: bool -> string -> unit) (rejected: (unit -> unit) -> string -> s
         "captured transition endpoints resolve actual native states"
     check (view.EvaluateTransition(transition) && callbackCalls = 1)
         "an actual native transition invokes its rooted F# condition"
+    let evaluateBoard = NativeMethodSpec("FSM::Transition", "operator()", true,
+        [|"BlackBoard"|], [|"const_reference"|])
+    let liveBoard = view.Field("liveBoard", "liveBoard")
+    let boardResult = transition.Value.InvokeBound(evaluateBoard, [|liveBoard.AsNativeArgument()|])
+    check (boardResult.ReturnValue.GetBoolean() && callbackCalls = 2)
+        "a native BlackBoard argument preserves private ready=true through the actual transition operator"
+    let detachedBoard = NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(
+        System.Collections.Generic.Dictionary<string, obj>()))
+    check (rejected (fun () -> transition.Value.InvokeBound(evaluateBoard,
+            [|detachedBoard.AsNativeArgument()|]) |> ignore) "detached BlackBoard cannot bind native state" = "detached_argument")
+        "detached BlackBoard values require an existing native identity"
+    check (callbackCalls = 2) "detached BlackBoard rejection occurs before the condition callback"
 
     let beforeWrongType = view.calls
     let removeState = NativeMethodSpec("ProbeComponent", "RemoveState", false,

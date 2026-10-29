@@ -19,6 +19,15 @@
 #include <variant>
 #include <vector>
 
+// Match the production diagnostic enum exactly while keeping the portable
+// provider independent from Animator's renderer and asset dependencies.
+enum class [[reflgen::reflect]] AnimatorDataPath : std::uint8_t
+{
+    None,
+    Generation,
+    Granular,
+};
+
 namespace reflection_probe
 {
     enum class [[reflgen::reflect]] Mode { Idle = 0, Running = 7 };
@@ -120,10 +129,86 @@ namespace reflection_probe
         Cycle cycle;
         int calls = 0;
         mutable int lookupCalls = 0;
+        mutable int diagnosticCalls = 0;
+        [[reflgen::ignore]] std::vector<float> heightSamples{1.5f, -2.0f, 3.25f};
+        BlackBoard liveBoard = [] {
+            BlackBoard board;
+            // Private authoring state must survive a native reference binding;
+            // an empty public-field JSON record cannot represent this value.
+            auto& values = const_cast<ce::engine_node_map<std::string, BlackBoardValue>&>(board.GetValues());
+            BlackBoardValue ready{};
+            ready.Type = BlackBoardType::Bool;
+            ready.BoolValue = true;
+            values["ready"] = ready;
+            return board;
+        }();
         [[reflgen::ignore]] ce::owned_func<void(float)> tickCallback;
         [[reflgen::ignore]] FSM::StateMachineChildren stateMachine;
 
         [[reflgen::reflect]] int Increase(int amount) { ++calls; settings.count += amount; return settings.count; }
+        [[reflgen::ignore]] void RecordDiagnostics(bool* outViaExperiment, AnimatorDataPath* outPath) const
+        {
+            ++diagnosticCalls;
+            if (outViaExperiment) *outViaExperiment = true;
+            if (outPath) *outPath = AnimatorDataPath::Granular;
+        }
+        [[reflgen::reflect]] std::size_t GetClipCount(bool* outViaExperiment, AnimatorDataPath* outPath) const
+        {
+            // The result observes both initial outputs before native writeback.
+            const auto initial = static_cast<std::size_t>(outViaExperiment && *outViaExperiment ? 100 : 0)
+                + static_cast<std::size_t>(outPath ? *outPath : AnimatorDataPath::None);
+            RecordDiagnostics(outViaExperiment, outPath);
+            return initial;
+        }
+        [[reflgen::reflect]] std::string GetClipName(int clipIndex, bool* outViaExperiment, AnimatorDataPath* outPath) const
+        {
+            RecordDiagnostics(outViaExperiment, outPath);
+            return "clip" + std::to_string(clipIndex);
+        }
+        [[reflgen::reflect]] std::size_t GetClipFrameCount(int clipIndex, bool* outViaExperiment, AnimatorDataPath* outPath) const
+        {
+            RecordDiagnostics(outViaExperiment, outPath);
+            return static_cast<std::size_t>(clipIndex + 10);
+        }
+        [[reflgen::reflect]] std::uint64_t GetSkeletonSerial(bool* outViaExperiment, AnimatorDataPath* outPath) const
+        {
+            RecordDiagnostics(outViaExperiment, outPath);
+            return 0xf123456789abcdefULL;
+        }
+        [[reflgen::reflect]] double GetClipDuration(int clipIndex, bool* outViaExperiment, AnimatorDataPath* outPath) const
+        {
+            RecordDiagnostics(outViaExperiment, outPath);
+            return clipIndex + 0.5;
+        }
+        [[reflgen::reflect]] std::size_t GetBoneCount(bool* outViaExperiment, AnimatorDataPath* outPath) const
+        {
+            RecordDiagnostics(outViaExperiment, outPath);
+            return 4;
+        }
+        [[reflgen::reflect]] std::string GetBoneName(int boneIndex, bool* outViaExperiment, AnimatorDataPath* outPath) const
+        {
+            if (boneIndex < 0) { ++diagnosticCalls; return {}; }
+            RecordDiagnostics(outViaExperiment, outPath);
+            return "bone" + std::to_string(boneIndex);
+        }
+        [[reflgen::reflect]] int ResolveBoneIndex(const std::string& boneName, bool* outViaExperiment, AnimatorDataPath* outPath) const
+        {
+            RecordDiagnostics(outViaExperiment, outPath);
+            return boneName == "hip" ? 2 : -1;
+        }
+        [[reflgen::reflect]] Settings* BuildAvatarBoneMasks(Settings& mask, bool* outViaExperiment, AnimatorDataPath* outPath)
+        {
+            RecordDiagnostics(outViaExperiment, outPath);
+            ++calls;
+            ++mask.count;
+            return &mask;
+        }
+        [[reflgen::reflect]] std::span<const float> GetHeightSamples() const noexcept
+        {
+            return {heightSamples.data(), heightSamples.size()};
+        }
+        [[reflgen::reflect]] float* GetHeightMap() { return heightSamples.data(); }
+        [[reflgen::reflect]] void ResizeHeightSamples(int size) { heightSamples.resize(static_cast<std::size_t>(size), 9.0f); }
         [[reflgen::reflect]] void Adjust(int& value) const { value += settings.count; }
         [[reflgen::reflect]] std::string Echo(const std::string& text) const { return text; }
         [[reflgen::reflect]] math::vector3 EchoDirection(math::vector3 value) const { return value; }

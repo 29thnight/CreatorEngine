@@ -7,5 +7,5 @@
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../../../ScriptNative/ScriptNative.fsproj" /></ItemGroup>
   <Import Project="$(ScriptReflectionGeneratedProps)" Condition="'$(ScriptReflectionGeneratedProps)' != ''" />
-  <ItemGroup><Compile Include="TypedSupportTests.fs" /><Compile Include="TypedFacadeTests.fs" /><Compile Include="CallbackTests.fs" /><Compile Include="OwnedIdentityTests.fs" /><Compile Include="Program.fs" /></ItemGroup>
+  <ItemGroup><Compile Include="TypedSupportTests.fs" /><Compile Include="TypedFacadeTests.fs" /><Compile Include="CallbackTests.fs" /><Compile Include="OwnedIdentityTests.fs" /><Compile Include="ScalarOutputTests.fs" /><Compile Include="Program.fs" /></ItemGroup>
 </Project>

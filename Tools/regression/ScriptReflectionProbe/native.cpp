@@ -4,6 +4,7 @@
 #include "../../../Engine/SceneRuntime/ScriptReflectionService.h"
 #include "../../../Engine/SceneRuntime/ScriptReflectionCallbacks.h"
 #include "../../../Engine/SceneRuntime/ScriptReflectionStateMachineChildren.h"
+#include "../../../Engine/SceneRuntime/ScriptReflectionScalarOutputs.h"
 #include <memory>
 #include <thread>
 
@@ -25,6 +26,7 @@ namespace
     reflection_probe::InvalidScript invalidScript;
     bool physicsEnabled = false;
     bool ownedChildrenEnabled = true;
+    bool scalarOutputsEnabled = true;
     std::uint64_t instance = FirstInstance;
     std::uint32_t generation = 3;
     int notifications = 0;
@@ -59,6 +61,8 @@ namespace
                     [expected] { return component && instance == expected; }});
                 if (ownedChildrenEnabled)
                     protocol::BindStateMachineChildren(values.back(), component->stateMachine);
+                if (scalarOutputsEnabled)
+                    protocol::BindAnimatorOutputs<AnimatorDataPath>(values.back());
                 if (physicsEnabled)
                 {
                     const auto alive = [expected] { return component && instance == expected; };
@@ -115,6 +119,7 @@ PROBE_EXPORT ScriptApiTable* ProbeReflectionTable()
     notifications = 0;
     physicsEnabled = false;
     ownedChildrenEnabled = true;
+    scalarOutputsEnabled = true;
     script = {};
     invalidScript = {};
     lastField.clear();
@@ -146,6 +151,7 @@ PROBE_EXPORT void ProbeReflectionReplace()
 PROBE_EXPORT void ProbeReflectionRemove() { component.reset(); }
 PROBE_EXPORT void ProbeReflectionResetCallbacks() { ce::script::binding::RegisterReflectionCallbackApi(table); }
 PROBE_EXPORT void ProbeReflectionEnableOwnedChildren(int enabled) { ownedChildrenEnabled = enabled != 0; }
+PROBE_EXPORT void ProbeReflectionEnableScalarOutputs(int enabled) { scalarOutputsEnabled = enabled != 0; }
 PROBE_EXPORT void ProbeReflectionEnablePhysics() { physicsEnabled = true; }
 PROBE_EXPORT void ProbeReflectionDestroyOwner() { ++generation; }
 PROBE_EXPORT int ProbeReflectionNotifications() { return notifications; }

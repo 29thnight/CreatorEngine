@@ -348,7 +348,9 @@ class Generator:
         self.snapshot = snapshot
         self.components = set(snapshot["components"])
         self.classes = {item["qualified_name"]: item for item in snapshot["classes"]}
-        for name in ("RHITextureHandle", "RHIBufferHandle", "FSM::FSMState", "FSM::Transition"):
+        # These types carry native identity or private state that their public
+        # field schema cannot reconstruct from a detached JSON value.
+        for name in ("RHITextureHandle", "RHIBufferHandle", "FSM::FSMState", "FSM::Transition", "BlackBoard"):
             if name in self.classes:
                 self.classes[name] = dict(self.classes[name], native_view_only=True)
         for record in manual_schemas():
@@ -726,9 +728,26 @@ class Generator:
                     return Mapping(f"NativeCallback<{managed}>", "", "callback", argument_safe=False)
         return self.mapping(value)
 
+    def method_parameter_mapping(self, method: dict, parameter: dict) -> Mapping:
+        # The host opts these exact diagnostics into request-owned scalar
+        # storage. No pointer address is supplied by F# or kept after the call.
+        diagnostic_methods = {
+            "GetClipCount", "GetClipName", "GetClipFrameCount", "GetSkeletonSerial",
+            "GetClipDuration", "GetBoneCount", "GetBoneName", "ResolveBoneIndex", "BuildAvatarBoneMasks",
+        }
+        diagnostic_types = {"outViaExperiment": "bool*", "outPath": "AnimatorDataPath*"}
+        value = parameter["type"]
+        if (method["name"] in diagnostic_methods and value["kind"] == "pointer"
+                and re.sub(r"\s+", "", value["canonical_spelling"])
+                    == diagnostic_types.get(parameter.get("name"))):
+            child = self.mapping(value["pointee"])
+            if child.supported:
+                return Mapping(child.fs_type, child.codec, "output", argument_safe=False)
+        return self.parameter_mapping(value)
+
     def method_analysis(self, method: dict) -> tuple[Mapping, list[Mapping], str, str]:
         result = self.mapping(method["return_type"])
-        parameters = [self.parameter_mapping(parameter["type"]) for parameter in method["parameters"]]
+        parameters = [self.method_parameter_mapping(method, parameter) for parameter in method["parameters"]]
         attributes = self.attributes(method)
         reason = ""
         if "reflgen::script_internal" in attributes:
@@ -743,7 +762,7 @@ class Generator:
                     reason = f"argument {index}: " + parameter.reason
                     break
                 if not parameter.argument_safe and parameter.shape not in {
-                        "record", "sequence", "map", "reference", "optional", "variant", "expected", "tuple", "callback"}:
+                        "record", "sequence", "map", "reference", "optional", "variant", "expected", "tuple", "callback", "output"}:
                     reason = f"argument {index}: native input requires a live typed view; its scalar mapping has no native identity"
                     break
                 if self.passing(method["parameters"][index]["type"]) == "rvalue_reference":
@@ -753,7 +772,11 @@ class Generator:
         safe_borrow_arguments = all(self.passing(parameter["type"]) in ("value", "const_reference") and
                                    not self.output_parameter(parameter["type"]) for parameter in method["parameters"])
         native_arguments = any(not parameter.argument_safe for parameter in parameters)
-        borrow = (is_reference_result and not native_arguments and "reflgen::script_once" not in attributes
+        # Terrain samples can be large. Re-resolve the bounded read-only span
+        # through its component path instead of serializing the whole buffer.
+        height_samples = (method["name"] == "GetHeightSamples" and method["is_const"]
+                          and not parameters and result.shape == "sequence")
+        borrow = ((is_reference_result or height_samples) and not native_arguments and "reflgen::script_once" not in attributes
                   and (not parameters or (method["is_const"] and safe_borrow_arguments)))
         operation = "borrow" if borrow else "invoke"
         if native_arguments or (result.shape == "reference" and not borrow):
@@ -788,7 +811,7 @@ class Generator:
                 name += "_" + str(index)
             used.add(name)
             names.append(identifier(name))
-            is_mutable = self.output_parameter(parameter["type"]) and mapping.argument_safe
+            is_mutable = mapping.shape == "output" or (self.output_parameter(parameter["type"]) and mapping.argument_safe)
             fs_type = f"byref<{mapping.fs_type}>" if is_mutable else mapping.fs_type
             declarations.append(identifier(name) + ": " + fs_type)
             if is_mutable:
@@ -798,6 +821,8 @@ class Generator:
             for parameter, mapping, name in zip(method["parameters"], parameters, names):
                 if mapping.argument_safe:
                     bound_arguments.append(f"NativeCallArgument.FromJson(({mapping.codec}).Encode({name}))")
+                elif mapping.shape == "output":
+                    bound_arguments.append(f"NativeCallArgument.FromOutput(({mapping.codec}).Encode({name}))")
                 elif mapping.shape == "callback":
                     bound_arguments.append(f"NativeCallArgument.FromCallback({name}.Token)")
                 else:
@@ -843,17 +868,17 @@ class Generator:
         view = self.names[record["qualified_name"]]
         methods = sorted(record["methods"], key=lambda method: (method["name"], method["is_const"], method["signature"]))
         analyses = [self.method_analysis(method) for method in methods]
-        counts = Counter((method["name"], tuple((mapping.fs_type, self.output_parameter(parameter["type"]))
+        counts = Counter((method["name"], tuple((mapping.fs_type, mapping.shape == "output" or self.output_parameter(parameter["type"]))
                          for parameter, mapping in zip(method["parameters"], analysis[1]))) for method, analysis in zip(methods, analyses))
         native_name_counts = Counter(method["name"] for method in methods)
-        const_counts = Counter((method["name"], method["is_const"], tuple((mapping.fs_type, self.output_parameter(parameter["type"]))
+        const_counts = Counter((method["name"], method["is_const"], tuple((mapping.fs_type, mapping.shape == "output" or self.output_parameter(parameter["type"]))
                                for parameter, mapping in zip(method["parameters"], analysis[1]))) for method, analysis in zip(methods, analyses))
         specs = []
         bodies = []
         names: set[str] = set(field["name"] for field in record["fields"])
         for method, analysis in zip(methods, analyses):
             digest = hashlib.sha256((record["qualified_name"] + "::" + method["name"] + method["signature"]).encode()).hexdigest()[:10]
-            key = (method["name"], tuple((mapping.fs_type, self.output_parameter(parameter["type"]))
+            key = (method["name"], tuple((mapping.fs_type, mapping.shape == "output" or self.output_parameter(parameter["type"]))
                                        for parameter, mapping in zip(method["parameters"], analysis[1])))
             fs_name = method["name"]
             if counts[key] > 1:

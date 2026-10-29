@@ -101,6 +101,28 @@ class NativeFacadeMappings(unittest.TestCase):
                 self.assertNotIn("static member Create(", emitted)
                 self.assertNotIn("static member FromJson(", emitted)
 
+    def test_blackboard_arguments_preserve_private_values_in_the_live_object(self):
+        record = self.generator.classes["BlackBoard"]
+        self.assertEqual(record["fields"], [])
+        self.assertFalse(self.mapping("BlackBoard").argument_safe)
+        emitted = self.generator.emit_record(record)
+        self.assertNotIn("static member Create(", emitted)
+        self.assertNotIn("static member FromJson(", emitted)
+        for name, methods in (("FSM::Transition", ("operator()",)),
+                              ("FSM::FSMState", ("Enter", "Update", "Exit"))):
+            owner = self.generator.classes[name]
+            for method in owner["methods"]:
+                if method["name"] not in methods:
+                    continue
+                with self.subTest(owner=name, method=method["name"]):
+                    analysis = self.generator.method_analysis(method)
+                    self.assertEqual(analysis[2:], ("invoke_bound", ""))
+                    emitted = "\n".join(self.generator.emit_method(
+                        owner, method, method["name"], "probeSpec", analysis))
+                    self.assertIn(".AsNativeArgument()", emitted)
+                    self.assertIn("this.InvokeBound(probeSpec, arguments", emitted)
+                    self.assertNotIn("BlackBoardView(value))).Encode", emitted)
+
     def test_unsafe_scalar_inputs_do_not_emit_native_view_members(self):
         for spelling in ("std::atomic<bool>", "ce::delegate_handle", "std::strong_ordering", "ce::string_view"):
             with self.subTest(spelling=spelling):
@@ -120,6 +142,85 @@ class NativeFacadeMappings(unittest.TestCase):
             self.generator.classes["Scene"], method, "AcceptProbe", "probeSpec", analysis))
         self.assertIn("``value``.AsNativeArgument()", emitted)
         self.assertNotIn(".Dereference()", emitted)
+
+    def test_animator_diagnostics_use_owned_outputs_with_exact_pointer_specs(self):
+        owner = self.generator.classes["Animator"]
+        names = {"GetClipCount", "GetClipName", "GetClipFrameCount", "GetSkeletonSerial",
+                 "GetClipDuration", "GetBoneCount", "GetBoneName", "ResolveBoneIndex", "BuildAvatarBoneMasks"}
+        methods = [method for method in owner["methods"] if method["name"] in names]
+        self.assertEqual({method["name"] for method in methods}, names)
+        self.assertEqual(len(methods), 9)
+        for method in methods:
+            with self.subTest(method=method["name"]):
+                analysis = self.generator.method_analysis(method)
+                self.assertEqual(analysis[2:], ("invoke_bound", ""))
+                self.assertEqual([mapping.shape for mapping in analysis[1][-2:]], ["output", "output"])
+                self.assertTrue(all(not mapping.argument_safe for mapping in analysis[1][-2:]))
+                emitted = "\n".join(self.generator.emit_method(
+                    owner, method, method["name"], "probeSpec", analysis))
+                self.assertIn("``outViaExperiment``: byref<bool>", emitted)
+                self.assertIn("``outPath``: byref<NativeEnumValue<AnimatorDataPathTag>>", emitted)
+                self.assertEqual(emitted.count("NativeCallArgument.FromOutput("), 2)
+                self.assertIn("this.InvokeBound(probeSpec, arguments)", emitted)
+                output_indices = list(range(len(method["parameters"]) - 2, len(method["parameters"])))
+                for index, name in zip(output_indices, ("outViaExperiment", "outPath")):
+                    self.assertIn(f"``{name}`` <-", emitted)
+                    self.assertIn(f"response.Arguments.[{index}]", emitted)
+                spec = self.generator.method_spec(owner, method)
+                self.assertIn('"bool *"; "AnimatorDataPath *" |]', spec)
+                self.assertTrue(spec.endswith('"value"; "value" |])'))
+                entry = self.generator.manifest[-1]
+                self.assertEqual(entry["refWriteback"][-2:], output_indices)
+                self.assertTrue(all(parameter["nativeBinding"] for parameter in entry["parameters"][-2:]))
+
+    def test_diagnostic_outputs_do_not_enable_other_raw_pointers(self):
+        cases = [
+            ("GetClipCountOther", "outViaExperiment", "bool *"),
+            ("GetClipCount", "value", "bool *"),
+            ("GetClipCount", "outViaExperiment", "const bool *"),
+            ("GetClipCount", "outViaExperiment", "bool **"),
+            ("GetClipCount", "outViaExperiment", "unsigned char *"),
+            ("GetClipCount", "outPath", "bool *"),
+            ("GetClipCount", "outPath", "const AnimatorDataPath *"),
+            ("GetClipCount", "outViaExperiment", "AnimatorDataPath *"),
+        ]
+        for method_name, parameter_name, spelling in cases:
+            with self.subTest(method=method_name, parameter=parameter_name, spelling=spelling):
+                method = self.method(spelling)
+                method["name"] = method_name
+                method["parameters"][0]["name"] = parameter_name
+                analysis = self.generator.method_analysis(method)
+                self.assertIn("raw pointer", analysis[3])
+                emitted = "\n".join(self.generator.emit_method(
+                    self.generator.classes["Scene"], method, method_name, "probeSpec", analysis))
+                self.assertIn("_Unavailable", emitted)
+                self.assertNotIn("NativeCallArgument.FromOutput(", emitted)
+        for spelling in ("bool *", "AnimatorDataPath *"):
+            self.assertFalse(self.mapping(spelling).supported)
+
+    def test_height_samples_use_a_bounded_live_sequence_path(self):
+        method = {"name": "GetHeightSamples", "signature": "std::span<const float> () const",
+                  "return_type": self.generator.resolve("std::span<const float>"),
+                  "is_const": True, "parameters": [], "attributes": []}
+        owner = self.generator.classes["TerrainComponent"]
+        analysis = self.generator.method_analysis(method)
+        self.assertEqual(analysis[2:], ("borrow", ""))
+        emitted = "\n".join(self.generator.emit_method(
+            owner, method, "GetHeightSamples", "probeSpec", analysis))
+        self.assertIn("NativeArray<single>", emitted)
+        self.assertIn("this.Borrow(probeSpec, arguments)", emitted)
+        self.assertNotIn("FromSnapshot", emitted)
+        self.assertEqual(self.generator.manifest[-1]["resultLifetime"], "live_path")
+        self.assertEqual(self.generator.manifest[-1]["operation"], "borrow")
+        variants = [dict(method, name="OtherSamples"), dict(method, is_const=False),
+                    dict(method, parameters=[{"name": "index", "type": self.generator.resolve("int")}]),
+                    dict(method, return_type=self.generator.resolve("float")),
+                    dict(method, attributes=[{"scope": "reflgen", "name": "script_once"}])]
+        for variant in variants:
+            with self.subTest(variant=variant):
+                self.assertEqual(self.generator.method_analysis(variant)[2:], ("invoke", ""))
+        raw = next(method for method in owner["methods"] if method["name"] == "GetHeightMap")
+        self.assertIn("raw pointer", self.generator.method_analysis(raw)[3])
 
     def test_rooted_callback_input_uses_its_registry_token(self):
         method = self.method("ce::func_detail::owning_func<void, false, true, false, 48, 8, ce::heap_allocator, float>")

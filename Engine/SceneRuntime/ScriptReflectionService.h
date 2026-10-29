@@ -211,6 +211,10 @@ namespace ce::script::reflection
         std::function<bool(const reflgen::value_descriptor&)> child_supported;
         std::function<std::uint64_t(const reflgen::value_view&)> child_identify;
         std::function<reflgen::value_view(std::uint64_t, std::uint64_t)> child_resolve;
+        // A host may explicitly opt synchronous scalar output parameters into
+        // request-owned storage. This returns a retained writable pointee,
+        // never an address supplied by the caller or a reusable native handle.
+        std::function<reflgen::value_view(const reflgen::method_info&, std::size_t)> create_output;
     };
 
     struct host
@@ -815,6 +819,14 @@ namespace ce::script::reflection
                         if (binding.as_object().size() != 1 || callback->as_unsigned() == 0)
                             throw protocol_error("invalid_request", "a callback binding requires exactly one nonzero opaque token");
                     }
+                    else if (binding.find("output"))
+                    {
+                        if (binding.as_object().size() != 1)
+                            throw protocol_error("invalid_request", "an output binding requires exactly one initial value");
+                        if (!root->create_output || selected.data() != root->address
+                            || selected.descriptor().reflected_type() != root->type)
+                            throw protocol_error("unsupported", "this receiver has no registered synchronous output adapter");
+                    }
                     else
                     {
                         validate_path(binding.require("path").as_array(), false);
@@ -827,6 +839,7 @@ namespace ce::script::reflection
             std::vector<std::vector<component_view>> argumentRoots;
             argumentRoots.reserve(bindings.size());
             std::vector<reflgen::value_view> nativeArguments(bindings.size());
+            std::vector<reflgen::value_view> ownedOutputs(bindings.size());
             std::vector<const component_view*> boundRoots(bindings.size());
             std::vector<std::string> boundFields(bindings.size());
             for (std::size_t index = 0; index < bindings.size(); ++index)
@@ -848,6 +861,20 @@ namespace ce::script::reflection
                         method.parameters()[index].value());
                     if (!nativeArguments[index])
                         throw protocol_error("invalid_callback", "callback token is expired or has a different native signature");
+                    continue;
+                }
+                if (const auto* initial = binding.find("output"))
+                {
+                    auto value = root->create_output(method, index);
+                    if (!value || !value.is_writable())
+                        throw protocol_error("unsupported", "this parameter has no registered synchronous output adapter");
+                    const auto& parameter = method.parameters()[index].value();
+                    if (parameter.shape() != reflgen::value_shape::pointer || parameter.children().size() != 1
+                        || parameter.children()[0].value().id() != value.descriptor().id())
+                        throw protocol_error("unsupported", "the output adapter does not match the native pointer parameter");
+                    write_value(value, *initial);
+                    ownedOutputs[index] = value;
+                    nativeArguments[index] = std::move(value);
                     continue;
                 }
                 const auto& bindingOwner = binding.require("owner");
@@ -933,10 +960,13 @@ namespace ce::script::reflection
             } notification{notify};
             json_value::array outputArguments;
             outputArguments.reserve(call.arguments.size());
-            for (const auto& argument : call.arguments)
+            for (std::size_t index = 0; index < call.arguments.size(); ++index)
             {
                 std::set<std::pair<std::uint64_t, const void*>> visiting;
                 std::size_t nodes = 0;
+                // Only host-owned output storage is reread. Ordinary native
+                // bindings can have been deleted by the method and stay null.
+                const auto& argument = ownedOutputs[index] ? ownedOutputs[index] : call.arguments[index];
                 outputArguments.push_back(read_value(argument, 0, visiting, nodes));
             }
             json_value result;

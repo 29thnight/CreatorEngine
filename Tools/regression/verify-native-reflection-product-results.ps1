@@ -79,6 +79,60 @@ foreach ($rows in @(@(), @($audio, $audio))) {
     $count++
 }
 
+# Hash comparison only: these synthetic files are never executed as products.
+$closureFixture = Join-Path ([IO.Path]::GetTempPath()) ('NativeReflectionClosure-' + [guid]::NewGuid().ToString('N'))
+$published = Join-Path $closureFixture 'Published'
+$repository = Join-Path $closureFixture 'Repository'
+$paths = @('Editor/CreatorEditor.exe', 'Editor/CreatorEditor.runtime.dll', 'Runtime/Core/shared.dll', 'Runtime/layout.version')
+try {
+    foreach ($root in @($published, $repository)) {
+        foreach ($path in $paths) {
+            $full = Join-Path $root $path
+            [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($full)) | Out-Null
+            [IO.File]::WriteAllText($full, 'current-' + $path)
+        }
+    }
+    $entries = @(Get-EngineEntries $published $paths)
+    $record = @{
+        schemaVersion = 1; host = 'CreatorEditor'; configuration = 'Release'
+        abi = @{ scriptApi = 49 }; entries = $entries; digest = Get-EngineDigest $entries
+    }
+    $recordPath = Join-Path $published 'Runtime/Manifests/CreatorEditor.json'
+    Write-EngineJson $recordPath $record
+    $receipt = Assert-NativeReflectionEditorClosure $repository $published 'Release' 49
+    if ($receipt.files -ne $paths.Count -or $receipt.runtimeSha256 -cne (Get-EngineFileHash (Join-Path $repository 'Editor/CreatorEditor.runtime.dll'))) {
+        throw 'Editor closure receipt does not identify the runtime DLL and full file set.'
+    }
+    $count++
+    foreach ($path in @('Editor/CreatorEditor.runtime.dll', 'Runtime/Core/shared.dll')) {
+        $file = Join-Path $repository $path
+        # Preserve file length and the launcher hash: a size/exe-only check must fail this test.
+        [IO.File]::WriteAllText($file, 'retired-' + $path)
+        if ((Get-EngineFileHash (Join-Path $repository 'Editor/CreatorEditor.exe')) -cne
+            (Get-EngineFileHash (Join-Path $published 'Editor/CreatorEditor.exe'))) { throw 'Fixture launcher unexpectedly changed.' }
+        $rejected = $false
+        try { $null = Assert-NativeReflectionEditorClosure $repository $published 'Release' 49 } catch { $rejected = $true }
+        if (!$rejected) { throw "Accepted stale native closure member with an unchanged launcher: $path" }
+        $count++
+        Copy-Item -LiteralPath (Join-Path $published $path) -Destination $file -Force
+    }
+    Remove-Item -LiteralPath (Join-Path $repository 'Runtime/Core/shared.dll')
+    $rejected = $false
+    try { $null = Assert-NativeReflectionEditorClosure $repository $published 'Release' 49 } catch { $rejected = $true }
+    if (!$rejected) { throw 'Accepted a missing shared native dependency.' }
+    $count++
+    Copy-Item -LiteralPath (Join-Path $published 'Runtime/Core/shared.dll') -Destination (Join-Path $repository 'Runtime/Core/shared.dll')
+    $record.entries = @($entries | Where-Object path -CNE 'Editor/CreatorEditor.runtime.dll')
+    $record.digest = Get-EngineDigest $record.entries
+    Write-EngineJson $recordPath $record
+    $rejected = $false
+    try { $null = Assert-NativeReflectionEditorClosure $repository $published 'Release' 49 } catch { $rejected = $true }
+    if (!$rejected) { throw 'Accepted a deployment record that omits the actual Editor runtime DLL.' }
+    $count++
+} finally {
+    if (Test-Path -LiteralPath $closureFixture) { Remove-Item -LiteralPath $closureFixture -Recurse -Force }
+}
+
 # Parse the actual runner as part of the portable consumer gate. Do not execute
 # Windows process orchestration or award product credit on this path.
 $tokens = $null

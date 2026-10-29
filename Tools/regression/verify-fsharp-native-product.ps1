@@ -35,10 +35,9 @@ $expectedComponents = @([regex]::Matches($inventory, '\{\s*"([A-Za-z_][A-Za-z_0-
     ForEach-Object { $_.Groups[1].Value } | Sort-Object)
 if ($expectedComponents.Count -lt 27) { throw 'Native component source inventory is incomplete.' }
 $exe = Join-Path $repo "Bin/x64-$Configuration/Editor/CreatorEditor.exe"
-$publishedEditor = Join-Path $distribution "Bin/x64-$Configuration/Editor/CreatorEditor.exe"
-if ((Get-FileHash $exe).Hash -ne (Get-FileHash $publishedEditor).Hash) {
-    throw 'The repository Editor differs from the verified distribution.'
-}
+$editorNativeClosure = Assert-NativeReflectionEditorClosure (Join-Path $repo "Bin/x64-$Configuration") `
+    (Join-Path $distribution "Bin/x64-$Configuration") $Configuration $apiVersion
+$editorNativeClosure | ConvertTo-Json | Set-Content "$workRoot/editor.native-closure.json" -Encoding utf8
 
 $project = Join-Path $workRoot 'Project'
 $scriptRoot = Join-Path $project 'Assets/Script'
@@ -242,7 +241,7 @@ try {
     result = 'NATIVE_REFLECTION_PRODUCT_OK'; schemaVersion = 1; configuration = $Configuration
     revision = $revision; nativeApi = $apiVersion; distribution = $distribution; evidence = $workRoot
     scope = 'Actual Editor and cooked Player; native component catalogue, typed calls, PhysX movement, audio device callbacks, renderer submission, stale handles and clean shutdown'
-    editor = $editorResult; editorAudio = $editorAudio; retiredComponentRejected = $true
+    editor = $editorResult; editorAudio = $editorAudio; editorNativeClosure = $editorNativeClosure; retiredComponentRejected = $true
     player = $playerResult; playerAudio = $playerAudio
 } | ConvertTo-Json -Depth 12 | Set-Content "$workRoot/result.json" -Encoding utf8
 "NATIVE_REFLECTION_PRODUCT_OK evidence=$workRoot"

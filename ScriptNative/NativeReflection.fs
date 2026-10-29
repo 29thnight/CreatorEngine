@@ -234,7 +234,8 @@ type NativeValue internal (owner: ObjectHandle, componentName: string, instance:
     member this.InvokeBoundOverload(methodName: string, signature: string, arguments: obj array,
                                     bindings: NativeValue option array, ?discardResult: bool,
                                     ?resultPath: Dictionary<string, obj> array,
-                                    ?callbackTokens: uint64 option array, ?captureResult: bool) =
+                                    ?callbackTokens: uint64 option array, ?captureResult: bool,
+                                    ?outputValues: JsonElement option array) =
         ArgumentException.ThrowIfNullOrEmpty(methodName)
         ArgumentException.ThrowIfNullOrEmpty(signature)
         ArgumentNullException.ThrowIfNull(arguments)
@@ -244,20 +245,24 @@ type NativeValue internal (owner: ObjectHandle, componentName: string, instance:
         let callbacks = defaultArg callbackTokens (Array.create arguments.Length None)
         if callbacks.Length <> arguments.Length then
             invalidArg "callbackTokens" "Every argument requires one optional callback token."
+        let outputs = defaultArg outputValues (Array.create arguments.Length None)
+        if outputs.Length <> arguments.Length then
+            invalidArg "outputValues" "Every argument requires one optional output value."
         let wireBindings =
-            Array.map2 (fun (binding: NativeValue option) callback ->
-                match binding, callback with
-                | Some _, Some _ -> invalidArg "callbackTokens" "An argument cannot bind both a native path and a callback."
-                | None, Some token ->
+            bindings |> Array.mapi (fun index binding ->
+                match binding, callbacks.[index], outputs.[index] with
+                | None, None, Some value -> box (ReflectionJson.fields [ "output", box (value.Clone()) ])
+                | None, Some token, None ->
                     if token = 0UL then invalidArg "callbackTokens" "Callback tokens must be nonzero."
                     box (ReflectionJson.fields [ "callback", box token ])
-                | None, None -> null
-                | Some value, None ->
+                | None, None, None -> null
+                | Some value, None, None ->
                     box (ReflectionJson.fields [
                         "owner", box (ReflectionJson.fields [ "index", box value.Owner.Index;
                                                               "generation", box value.Owner.Generation ])
                         "component", box value.ComponentName; "instance", box value.NativeInstance
-                        "path", box value.Path ])) bindings callbacks
+                        "path", box value.Path ])
+                | _ -> invalidArg "bindings" "An argument can select only one native path, callback, or output binding.")
         let extras = [ "method", box methodName; "signature", box signature
                        "arguments", box arguments; "bindings", box wireBindings
                        "discardResult", box (defaultArg discardResult false)

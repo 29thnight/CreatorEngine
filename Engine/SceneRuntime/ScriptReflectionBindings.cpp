@@ -2,7 +2,9 @@
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "ScriptReflectionBindings.h"
 #include "ScriptReflectionCallbacks.h"
+#include "ScriptReflectionScalarOutputs.h"
 #include "ScriptReflectionStateMachineChildren.h"
+#include "Animator.h"
 #include "StateMachineComponent.h"
 #include "ScriptReflectionService.h"
 #include "ScriptObjectRegistry.h"
@@ -83,6 +85,10 @@ namespace
             {
                 auto* machine = static_cast<StateMachineComponent*>(component);
                 BindStateMachineChildren(result.back(), machine->ScriptChildren());
+            }
+            if (component->GetTypeID() == type_guid(Animator))
+            {
+                BindAnimatorOutputs<AnimatorDataPath>(result.back());
             }
         }
         return result;

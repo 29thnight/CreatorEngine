@@ -281,6 +281,7 @@ let main _ =
     let staleTypedGetter = TypedFacadeTests.run check rejected entity
     CallbackTests.run(entity, check)
     let staleOwnedIdentity = OwnedIdentityTests.run check rejected entity
+    ScalarOutputTests.run check rejected entity
     ProbeReflectionEnablePhysics()
     let body = wrapper<PhysicsBodyComponent> owner reflected.InstanceId
     let movement = wrapper<CharacterMovementComponent> owner reflected.InstanceId
