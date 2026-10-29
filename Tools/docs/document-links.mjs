@@ -16,7 +16,7 @@ export function resolveDocumentLink(href, document, { markdownSet = new Set(), t
     : posix.join(posix.dirname(document), decodeURI(match[1])));
   const parts = target.split('/');
 
-  if (/^(?:artifacts|build|bin)$/i.test(parts[0]) ||
+  if (target.startsWith('../CreatorContainers/') || /^(?:artifacts|build|bin)$/i.test(parts[0]) ||
       (target.startsWith('../FSharp_Tool_Pakage_for_CreatorEngine/') && parts.some(part => /^artifacts$/i.test(part)))) {
     return { kind: 'local-record', path: target + suffix };
   }

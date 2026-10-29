@@ -220,40 +220,40 @@
 <div class="prose"><h3 id="먼저-묶을-수-있는-값-배열비트셋">먼저 묶을 수 있는 값 배열·비트셋</h3>
 <p>61건 중 <strong>59건은 Effect 계열의 미추적 파일 6개</strong>에 있고, 나머지 2건은 기존 비트셋 사용처다. Effect의 Definition/ModuleIR/State와 RenderEngine의 EffectFrame은 값 모델·함수 시그니처를 함께 바꾸는 배치로 잡는다. 현재 사용자의 미추적 작업이라는 상태를 보존하고, 관련 테스트·직렬화 소비자를 함께 점검해야 한다. 문자열인 <code>DefinitionId</code> 자체는 유지한다.</p>
 <ul>
-<li><a href="../../Engine/Effect/EffectDefinition.h">EffectDefinition.h</a>: Curve/Gradient·모듈 입력·Emitter 값 배열과 공개 함수 인수·반환.</li>
-<li><a href="../../Engine/Effect/EffectModuleIR.h">EffectModuleIR.h</a>: 중첩 배열·명령·진단 결과·함수 인터페이스. 같은 줄의 중첩 vector도 각각 집계된다.</li>
-<li><a href="../../Engine/RenderEngine/Effects/EffectFrame.h">EffectFrame.h</a>: 고정 행렬 배열과 프레임 값 배열.</li>
-<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/Contracts/Core/Creator.Core.DynamicBitset.ixx" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">DynamicBitset 모듈</a>: 64비트 블록의 <code>std::bitset</code> 사용. 생성·비트 연산·마지막 블록 마스킹 계약을 유지한다.</li>
-<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/RenderEngine/RHI/RHISoftwareRecorder.cpp" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">RHISoftwareRecorder.cpp</a>: 8비트 중복 검사.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/Effect/EffectDefinition.h" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">EffectDefinition.h</a>: Curve/Gradient·모듈 입력·Emitter 값 배열과 공개 함수 인수·반환.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/Effect/EffectModuleIR.h" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">EffectModuleIR.h</a>: 중첩 배열·명령·진단 결과·함수 인터페이스. 같은 줄의 중첩 vector도 각각 집계된다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/RenderEngine/Effects/EffectFrame.h" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">EffectFrame.h</a>: 고정 행렬 배열과 프레임 값 배열.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/Contracts/Core/Creator.Core.DynamicBitset.ixx" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">DynamicBitset 모듈</a>: 64비트 블록의 <code>std::bitset</code> 사용. 생성·비트 연산·마지막 블록 마스킹 계약을 유지한다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/RenderEngine/RHI/RHISoftwareRecorder.cpp" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">RHISoftwareRecorder.cpp</a>: 8비트 중복 검사.</li>
 </ul>
 <h3 id="해시-계열은-내부-전환-대상">해시 계열은 내부 전환 대상</h3>
 <p><code>node_hash_map</code>은 값 주소를 유지하는 경로에 사용할 수 있고, 삭제 시 노드 반환이 필요한 사용처에는 <code>PoolNodes=false</code>를 명시한다. <code>flat_hash_set</code>의 <code>insert</code>는 bool, <code>find</code>는 포인터를 반환하며 STL 반복기 계약과 같지 않다. 집합을 flat 저장소로 바꾸면 rehash 시 참조 안정성과 노드 저장소 반환 특성이 달라지므로 사용처별 어댑터 또는 별도 노드 집합 설계가 필요하다.</p>
 <ul>
-<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/RenderEngine/Experiment/Import/FbxImporter.cpp" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">FbxImporter.cpp:232</a>: 로컬 코너→인덱스 맵은 ufbx의 함수 인수가 아니다. SDK 관련 파일이라는 이유만으로 외부 STL 경계로 남기지 않는다.</li>
-<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/RenderEngine/DataSystem.h" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">DataSystem.h</a>: 캐시 Entry, 폰트 소유자, retained asset 연결이 있다. 키 타입 변경 없이 조회 무할당, 약한/강한 소유 관계와 제거 순서를 보존한다.</li>
-<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/Utility_Framework/Diagnostics/LogStore.h" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">LogStore.h:397</a>: 발생 목록·그룹·해시 인덱스·유휴 목록이 연동된다. 그룹 제거가 문자열과 인덱스 소유를 함께 해제해야 한다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/RenderEngine/Experiment/Import/FbxImporter.cpp" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">FbxImporter.cpp:232</a>: 로컬 코너→인덱스 맵은 ufbx의 함수 인수가 아니다. SDK 관련 파일이라는 이유만으로 외부 STL 경계로 남기지 않는다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/RenderEngine/DataSystem.h" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">DataSystem.h</a>: 캐시 Entry, 폰트 소유자, retained asset 연결이 있다. 키 타입 변경 없이 조회 무할당, 약한/강한 소유 관계와 제거 순서를 보존한다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/Utility_Framework/Diagnostics/LogStore.h" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">LogStore.h:397</a>: 발생 목록·그룹·해시 인덱스·유휴 목록이 연동된다. 그룹 제거가 문자열과 인덱스 소유를 함께 해제해야 한다.</li>
 </ul>
 <p>문자열 키를 유지할 때는 기존 해시·동등성 또는 명시적 어댑터를 선택해야 한다. 정본의 기본 <code>ce::hash&lt;T&gt;</code>가 임의의 <code>std::string</code>, path, GUID 사용자 타입에 그대로 맞는다고 가정하지 않는다. 뷰 조회를 임시 소유 문자열 생성으로 바꿔 무할당 조건을 깨뜨리지 않는다.</p>
 <h3 id="정렬-계열은-현재-구현의-빈-범위">정렬 계열은 현재 구현의 빈 범위</h3>
 <p><a href="../../Engine/Containers/modules/Creator.Containers.ixx">정본 모듈 export 목록</a>과 헤더를 확인했다. 현재 합격 정본에는 ordered map/set/multi 계열이 없다. 355건 모두 해시 컨테이너로 바꿀 수 있다는 결론은 내리지 않았다.</p>
 <ul>
-<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">RHIPersistentHeapPolicy.h:137</a>: offset 정렬 맵·size 중복 맵·allocated 맵이 함께 동작한다. 구현의 <code>lower_bound</code>, <code>equal_range</code>, 앞뒤 블록 병합이 실제 정렬 의미를 사용한다.</li>
-<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Lattice/ImGui/LXStyle.cpp" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">LXStyle.cpp:423</a>: 정렬 맵 순회로 저장 내용을 쓴다. 해시 순회로 바꾸려면 출력 순서가 바뀌므로 직렬화 계약 검증이 필요하다.</li>
-<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/EngineDiagnostics/DxCaptureFile.cpp" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">DxCaptureFile.cpp:401</a>: 중복 허용 정렬 active 집합을 사용한다.</li>
-<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Lattice/Core/LXGraph.h" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">LXGraph.h</a>: 정렬 맵이 외부에 노출된 내부 API·레이아웃·그룹 저장소를 구성한다. Lattice 소비자와 직렬화 경로를 같은 배치로 검토한다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">RHIPersistentHeapPolicy.h:137</a>: offset 정렬 맵·size 중복 맵·allocated 맵이 함께 동작한다. 구현의 <code>lower_bound</code>, <code>equal_range</code>, 앞뒤 블록 병합이 실제 정렬 의미를 사용한다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Lattice/ImGui/LXStyle.cpp" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">LXStyle.cpp:423</a>: 정렬 맵 순회로 저장 내용을 쓴다. 해시 순회로 바꾸려면 출력 순서가 바뀌므로 직렬화 계약 검증이 필요하다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/EngineDiagnostics/DxCaptureFile.cpp" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">DxCaptureFile.cpp:401</a>: 중복 허용 정렬 active 집합을 사용한다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Lattice/Core/LXGraph.h" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">LXGraph.h</a>: 정렬 맵이 외부에 노출된 내부 API·레이아웃·그룹 저장소를 구성한다. Lattice 소비자와 직렬화 경로를 같은 배치로 검토한다.</li>
 </ul>
 <p>필요한 정렬 구현을 추가하는 경우 기존 합격 파일은 유지하되, 새 계열에는 별도 정확성·MSVC STL 성능 수용이 필요하다. 정렬이 필요 없는 사용처는 사용 계약을 확인한 뒤 해시 계열로 전환할 수 있다.</p>
 <h3 id="deque어댑터의-수명-차이">deque·어댑터의 수명 차이</h3>
 <ul>
-<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/EngineDiagnostics/ProfileMarker.cpp" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">ProfileMarker.cpp:23</a>: 소유한 이름의 <code>c_str()</code> 주소를 다른 표가 보관한다. 소스가 deque를 선택한 이유를 명시한다. 이동 가능한 문자열 배열로 치환하면 짧은 문자열의 주소가 깨질 수 있다. 문자열 타입 보류 중에도 이 컨테이너 수명 검토는 필요하다.</li>
-<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/SceneRuntime/Audio/MiniaudioBackend.cpp" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">MiniaudioBackend.cpp:475</a>: VoiceSlot 저장소는 네이티브 객체·콜백·슬롯의 주소와 중지/해제 순서를 검토해야 한다. 백엔드 파일이라는 이유로 외부 STL ABI로 분류하지 않는다.</li>
-<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">EnhancedSceneRenderer.cpp</a>: 프레임 제출 큐는 GPU 완료·생산자/소비자 종료와 함께 검토한다. 고정 용량 링으로 바꾸려면 포화·역압 정책이 필요하다.</li>
-<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Editor/EngineEntry/Editing/ReflectionUndo.h" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">ReflectionUndo.h:100</a>: unique_ptr 명령을 두 스택 사이로 이동한다. Undo 실패 시 원본 복구, Pop 시 명령 파괴, Play/Stop의 이력 분리를 보존한다.</li>
-<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">EnhancedRenderGraph.cpp:2107</a>: 우선순위 큐의 작은 pass ID 우선 순서와 기존 render arena 할당자를 유지한다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/EngineDiagnostics/ProfileMarker.cpp" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">ProfileMarker.cpp:23</a>: 소유한 이름의 <code>c_str()</code> 주소를 다른 표가 보관한다. 소스가 deque를 선택한 이유를 명시한다. 이동 가능한 문자열 배열로 치환하면 짧은 문자열의 주소가 깨질 수 있다. 문자열 타입 보류 중에도 이 컨테이너 수명 검토는 필요하다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/SceneRuntime/Audio/MiniaudioBackend.cpp" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">MiniaudioBackend.cpp:475</a>: VoiceSlot 저장소는 네이티브 객체·콜백·슬롯의 주소와 중지/해제 순서를 검토해야 한다. 백엔드 파일이라는 이유로 외부 STL ABI로 분류하지 않는다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">EnhancedSceneRenderer.cpp</a>: 프레임 제출 큐는 GPU 완료·생산자/소비자 종료와 함께 검토한다. 고정 용량 링으로 바꾸려면 포화·역압 정책이 필요하다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Editor/EngineEntry/Editing/ReflectionUndo.h" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">ReflectionUndo.h:100</a>: unique_ptr 명령을 두 스택 사이로 이동한다. Undo 실패 시 원본 복구, Pop 시 명령 파괴, Play/Stop의 이력 분리를 보존한다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">EnhancedRenderGraph.cpp:2107</a>: 우선순위 큐의 작은 pass ID 우선 순서와 기존 render arena 할당자를 유지한다.</li>
 </ul>
 <p>현재 <code>bounded_ring</code>은 고정 용량이며 일반 deque와 같은 성장 계약을 제공하지 않는다. 기존 락으로 보호하던 큐를 락 프리 큐로 바꾸는 것도 이번 분류의 자동 결론이 아니다.</p>
 <h3 id="실제-외부-stl-반환-경계">실제 외부 STL 반환 경계</h3>
-<p><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/Utility_Framework/Reflection/ReflgenAuthoring.h" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">ReflgenAuthoring.h:244</a>의 <code>read_bytes()</code>는 SDK <code>reflgen::reader</code> 가상 함수를 override한다. 설치된 SDK <code>reflgen/serial/reader.h:70</code>에서 <code>virtual std::vector&lt;std::byte&gt; read_bytes() = 0</code>을 직접 확인했다. 같은 함수의 결과 버퍼까지 2건이며 하나의 논리적 경계다. 내부 디코드 배열은 이미 ce 타입이다. 이 경계까지 없애려면 SDK 인터페이스 변경 또는 별도 SDK 경계 유지 정책이 필요하다.</p>
+<p><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/Utility_Framework/Reflection/ReflgenAuthoring.h" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">ReflgenAuthoring.h:244</a>의 <code>read_bytes()</code>는 SDK <code>reflgen::reader</code> 가상 함수를 override한다. 설치된 SDK <code>reflgen/serial/reader.h:70</code>에서 <code>virtual std::vector&lt;std::byte&gt; read_bytes() = 0</code>을 직접 확인했다. 같은 함수의 결과 버퍼까지 2건이며 하나의 논리적 경계다. 내부 디코드 배열은 이미 ce 타입이다. 이 경계까지 없애려면 SDK 인터페이스 변경 또는 별도 SDK 경계 유지 정책이 필요하다.</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-실행-배치-권고">
@@ -275,7 +275,7 @@
 <li><span class="local-record">분류 JSON <small>로컬 기록 · 사이트 미포함</small> (<code>Build/Verification/ContainerMigration/NonStringBoundaries20261027verified/classification.json</code>)</span>: 모든 위치·원문·템플릿 인수·분류·검토 표시.</li>
 <li><span class="local-record">분류 CSV <small>로컬 기록 · 사이트 미포함</small> (<code>Build/Verification/ContainerMigration/NonStringBoundaries20261027verified/classification.csv</code>)</span>: 파일/유형별 필터용.</li>
 <li><span class="local-record">검증 기록 <small>로컬 기록 · 사이트 미포함</small> (<code>Build/Verification/ContainerMigration/NonStringBoundaries20261027verified/verification.json</code>)</span>: 합계·입력·정본 해시와 외부 SDK 근거.</li>
-<li><a href="../../Tools/build/classify-nonstring-container-boundaries.ps1">재현 스크립트</a>: 새 출력 디렉토리를 지정해 재실행.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Tools/build/classify-nonstring-container-boundaries.ps1" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">재현 스크립트</a>: 새 출력 디렉토리를 지정해 재실행.</li>
 </ul>
 <p>이전 구현 단계: <a href="PsoMapMigration20261027.html">PSO 캐시·비동기 대기 맵 전환</a>.</p>
 <p>후속 구현: <a href="ArrayBitsetBatchMigration20261027.html">배열·비트셋 61건 배치 전환</a>. 이 분류표는 전환 전 시점이며 최신 잔여 저장 컨테이너 참조는 692건이다.</p>
@@ -283,7 +283,7 @@
 </section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="NonStringContainerBoundaries20261027.md"><code>docs/analysis/NonStringContainerBoundaries20261027.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="NonStringContainerBoundaries20261027.md"><code>docs/analysis/NonStringContainerBoundaries20261027.md</code></a> · 마지막 커밋 2026-10-28 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>

@@ -196,8 +196,8 @@
 <div class="sec-head"><p class="ve-label">§00</p><h2 id="구현-정본과-표준-라이브러리-경계">구현 정본과 표준 라이브러리 경계</h2></div>
 <div class="prose"><ul>
 <li>정본: <a href="../../Engine/Containers/storage/Creator.Containers.Storage.ixx">Creator.Containers.Storage.ixx</a></li>
-<li>생성 헤더: <a href="../../Engine/Containers/storage/storage.h">storage.h</a>, sync-storage.ps1로 동기화</li>
-<li>엔진 별칭: <a href="../../Engine/Utility_Framework/Foundation/EngineStorage.h">EngineStorage.h</a></li>
+<li>생성 헤더: <a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/Containers/storage/storage.h" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">storage.h</a>, sync-storage.ps1로 동기화</li>
+<li>엔진 별칭: <a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/Utility_Framework/Foundation/EngineStorage.h" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">EngineStorage.h</a></li>
 <li>독립 테스트 입구: 외부 CreatorContainers/storage/StorageValidation.proj. 엔진 정본과 테스트 프로젝트를 직접 참조하며 구현 복사본은 없다.</li>
 </ul>
 <p>segmented_deque는 직접 할당하는 요소 블록과 순환 포인터 디렉토리를 사용한다. 디렉토리가 확장돼도 살아 있는 요소를 이동하지 않는다. 블록 크기는 요소 크기에 따라 32 / 8 / 1개다. queue와 stack도 이 자체 저장소를 사용하며 priority_queue는 기본적으로 기존 합격 dynamic_array에 heap 알고리즘을 적용한다.</p>
@@ -288,7 +288,7 @@
 </section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="StorageBatchMigration20261028.md"><code>docs/analysis/StorageBatchMigration20261028.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="StorageBatchMigration20261028.md"><code>docs/analysis/StorageBatchMigration20261028.md</code></a> · 마지막 커밋 2026-10-28 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>

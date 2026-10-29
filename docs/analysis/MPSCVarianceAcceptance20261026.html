@@ -179,12 +179,12 @@
 <figure>
 <div class="frame doc-map" role="img" aria-label="절 9개의 분량 막대">
 <a class="map-row" href="#환경과-독립-위치"><span class="ve-label">§01</span><span class="map-name">환경과 독립 위치</span><span class="map-bar"><i style="width:15.3%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#고정-용량-mpsc-계약과-구현"><span class="ve-label">§02</span><span class="map-name">고정 용량 MPSC 계약과 구현</span><span class="map-bar"><i style="width:45.8%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#대형-배열-확장"><span class="ve-label">§03</span><span class="map-name">대형 배열 확장</span><span class="map-bar"><i style="width:48.8%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#안정된-stl-기준에서-드러난-맵-경로"><span class="ve-label">§04</span><span class="map-name">안정된 STL 기준에서 드러난 맵 경로</span><span class="map-bar"><i style="width:12.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#고정-용량-mpsc-계약과-구현"><span class="ve-label">§02</span><span class="map-name">고정 용량 MPSC 계약과 구현</span><span class="map-bar"><i style="width:47.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#대형-배열-확장"><span class="ve-label">§03</span><span class="map-name">대형 배열 확장</span><span class="map-bar"><i style="width:50.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#안정된-stl-기준에서-드러난-맵-경로"><span class="ve-label">§04</span><span class="map-name">안정된 STL 기준에서 드러난 맵 경로</span><span class="map-bar"><i style="width:14.2%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#측정-편차에서-확인한-것과-남은-것"><span class="ve-label">§05</span><span class="map-name">측정 편차에서 확인한 것과 남은 것</span><span class="map-bar"><i style="width:26.3%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span></span></a>
 <a class="map-row" href="#정확성진행-보장-검증"><span class="ve-label">§06</span><span class="map-name">정확성·진행 보장 검증</span><span class="map-bar"><i style="width:16.3%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#자료와-재현"><span class="ve-label">§07</span><span class="map-name">자료와 재현</span><span class="map-bar"><i style="width:20.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#자료와-재현"><span class="ve-label">§07</span><span class="map-name">자료와 재현</span><span class="map-bar"><i style="width:29.9%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#엔진-통합-경계"><span class="ve-label">§08</span><span class="map-name">엔진 통합 경계</span><span class="map-bar"><i style="width:10%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#일반-컨테이너-전체-표"><span class="ve-label">§09</span><span class="map-name">일반 컨테이너 전체 표</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
 </div>
@@ -212,7 +212,7 @@
 </section>
 <section class="doc-sec" id="sec-고정-용량-mpsc-계약과-구현">
 <div class="sec-head"><p class="ve-label">§02</p><h2 id="고정-용량-mpsc-계약과-구현">고정 용량 MPSC 계약과 구현</h2></div>
-<div class="prose"><p><a href="../../../CreatorContainers/include/ce/bounded_mpsc_queue.h">bounded_mpsc_queue.h</a>는 고정 값 풀 N개와 64비트 epoch/index publication ring N개를 직접 보유한다. 코어에 힙 할당·락·TLS·참여자 등록은 없다. 소비자는 정확히 한 명이어야 한다.</p>
+<div class="prose"><p><span class="local-record">bounded_mpsc_queue.h <small>로컬 기록 · 사이트 미포함</small> (<code>../CreatorContainers/include/ce/bounded_mpsc_queue.h</code>)</span>는 고정 값 풀 N개와 64비트 epoch/index publication ring N개를 직접 보유한다. 코어에 힙 할당·락·TLS·참여자 등록은 없다. 소비자는 정확히 한 명이어야 한다.</p>
 <p>생산자는 빈 값 슬롯을 소유하고 T를 생성한 뒤 FAA ticket을 얻어 공개한다. 소비자는 아직 공개되지 않은 빈 예약을 취소하고 다음 epoch로 전진한다. 지연된 생산자는 이미 만든 값을 유지한 채 새 ticket에서 재공개한다. 예약 생산자의 재개를 기다리지 않는다. 실패 CAS는 소비자의 진행을 뜻하고, 풀 탐색은 고정 크기 내에서 종료한다. consumer는 시작 시 tail snapshot까지만 탐색한다. FIFO/생산자별 순서를 검사했으며 생산자의 wait-free 보장은 아니다.</p>
 <p><code>false/unavailable</code>은 공개 FIFO의 strict full 판정이 아니다. 비공개 예약이 용량을 쓰거나 경합 중 풀 탐색을 놓친 경우도 포함한다. false 반환 시 인수를 이동하지 않는다. T 생성자 예외는 ticket 전에 정리하며 이동 대입/소멸은 noexcept를 요구한다. 사용자 T와 예외 런타임의 진행 보장은 코어와 별도다. 유한 counter 소진은 명시적 예외이며 조용히 wrap하지 않는다. 생성/소멸에는 동시 접근이 없어야 한다. 잔존 값은 풀 순서로 소멸하므로 FIFO 소멸이 필요하면 먼저 drain한다.</p>
 <h3 id="ppl-비교의-최종-조건">PPL 비교의 최종 조건</h3>
@@ -231,7 +231,7 @@
 </section>
 <section class="doc-sec" id="sec-대형-배열-확장">
 <div class="sec-head"><p class="ve-label">§03</p><h2 id="대형-배열-확장">대형 배열 확장</h2></div>
-<div class="prose"><p>기존 1.5배 성장 정책을 유지했다. <a href="../../../CreatorContainers/include/ce/dynamic_array.h">dynamic_array.h</a>는 trivial/noexcept-move 값과 구체 allocator의 명시적 <code>byte_relocation_allocator</code> 자기 타입 opt-in에만 재할당 최적화를 적용한다. 상속만 한 allocator가 우연히 CRT realloc을 호출해 소유권을 깨지 않게 한다. 자기 참조 append 인수는 재할당 전에 보존한다. 비단순 객체·opt-in 없는 allocator는 기존 생성/이동·복사/파괴 경로를 유지한다.</p>
+<div class="prose"><p>기존 1.5배 성장 정책을 유지했다. <span class="local-record">dynamic_array.h <small>로컬 기록 · 사이트 미포함</small> (<code>../CreatorContainers/include/ce/dynamic_array.h</code>)</span>는 trivial/noexcept-move 값과 구체 allocator의 명시적 <code>byte_relocation_allocator</code> 자기 타입 opt-in에만 재할당 최적화를 적용한다. 상속만 한 allocator가 우연히 CRT realloc을 호출해 소유권을 깨지 않게 한다. 자기 참조 append 인수는 재할당 전에 보존한다. 비단순 객체·opt-in 없는 allocator는 기존 생성/이동·복사/파괴 경로를 유지한다.</p>
 <p>일반 정렬은 malloc/realloc/free, 오버얼라인은 정렬 new/delete로 확보·복사한다. MSVC x64의 CRT malloc 정렬 한도 16B와 그 밖의 alignof(max_align_t)를 사용하며 컴파일러 new-alignment 옵션과 구분한다. <a href="https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/malloc?view=msvc-170">Microsoft malloc 계약</a>을 참조했다. 일반 heap은 전역 operator new hook을 경유하지 않으므로 엔진 계측은 명시적 resource를 사용해야 한다. 원본 주소와 같아 보여도 확장의 참조 무효화 계약은 유지한다. 모든 소비자를 같은 헤더로 재빌드해야 한다.</p>
 <p>아래 ns는 <strong>N개 배열을 16번 생성·채움·합산·파괴하는 1회 작업 묶음</strong>이다. 단일 원소 ns가 아니다. 각 조건은 새 프로세스에서 3회 측정했다.</p>
 <div class="table-scroll"><table>
@@ -268,7 +268,7 @@
 <section class="doc-sec" id="sec-안정된-stl-기준에서-드러난-맵-경로">
 <div class="sec-head"><p class="ve-label">§04</p><h2 id="안정된-stl-기준에서-드러난-맵-경로">안정된 STL 기준에서 드러난 맵 경로</h2></div>
 <div class="prose"><p>map_miss/4096은 편차가 작아진 중간 검사에서 약 1.26~1.31배로 실패했다. 해시 상위 7비트 태그만 추가하면 별도 probe의 equality 호출이 192,000→1,664회로 줄었지만 자체 시간은 1.449ms→1.687ms로 악화했다. 태그만으로 해결했다고 판정하지 않았다.</p>
-<p>최종 <a href="../../../CreatorContainers/include/ce/flat_hash_map.h">flat_hash_map.h</a>는 8개 제어 바이트를 읽어 SWAR로 태그/empty를 찾고 첫 empty 이전의 후보만 비교한다. wrap용 첫 8바이트 복제본, home 슬롯 hit 경로와 capacity≤128 scalar 경로를 함께 사용한다. 같은 분리 probe는 약 0.666ms까지 내려갔다. 이 fixture는 메인 전체 RNG와 다르므로 전체 판정은 아래 표를 따른다. wrap·tombstone·clear·copy·rehash 회귀와 sanitizer를 검사했고 실패한 scalar 후보도 보존했다. 문자열은 양쪽의 실제 복사 생성자를 같은 방식으로 호출하고 pointer+length 생성은 별도 항목으로 나눴다.</p>
+<p>최종 <span class="local-record">flat_hash_map.h <small>로컬 기록 · 사이트 미포함</small> (<code>../CreatorContainers/include/ce/flat_hash_map.h</code>)</span>는 8개 제어 바이트를 읽어 SWAR로 태그/empty를 찾고 첫 empty 이전의 후보만 비교한다. wrap용 첫 8바이트 복제본, home 슬롯 hit 경로와 capacity≤128 scalar 경로를 함께 사용한다. 같은 분리 probe는 약 0.666ms까지 내려갔다. 이 fixture는 메인 전체 RNG와 다르므로 전체 판정은 아래 표를 따른다. wrap·tombstone·clear·copy·rehash 회귀와 sanitizer를 검사했고 실패한 scalar 후보도 보존했다. 문자열은 양쪽의 실제 복사 생성자를 같은 방식으로 호출하고 pointer+length 생성은 별도 항목으로 나눴다.</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-측정-편차에서-확인한-것과-남은-것">
@@ -298,11 +298,11 @@
 <div class="sec-head"><p class="ve-label">§07</p><h2 id="자료와-재현">자료와 재현</h2></div>
 <div class="prose"><div class="table-scroll"><table>
 <thead><tr><th>자료</th><th>위치/명령</th></tr></thead>
-<tbody><tr><td>최종 범위별 판정</td><td><a href="../../../CreatorContainers/results/20261026-component-acceptance.json">component-acceptance.json</a></td></tr>
-<tr><td>일반 82개 격리 표</td><td><a href="../../../CreatorContainers/results/20261026-final5-summary.json">final5-summary.json</a></td></tr>
-<tr><td>MPSC 5모드 분리 표</td><td><a href="../../../CreatorContainers/results/20261026-mpsc-sampler-summary.json">mpsc-sampler-summary.json</a></td></tr>
-<tr><td>일반 환경/해시</td><td><a href="../../../CreatorContainers/results/20261026-final5-environment.json">final5-environment.json</a></td></tr>
-<tr><td>MPSC 환경/해시</td><td><a href="../../../CreatorContainers/results/20261026-mpsc-sampler-environment.json">mpsc-sampler-environment.json</a></td></tr>
+<tbody><tr><td>최종 범위별 판정</td><td><span class="local-record">component-acceptance.json <small>로컬 기록 · 사이트 미포함</small> (<code>../CreatorContainers/results/20261026-component-acceptance.json</code>)</span></td></tr>
+<tr><td>일반 82개 격리 표</td><td><span class="local-record">final5-summary.json <small>로컬 기록 · 사이트 미포함</small> (<code>../CreatorContainers/results/20261026-final5-summary.json</code>)</span></td></tr>
+<tr><td>MPSC 5모드 분리 표</td><td><span class="local-record">mpsc-sampler-summary.json <small>로컬 기록 · 사이트 미포함</small> (<code>../CreatorContainers/results/20261026-mpsc-sampler-summary.json</code>)</span></td></tr>
+<tr><td>일반 환경/해시</td><td><span class="local-record">final5-environment.json <small>로컬 기록 · 사이트 미포함</small> (<code>../CreatorContainers/results/20261026-final5-environment.json</code>)</span></td></tr>
+<tr><td>MPSC 환경/해시</td><td><span class="local-record">mpsc-sampler-environment.json <small>로컬 기록 · 사이트 미포함</small> (<code>../CreatorContainers/results/20261026-mpsc-sampler-environment.json</code>)</span></td></tr>
 <tr><td>정확성·sanitizer</td><td>results/20261026-final2-*.txt</td></tr>
 <tr><td>원인 대조/배열 profile</td><td>results/20261026-final4-variance-<em>.csv, final4-array-</em>.csv</td></tr>
 <tr><td>조건별 일반 원본</td><td>results/20261026-final5-cases/</td></tr>
@@ -412,7 +412,7 @@
 </section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="MPSCVarianceAcceptance20261026.md"><code>docs/analysis/MPSCVarianceAcceptance20261026.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="MPSCVarianceAcceptance20261026.md"><code>docs/analysis/MPSCVarianceAcceptance20261026.md</code></a> · 마지막 커밋 2026-10-28 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>

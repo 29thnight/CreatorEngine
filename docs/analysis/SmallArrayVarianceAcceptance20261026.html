@@ -184,7 +184,7 @@
 <a class="map-row" href="#실측한-분리-대조"><span class="ve-label">§02</span><span class="map-name">실측한 분리 대조</span><span class="map-bar"><i style="width:43.5%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#측정-환경-제어"><span class="ve-label">§03</span><span class="map-name">측정 환경 제어</span><span class="map-bar"><i style="width:15.8%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#남았던-조건의-최종-결과"><span class="ve-label">§04</span><span class="map-name">남았던 조건의 최종 결과</span><span class="map-bar"><i style="width:2%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#원본해시범위-확인"><span class="ve-label">§05</span><span class="map-name">원본·해시·범위 확인</span><span class="map-bar"><i style="width:23.6%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span></span></a>
+<a class="map-row" href="#원본해시범위-확인"><span class="ve-label">§05</span><span class="map-name">원본·해시·범위 확인</span><span class="map-bar"><i style="width:33.7%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span></span></a>
 <a class="map-row" href="#일반-82개-전체-표"><span class="ve-label">§06</span><span class="map-name">일반 82개 전체 표</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
 </div>
 <figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「일반 82개 전체 표」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
@@ -249,11 +249,11 @@
 <div class="prose"><p>원시 표본에서 중앙값과 편차를 다시 계산했다. 제어 프로세스가 전체 작업 종료까지 유지됐고 246개 조건별 파일이 그 실행 구간 안에 생성됐음을 검사했다. 일반 검사 두 바이너리는 이전 실패 때와 같고 라이브러리 포함 헤더 22개도 MSVC/ASan/ClangCL/Linux ASan+UBSan/TSan 검사본과 같다. 따라서 라이브러리 코드를 느리게 만들거나 새 조건에 맞춰 바꾼 결과가 아니다. 새 진단/제어 코드는 모두 독립 experiments 디렉토리에 있다.</p>
 <div class="table-scroll"><table>
 <thead><tr><th>자료</th><th>링크/경로</th></tr></thead>
-<tbody><tr><td>전체 최종 범위 판정</td><td><a href="../../../CreatorContainers/results/20261026-smt-final-acceptance.json">smt-final-acceptance.json</a></td></tr>
-<tr><td>일반/MPSC 새 행렬</td><td><a href="../../../CreatorContainers/results/20261026-smt-acceptance-summary.json">summary.json</a></td></tr>
-<tr><td>제어·동일 바이너리·헤더 증거</td><td><a href="../../../CreatorContainers/results/20261026-smt-acceptance-control-proof.json">control-proof.json</a></td></tr>
-<tr><td>SMT 제어 프로세스 기록</td><td><a href="../../../CreatorContainers/results/20261026-smt-control-guard.json">guard.json</a></td></tr>
-<tr><td>원인 대조·할당 분해</td><td><a href="../../../CreatorContainers/results/20261026-small-array-diagnostics.json">small-array-diagnostics.json</a></td></tr>
+<tbody><tr><td>전체 최종 범위 판정</td><td><span class="local-record">smt-final-acceptance.json <small>로컬 기록 · 사이트 미포함</small> (<code>../CreatorContainers/results/20261026-smt-final-acceptance.json</code>)</span></td></tr>
+<tr><td>일반/MPSC 새 행렬</td><td><span class="local-record">summary.json <small>로컬 기록 · 사이트 미포함</small> (<code>../CreatorContainers/results/20261026-smt-acceptance-summary.json</code>)</span></td></tr>
+<tr><td>제어·동일 바이너리·헤더 증거</td><td><span class="local-record">control-proof.json <small>로컬 기록 · 사이트 미포함</small> (<code>../CreatorContainers/results/20261026-smt-acceptance-control-proof.json</code>)</span></td></tr>
+<tr><td>SMT 제어 프로세스 기록</td><td><span class="local-record">guard.json <small>로컬 기록 · 사이트 미포함</small> (<code>../CreatorContainers/results/20261026-smt-control-guard.json</code>)</span></td></tr>
+<tr><td>원인 대조·할당 분해</td><td><span class="local-record">small-array-diagnostics.json <small>로컬 기록 · 사이트 미포함</small> (<code>../CreatorContainers/results/20261026-small-array-diagnostics.json</code>)</span></td></tr>
 <tr><td>원시 프로세스별 표본</td><td>CreatorContainers/results/20261026-smt-acceptance-cases/</td></tr>
 <tr><td>진단/제어 코드</td><td>CreatorContainers/experiments/20261026-small-array/</td></tr>
 <tr><td><span class="chip risk">기존 실패 자료</span></td><td>results/20261026-final5-cases/3-core-array_growth-64.csv 등, 삭제하지 않음</td></tr></tbody></table></div>
@@ -351,7 +351,7 @@
 </section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="SmallArrayVarianceAcceptance20261026.md"><code>docs/analysis/SmallArrayVarianceAcceptance20261026.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="SmallArrayVarianceAcceptance20261026.md"><code>docs/analysis/SmallArrayVarianceAcceptance20261026.md</code></a> · 마지막 커밋 2026-10-28 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>

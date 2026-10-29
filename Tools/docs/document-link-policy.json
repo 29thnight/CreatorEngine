@@ -1,6 +1,6 @@
 {
   "engineRepository": "https://github.com/29thnight/CreatorEngine",
-  "engineRevision": "7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff",
+  "engineRevision": "e0edd56663b44930ae301c64ec2e57ead2c81b7c",
   "fsharpRepository": "https://github.com/29thnight/FSharp_Tool_Pakage_for_CreatorEngine",
   "fsharpRevision": "3351cbc80d7216eb10110c4c8b30dce98aef1d1f"
 }

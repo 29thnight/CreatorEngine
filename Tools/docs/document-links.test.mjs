@@ -18,7 +18,8 @@ test('normalizes repository-style documentation links inside the deployed root',
 
 test('retains artifact locations as local observations, even when files exist', () => {
   for (const href of ['../../Artifacts/capture/result.json', '../../Build/Verification/run/result.json',
-    '../../../FSharp_Tool_Pakage_for_CreatorEngine/artifacts/run/result.json']) {
+    '../../../FSharp_Tool_Pakage_for_CreatorEngine/artifacts/run/result.json',
+    '../../../CreatorContainers/results/result.json', '../../../CreatorContainers/include/ce/queue.h']) {
     const link = resolveDocumentLink(href, page, context);
     assert.equal(link.kind, 'local-record');
     const html = renderDocumentLink(link, '검증 기록');
