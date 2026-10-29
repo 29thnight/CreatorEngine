@@ -91,6 +91,14 @@ let run (check: bool -> string -> unit) (rejected: (unit -> unit) -> string -> s
     let msvcCallback = NativeMethodSpec("ProbeComponent", "SetTickCallback", false,
         [|"ce::func_detail::owning_func<void,false,true,false,0x30ui64,0x8ui64,ce::heap_allocator,float>"|], [|"value"|])
     check (msvcCallback.Resolve().Name = "SetTickCallback") "typed selector normalizes callback inline capacity and alignment from MSVC metadata"
+    let numericMsvcCallback = NativeMethodSpec("ProbeComponent", "SetTickCallback", false,
+        [|"ce::func_detail::owning_func<void,0,1,0,48,8,ce::heap_allocator,float>"|], [|"value"|])
+    check (numericMsvcCallback.Resolve().Name = "SetTickCallback") "typed selector accepts the observed MSVC numeric callback bool parameters"
+    for flags in [|"1,1,0"; "0,0,0"; "0,1,1"|] do
+        let distinctFlags = NativeMethodSpec("ProbeComponent", "SetTickCallback", false,
+            [|"ce::func_detail::owning_func<void," + flags + ",48,8,ce::heap_allocator,float>"|], [|"value"|])
+        check (rejected (fun () -> distinctFlags.Resolve() |> ignore) "different callback bool flags retain a distinct native type" = "method_not_found")
+            "callback bool spelling normalization preserves noexcept, copyability and inline-only identity"
     let differentCallback = NativeMethodSpec("ProbeComponent", "SetTickCallback", false,
         [|"ce::func_detail::owning_func<void,false,true,false,0x40ui64,0x8ui64,ce::heap_allocator,float>"|], [|"value"|])
     check (rejected (fun () -> differentCallback.Resolve() |> ignore) "different callback inline storage retains a distinct native type" = "method_not_found")

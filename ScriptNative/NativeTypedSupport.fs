@@ -104,6 +104,10 @@ module internal NativeTypedJson =
                 // dynamic_extent sentinel. This equivalence is span-specific.
                 if name = "std::span" && parts.[1] = "-1" then parts.[1] <- "std::dynamic_extent"
             if name = "ce::func_detail::owning_func" && parts.Count >= 6 then
+                // These three positions are bool template parameters. MSVC's
+                // runtime spelling uses 0/1 where libclang emits false/true.
+                for index = 1 to 3 do
+                    parts.[index] <- match parts.[index] with "0" -> "false" | "1" -> "true" | value -> value
                 // Inline capacity/alignment are size_t arguments. Their numeric
                 // identity is independent of MSVC's hexadecimal type spelling.
                 parts.[4] <- extentKey parts.[4]
