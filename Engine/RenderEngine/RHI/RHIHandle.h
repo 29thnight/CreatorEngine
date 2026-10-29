@@ -52,8 +52,9 @@ namespace RHIHandleBits
     constexpr uint32_t kMaxSlots = kIndexMask - 1u;
 }
 
-struct RHITextureHandle
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RHITextureHandle
 {
+    [[reflgen::readonly]]
     uint32_t id{ 0 };
 
     bool IsValid() const { return 0 != id; }
@@ -61,8 +62,9 @@ struct RHITextureHandle
     bool operator!=(const RHITextureHandle& other) const { return id != other.id; }
 };
 
-struct RHIBufferHandle
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RHIBufferHandle
 {
+    [[reflgen::readonly]]
     uint32_t id{ 0 };
 
     bool IsValid() const { return 0 != id; }

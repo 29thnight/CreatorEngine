@@ -239,6 +239,7 @@
     <ClCompile Include="ScriptTransformBindings.cpp" />
     <ClCompile Include="ScriptInputBindings.cpp" />
     <ClCompile Include="ScriptReflectionBindings.cpp" />
+    <ClCompile Include="ScriptReflectionCallbacks.cpp" />
     <ClCompile Include="$(ScriptNativeProofDir)\reflgen_creator_script_native.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <IncludeInUnityFile>false</IncludeInUnityFile>
@@ -361,6 +362,7 @@
     <ClInclude Include="ScriptBindingValues.h" />
     <ClInclude Include="ScriptBindingRegistry.h" />
     <ClInclude Include="ScriptReflectionBindings.h" />
+    <ClInclude Include="ScriptReflectionCallbacks.h" />
     <ClInclude Include="ScriptReflectionService.h" />
     <ClInclude Include="ScriptPhysicsValues.h" />
     <ClInclude Include="ScriptApiTable.h" />
@@ -466,6 +468,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CollisionGeometrySource.h" />
+    <ClInclude Include="EntityHandle.h" />
+    <ClInclude Include="DetachedEntityTransfer.h" />
+    <ClInclude Include="RenderProxyDirty.h" />
+    <ClInclude Include="SystemSchedule.h" />
+    <ClInclude Include="MaterialAssetReferenceState.h" />
+    <ClInclude Include="ScriptReflectionAudioValues.h" />
+    <ClInclude Include="ScriptReflectionSceneViews.h" />
     <ClInclude Include="CollisionGeometryCodec.h" />
     <ClInclude Include="CollisionGeometryLibrary.h" />
     <ClInclude Include="CollisionGeometryIO.h" />

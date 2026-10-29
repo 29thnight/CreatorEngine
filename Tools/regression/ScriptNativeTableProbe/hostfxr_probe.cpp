@@ -95,7 +95,15 @@ int wmain(int argc, wchar_t** argv)
         return 7;
     }
     constexpr std::size_t tableSize = sizeof(ce::script::binding::ScriptApiTable);
-    if (initialize(table(), tableSize, fingerprint() ^ 1, 0) != -1 || initialize(table(), tableSize, fingerprint(), 0) != 0 ||
+    const auto* api = static_cast<ce::script::binding::ScriptApiTable*>(table());
+    if (!api || api->version != CreatorScriptApiVersion || api->version < 49 || api->structSize != tableSize ||
+        !api->NativeCallback_BeginGeneration || !api->NativeCallback_Register || !api->NativeCallback_Disable ||
+        !api->NativeCallback_TakeRetired || !api->NativeCallback_EndGeneration)
+    {
+        return 19;
+    }
+    if (initialize(const_cast<ce::script::binding::ScriptApiTable*>(api), tableSize, fingerprint() ^ 1, 0) != -1 ||
+        initialize(const_cast<ce::script::binding::ScriptApiTable*>(api), tableSize, fingerprint(), 0) != 0 ||
         isAlive(7, 3) != 1 || isAlive(7, 4) != 0)
     {
         return 8;
@@ -182,13 +190,13 @@ int wmain(int argc, wchar_t** argv)
     {
         return 15;
     }
-    const auto* api = static_cast<ce::script::binding::ScriptApiTable*>(table());
-    // ProbeTable resets the provider; the value is kept in its independent position state.
+    // Keep the original bound table; rebuilding it here would reset a native
+    // provider session while its managed runtime is still running.
     if (api->Transform_GetLocalPosition({7, 3}).x != 2.0f || destroy(instance) != 0 || flush() != 0 || stop() != 0 ||
         shutdown() != 0 || isAlive(7, 3) != -1)
     {
         return 14;
     }
-    std::puts("SCRIPT_NATIVE_HOSTFXR_OK");
+    std::printf("SCRIPT_NATIVE_HOSTFXR_OK version=%d bridge=C#-free\n", api->version);
     return 0;
 }

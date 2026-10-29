@@ -42,7 +42,7 @@
 // NextSceneId 참고). 기본 생성된 EntityHandle{}의 sceneId==0은 그래서 항상
 // "어느 씬도 아님"을 뜻하고, generation==0(아래 IsValid)과 같은 뜻으로 겹치지
 // 않게 갈라 둔다.
-struct EntityHandle
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] EntityHandle
 {
 	uint32_t sceneId{ 0 };      // 0 = 무효/미지정. Scene::NextSceneId가 매기는 일련번호(Scene.cpp).
 	uint32_t index{ 0 };

@@ -5,11 +5,6 @@
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
 #include "BlackBoardValue.h"
-#if defined(CE_CONTRACT_STANDALONE)
-#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
-#else
-import Creator.Core.Delegate;
-#endif
 
 class Entity;
 class Transform;

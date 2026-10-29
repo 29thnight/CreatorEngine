@@ -2,6 +2,7 @@
 #include "types.h"
 #include "../../../Engine/SceneRuntime/ScriptApiTable.h"
 #include "../../../Engine/SceneRuntime/ScriptReflectionService.h"
+#include "../../../Engine/SceneRuntime/ScriptReflectionCallbacks.h"
 #include <memory>
 #include <thread>
 
@@ -69,6 +70,11 @@ namespace
             }
             return values;
         };
+        result.components_for = [](std::uint32_t index, std::uint32_t ownerGeneration)
+        {
+            return environment(ScriptObjectHandle{index, ownerGeneration}).components();
+        };
+        result.bind_callback = &ce::script::reflection::ResolveCallback;
         return result;
     }
 
@@ -115,6 +121,7 @@ PROBE_EXPORT ScriptApiTable* ProbeReflectionTable()
     table.NativeReflection_Execute = &Execute;
     table.NativeReflection_Read = &Read;
     table.NativeReflection_Release = &Release;
+    ce::script::binding::RegisterReflectionCallbackApi(table);
     return &table;
 }
 

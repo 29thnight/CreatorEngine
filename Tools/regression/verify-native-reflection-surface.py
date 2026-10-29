@@ -170,6 +170,8 @@ def compile_surfaces(engine: Path, work: Path, generated: dict[str, Path], confi
     inputs.append(("ScriptReflectionBindings", engine / "Engine/SceneRuntime/ScriptReflectionBindings.cpp",
                    generated["SceneRuntime"] / "reflgen_SceneRuntime.args",
                    [directory / ("reflgen_" + module + ".h") for module, directory in generated.items()]))
+    inputs.append(("ScriptReflectionCallbacks", engine / "Engine/SceneRuntime/ScriptReflectionCallbacks.cpp",
+                   generated["SceneRuntime"] / "reflgen_SceneRuntime.args", []))
     results: list[dict] = []
     for name, source, arguments, injections in inputs:
         result = {"name": name, "source": str(source), "log": str(work / "logs" / (name + ".log"))}
@@ -192,6 +194,8 @@ def main() -> None:
     parser.add_argument("--vcpkg", type=Path, required=True)
     parser.add_argument("--configuration", choices=("Debug", "Release"), default="Debug")
     parser.add_argument("--work", type=Path, required=True)
+    parser.add_argument("--facades-output", type=Path,
+                        help="Write freshly extracted F# facades to a separate directory for review; otherwise verify checked-in output")
     args = parser.parse_args()
     require(os.name == "nt", "Actual engine headers require Windows SDK and MSVC; run this gate in a VS developer shell.")
     require(shutil.which("msbuild.exe") is not None and shutil.which("cl.exe") is not None,
@@ -253,7 +257,11 @@ def main() -> None:
     # Compare typed F# files with fresh native declarations from both owning
     # modules. A stale checked-in snapshot must not silently omit a new member.
     facade_command = [sys.executable, str(engine / "Tools/build/generate-fsharp-native-facades.py"),
-                      "--engine", str(engine), "--check"]
+                      "--engine", str(engine)]
+    if args.facades_output:
+        facade_command.extend(["--output", str(args.facades_output.resolve())])
+    else:
+        facade_command.append("--check")
     for module, directory in generated.items():
         facade_command.extend(["--declarations", str(directory / ("reflgen_" + module + ".declarations.json"))])
     run(facade_command, cwd=engine, log=work / "logs/typed-facades.log")

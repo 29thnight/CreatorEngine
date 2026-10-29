@@ -49,7 +49,7 @@ def flatten(value: str) -> str:
 
 def unqualified(value: str) -> str:
     value = re.sub(r"^(?:class|struct|enum)\s+", "", value.strip())
-    value = re.sub(r"(?:\s+(?:const|volatile))+$", "", value)
+    value = re.sub(r"(?:\s+(?:const|volatile)|(?<=\*)(?:const|volatile))+$", "", value)
     # A leading const on a pointer belongs to its pointee, not to the pointer
     # value. It is significant when choosing native overloads (const char*).
     if not value.rstrip().endswith("*"):
@@ -173,6 +173,9 @@ PRIMITIVES = {
 
 def synthetic_type(name: str) -> dict:
     name = name.strip()
+    # Template element spellings can join the pointer qualifier (`T *const`).
+    # That is a const pointer to T, not an undeclared record named "T *const".
+    name = re.sub(r"(?<=\*)(?:const|volatile)\b", "", name).strip()
     const = name.startswith("const ")
     if name.endswith("&&") or name.endswith("&") or name.endswith("*"):
         suffix = "&&" if name.endswith("&&") else name[-1]
@@ -190,12 +193,13 @@ def synthetic_type(name: str) -> dict:
 
 
 def manual_record(name: str, fields: list[tuple[str, str]], source: str,
-                  methods: list[dict] | None = None, snapshot_only: bool = False) -> dict:
+                  methods: list[dict] | None = None, snapshot_only: bool = False,
+                  native_view_only: bool = False) -> dict:
     return {"name": name.rsplit("::", 1)[-1], "qualified_name": name,
             "schema_name": quoted(name), "class_key": "struct", "bases": [],
             "source": {"file": source, "line": 1, "column": 1}, "header": source,
             "module": "manual-runtime", "runtime_only": True, "public_fields": True,
-            "manual": True, "snapshot_only": snapshot_only, "attributes": [],
+            "manual": True, "snapshot_only": snapshot_only, "native_view_only": native_view_only, "attributes": [],
             "fields": [{"name": field, "owner": name, "access": "public",
                         "type": synthetic_type(kind), "attributes": [], "accessor": False}
                        for field, kind in fields], "methods": methods or []}
@@ -211,6 +215,10 @@ def manual_schemas() -> list[dict]:
     }.items():
         result.append(manual_record("math::" + kind, [(field, "float") for field in fields.split()], math_source))
     result.extend([
+        manual_record("Core::Sizef", [("width", "float"), ("height", "float")],
+                      "Engine/RenderEngine/ScriptReflectionValueTypes.h"),
+        manual_record("ce::layers::layer_id", [("value", "std::uint64_t")],
+                      "Engine/RenderEngine/ScriptReflectionValueTypes.h"),
         manual_record("math::matrix4x4", [("m", "ce::fixed_array<ce::fixed_array<float, 4>, 4>")], math_source),
         manual_record("math::aabb", [("center", "math::vector3"), ("extents", "math::vector3")], math_source),
         manual_record("math::sphere", [("center", "math::vector3"), ("radius", "float")], math_source),
@@ -259,6 +267,52 @@ def manual_schemas() -> list[dict]:
         "math::bounding_frustum": [("corner", "math::vector3", [("index", "std::size_t")]),
                                    ("corners", "std::array<math::vector3, 8>", [])],
     }
+    service_source = "Engine/SceneRuntime/ScriptReflectionSceneViews.h"
+    service_methods = {
+        "CameraSystem": [("GetPrimaryCamera", "CameraComponent *", []),
+                         ("GetRegisteredCameras", "const ce::dynamic_array<CameraComponent *> &", []),
+                         ("GetCount", "std::size_t", [])],
+        "SoundSystem": [("ClipKeys", "ce::dynamic_array<std::string>", []),
+                        ("ResolveAsset", "wave::ClipKey", [("text", "std::string_view"), ("kind", "wave::SoundSourceKind")]),
+                        ("WorldScope", "wave::PlaybackScope", []), ("PreviewScope", "wave::PlaybackScope", []),
+                        ("GetCount", "std::size_t", [])],
+        "TransformStore": [("Size", "std::size_t", [])],
+        "HierarchyStore": [("Size", "std::size_t", []), ("Revision", "std::uint64_t", []),
+                           ("IsOccupied", "bool", [("index", "std::size_t")]),
+                           ("ParentOf", "int", [("index", "std::size_t")]),
+                           ("RootOf", "int", [("index", "std::size_t")]),
+                           ("ChildrenOf", "const ce::dynamic_array<int> &", [("index", "std::size_t")])],
+        "SystemSchedule": [("GetSubscriptionCounts", "SystemSchedule::SubscriptionCounts", [])],
+        "ScenePhysicsSimulation": [
+            ("LayerRevision", "std::uint64_t", []),
+            ("ReadCharacter", "std::expected<ScenePhysicsSimulation::character_motion_state, ce::physics::error>", [("binding", "std::uint64_t")]),
+            ("RenderCharacterPosition", "std::expected<math::vector3, ce::physics::error>", [("binding", "std::uint64_t")]),
+            ("CharacterHandle", "ce::physics::handle<ce::physics::character_tag>", [("binding", "std::uint64_t")]),
+            ("Read", "std::expected<ce::physics::body_state, ce::physics::error>", [("binding", "std::uint64_t")]),
+            ("Handle", "ce::physics::handle<ce::physics::body_tag>", [("binding", "std::uint64_t")]),
+            ("Binding", "std::expected<std::uint64_t, ce::physics::error>", [("body", "ce::physics::handle<ce::physics::body_tag>")]),
+            ("RenderPose", "std::expected<ce::physics::pose, ce::physics::error>", [("binding", "std::uint64_t")]),
+            ("InterpolationAlpha", "double", []), ("IsRunning", "bool", []),
+            ("CompletedSteps", "std::uint64_t", []), ("DroppedSeconds", "double", [])],
+        "BasicTweenManager<Scene>": [("ActiveCount", "std::size_t", [])],
+        "TextureFramePins": [("Size", "std::size_t", []), ("Borrow", "const Texture *", [("index", "std::size_t")]),
+                             ("Owners", "ce::dynamic_array<own::shared_owner<const Texture>>", [])],
+    }
+    for name, entries in service_methods.items():
+        fields = []
+        if name == "TransformStore":
+            fields = [("localMatrix", "ce::dynamic_array<math::matrix4x4>"),
+                      ("worldMatrix", "ce::dynamic_array<math::matrix4x4>"),
+                      ("dirty", "ce::dynamic_array<unsigned char>"),
+                      ("worldScale", "ce::dynamic_array<math::vector4>"),
+                      ("worldQuaternion", "ce::dynamic_array<math::vector4>"),
+                      ("worldPosition", "ce::dynamic_array<math::vector4>"),
+                      ("worldChanged", "ce::dynamic_array<unsigned char>")]
+        record = manual_record(name, fields, service_source, native_view_only=True)
+        for field in record["fields"]:
+            field["attributes"].append({"scope": "reflgen", "name": "readonly", "argument_tokens": []})
+        result.append(record)
+        methods[name] = entries
     for record in result:
         for name, returns, parameters in methods.get(record["qualified_name"], []):
             record["methods"].append({"name": name, "owner": record["qualified_name"], "access": "public",
@@ -267,6 +321,10 @@ def manual_schemas() -> list[dict]:
                 "signature": returns + " (" + ", ".join(kind for _, kind in parameters) + ") const",
                 "return_type": synthetic_type(returns), "attributes": [],
                 "parameters": [{"name": parameter, "type": synthetic_type(kind)} for parameter, kind in parameters]})
+            for parameter in record["methods"][-1]["parameters"]:
+                if parameter["type"]["canonical_spelling"] == "wave::SoundSourceKind":
+                    parameter["type"]["kind"] = "enum"
+                    parameter["type"]["size_bytes"] = 1
     return result
 
 
@@ -290,6 +348,9 @@ class Generator:
         self.snapshot = snapshot
         self.components = set(snapshot["components"])
         self.classes = {item["qualified_name"]: item for item in snapshot["classes"]}
+        for name in ("RHITextureHandle", "RHIBufferHandle"):
+            if name in self.classes:
+                self.classes[name] = dict(self.classes[name], native_view_only=True)
         for record in manual_schemas():
             if record["qualified_name"] in self.classes:
                 raise ValueError("manual schema duplicates extracted owner: " + record["qualified_name"])
@@ -309,6 +370,19 @@ class Generator:
                 record = manual_record(unqualified(name), [("scene", "ce::physics::scene_id"),
                        ("slot", "std::uint32_t"), ("generation", "std::uint32_t")],
                        "Engine/RenderEngine/ScriptReflectionValueTypes.h")
+                self.classes.setdefault(record["qualified_name"], record)
+            elif template and template[0] == "AssetDepot::AssetLink":
+                record = manual_record(unqualified(name), [("identity", "experiment::cooked::AssetIdentity")],
+                       "Engine/RenderEngine/ScriptReflectionValueTypes.h")
+                for method_name, returns in (("IsValid", "bool"),
+                                             ("ToReference", "experiment::cooked::TypedAssetReference")):
+                    record["methods"].append({
+                        "name": method_name, "owner": record["qualified_name"], "access": "public",
+                        "is_static": False, "is_const": True, "is_volatile": False,
+                        "is_variadic": False, "is_deleted": False, "ref_qualifier": "none",
+                        "exception_specification": "basic_noexcept", "attributes": [],
+                        "signature": returns + " () const", "parameters": [],
+                        "return_type": synthetic_type(returns)})
                 self.classes.setdefault(record["qualified_name"], record)
         self.names = {name: flatten(name) + "View" for name in self.classes}
         duplicate = [name for name, count in Counter(self.names.values()).items() if count > 1]
@@ -356,6 +430,8 @@ class Generator:
         if name in active:
             return False
         record = self.classes[name]
+        if record.get("native_view_only"):
+            return True
         previous_context = self.context
         self.context = name
         active = active | {name}
@@ -418,13 +494,19 @@ class Generator:
         if kind == "floating_point" and value["size_bytes"] in (4, 8):
             return Mapping("single" if value["size_bytes"] == 4 else "double",
                            "NativeCodecs.Single" if value["size_bytes"] == 4 else "NativeCodecs.Double", "scalar", writable=True)
-        if kind == "enum":
+        if kind == "enum" or name == "ce::layers::error":
             tag = self.enums.setdefault(name, flatten(name) + "Tag")
             return Mapping(f"NativeEnumValue<{tag}>", f"NativeCodecs.Enum<{tag}>({quoted(name)})", "enum", writable=True)
         if name in ("FileGuid", "uuid::uuid16"):
             return Mapping("System.Guid", "NativeCodecs.Guid", "scalar", writable=True)
         if name == "HashedGuid":
             return Mapping("uint64", "NativeCodecs.UInt64", "scalar", writable=True)
+        if name == "ce::delegate_handle":
+            return Mapping("uint32", "NativeCodecs.UInt32", "scalar", argument_safe=False)
+        if name == "std::strong_ordering":
+            return Mapping("int", "NativeCodecs.Int32", "scalar", argument_safe=False)
+        if name == "std::filesystem::file_time_type":
+            return Mapping("int64", "NativeCodecs.Int64", "scalar", writable=True)
         if name == "std::filesystem::path":
             return Mapping("string", "NativeCodecs.String", "scalar", writable=True)
         if name in ("std::string", "std::string_view", "ce::string", "ce::utf8_string", "ce::string_view", "ce::utf8_string_view"):
@@ -452,6 +534,12 @@ class Generator:
         template = split_template(name)
         if template:
             owner, arguments = template
+            if (owner == "std::chrono::time_point" and len(arguments) == 1 and
+                    arguments[0] in ("std::filesystem::_File_time_clock", "std::filesystem::__file_clock",
+                                     "std::chrono::__file_clock")):
+                return Mapping("int64", "NativeCodecs.Int64", "scalar", writable=True)
+            if owner == "std::atomic" and arguments == ["bool"]:
+                return Mapping("bool", "NativeCodecs.Bool", "scalar", argument_safe=False)
             if owner in ("std::basic_string", "std::basic_string_view", "ce::basic_utf8_string", "ce::basic_utf16_string"):
                 return Mapping("string", "NativeCodecs.String", "scalar", writable="view" not in owner)
             if owner == "experiment::Index":
@@ -612,9 +700,35 @@ class Generator:
                        navigation=mapping.shape in ("record", "sequence", "map", "reference", "optional", "variant", "expected", "tuple"))
         return result
 
+    def parameter_mapping(self, value: dict) -> Mapping:
+        """Rooted callbacks are inputs only, never serializable field values."""
+        native = value
+        while native["kind"] in ("lvalue_reference", "rvalue_reference"):
+            native = native["pointee"]
+        template = split_template(native["canonical_spelling"])
+        if template and template[0] == "ce::func_detail::owning_func":
+            arguments = template[1]
+            # The registry constructs exactly ce::owned_func<Signature> with
+            # the engine's default policy. Other owning/noexcept/move-only
+            # function families retain an explicit unavailable result.
+            if len(arguments) >= 7 and arguments[1:7] == ["false", "true", "false", "48", "8", "ce::heap_allocator"]:
+                signature = (arguments[0], tuple(re.sub(r"\s+", "", item) for item in arguments[7:]))
+                managed = {
+                    ("void", ()): "unit",
+                    ("void", ("float",)): "single",
+                    ("void", ("math::vector2",)): "Float2",
+                    ("void", ("conststd::basic_string<char>&",)): "string",
+                    ("bool", ("constBlackBoard&",)): "NativeBlackBoardSnapshot",
+                }.get(signature)
+                if managed:
+                    if self.passing(value) not in ("value", "const_reference"):
+                        return Mapping("", "", "unsupported", "rooted callbacks accept value or const-reference parameters only")
+                    return Mapping(f"NativeCallback<{managed}>", "", "callback", argument_safe=False)
+        return self.mapping(value)
+
     def method_analysis(self, method: dict) -> tuple[Mapping, list[Mapping], str, str]:
         result = self.mapping(method["return_type"])
-        parameters = [self.mapping(parameter["type"]) for parameter in method["parameters"]]
+        parameters = [self.parameter_mapping(parameter["type"]) for parameter in method["parameters"]]
         attributes = self.attributes(method)
         reason = ""
         if "reflgen::script_internal" in attributes:
@@ -628,16 +742,26 @@ class Generator:
                 if not parameter.supported:
                     reason = f"argument {index}: " + parameter.reason
                     break
-                if not parameter.argument_safe:
-                    reason = f"argument {index}: native ownership, pointer, or callback cannot be manufactured from JSON"
+                if not parameter.argument_safe and parameter.shape not in {
+                        "record", "sequence", "map", "reference", "optional", "variant", "expected", "tuple", "callback"}:
+                    reason = f"argument {index}: native input requires a live typed view; its scalar mapping has no native identity"
+                    break
+                if self.passing(method["parameters"][index]["type"]) == "rvalue_reference":
+                    reason = f"argument {index}: native ownership transfer requires an explicit consuming API"
                     break
         is_reference_result = method["return_type"]["kind"] == "lvalue_reference" or result.shape == "reference"
         safe_borrow_arguments = all(self.passing(parameter["type"]) in ("value", "const_reference") and
                                    not self.output_parameter(parameter["type"]) for parameter in method["parameters"])
-        borrow = is_reference_result and (not parameters or (method["is_const"] and safe_borrow_arguments))
-        if not reason and result.shape == "reference" and not borrow:
-            reason = "mutable argument-bearing pointer/owner return requires a one-shot native identity API; it cannot be replayed as a path"
-        return result, parameters, "borrow" if borrow else "invoke", reason
+        native_arguments = any(not parameter.argument_safe for parameter in parameters)
+        borrow = (is_reference_result and not native_arguments and "reflgen::script_once" not in attributes
+                  and (not parameters or (method["is_const"] and safe_borrow_arguments)))
+        operation = "borrow" if borrow else "invoke"
+        if native_arguments or (result.shape == "reference" and not borrow):
+            # Paths provide already-existing native objects/owners. One-shot
+            # results are copied to immutable snapshots inside that request;
+            # mutating methods are never replayed as a getter path.
+            operation = "invoke_bound"
+        return result, parameters, operation, reason
 
     def emit_method(self, record: dict, method: dict, fs_name: str, spec_name: str,
                     analysis: tuple[Mapping, list[Mapping], str, str]) -> list[str]:
@@ -657,12 +781,23 @@ class Generator:
                 name += "_" + str(index)
             used.add(name)
             names.append(identifier(name))
-            is_mutable = self.output_parameter(parameter["type"])
+            is_mutable = self.output_parameter(parameter["type"]) and mapping.argument_safe
             fs_type = f"byref<{mapping.fs_type}>" if is_mutable else mapping.fs_type
             declarations.append(identifier(name) + ": " + fs_type)
             if is_mutable:
                 mutable.append((index, identifier(name), mapping))
-        arguments = "; ".join(f"({mapping.codec}).Encode({name})" for mapping, name in zip(parameters, names))
+        if operation == "invoke_bound":
+            bound_arguments = []
+            for parameter, mapping, name in zip(method["parameters"], parameters, names):
+                if mapping.argument_safe:
+                    bound_arguments.append(f"NativeCallArgument.FromJson(({mapping.codec}).Encode({name}))")
+                elif mapping.shape == "callback":
+                    bound_arguments.append(f"NativeCallArgument.FromCallback({name}.Token)")
+                else:
+                    bound_arguments.append(f"{name}.AsNativeArgument()")
+            arguments = "; ".join(bound_arguments)
+        else:
+            arguments = "; ".join(f"({mapping.codec}).Encode({name})" for mapping, name in zip(parameters, names))
         lines = [f"        /// Native {method['signature']}; {operation} uses the runtime's exact overload metadata.",
                  f"        member this.{identifier(fs_name)}({', '.join(declarations)}) : {result.fs_type} =",
                  f"            let arguments = [| {arguments} |]"]
@@ -670,7 +805,9 @@ class Generator:
             lines += [f"            let value = this.Borrow({spec_name}, arguments)",
                       f"            ({result.codec}).Decode(value)"]
         else:
-            lines.append(f"            let response = this.Invoke({spec_name}, arguments)")
+            operation_name = "InvokeBound" if operation == "invoke_bound" else "Invoke"
+            discard = ", discardResult = true" if operation == "invoke_bound" and result.shape == "void" else ""
+            lines.append(f"            let response = this.{operation_name}({spec_name}, arguments{discard})")
             for index, name, mapping in mutable:
                 lines.append(f"            {name} <- ({mapping.codec}).Decode(NativeTypeView.FromSnapshot(response.Arguments.[{index}]))")
             if result.shape == "void":
@@ -680,8 +817,10 @@ class Generator:
         lines.append("")
         self.add_entry(record, "method", method, fs_name, result, nativeSignature=method["signature"],
                        nativeReturn=method["return_type"]["canonical_spelling"], operation=operation,
+                       resultLifetime="live_path" if operation == "borrow" else "snapshot",
                        parameters=[{"nativeName": parameter.get("name", ""), "nativeType": parameter["type"]["canonical_spelling"],
-                                    "fsharpType": mapping.fs_type, "passing": self.passing(parameter["type"])}
+                                    "fsharpType": mapping.fs_type, "passing": self.passing(parameter["type"]),
+                                    "nativeBinding": not mapping.argument_safe}
                                    for parameter, mapping in zip(method["parameters"], parameters)],
                        refWriteback=[index for index, _, _ in mutable])
         return lines
@@ -727,13 +866,15 @@ class Generator:
             lines.append("")
         codec = "NativeCodecs.SnapshotView" if record.get("snapshot_only") else "NativeCodecs.View"
         lines += [f"    type {view} with", "        /// Typed native value codec for collection construction and explicit value arguments.",
-                  f"        static member Codec : NativeCodec<{view}> = {codec}(fun source -> {view}(source))", "",
-                  "        /// Construct an explicit read-only native wire snapshot for value arguments.",
-                  f"        static member FromJson(value: JsonElement) = {view}(NativeTypeView.FromSnapshot(value))", ""]
+                  f"        static member Codec : NativeCodec<{view}> = {codec}(fun source -> {view}(source))", ""]
+        if not record.get("native_view_only"):
+            lines += ["        /// Construct an explicit read-only native wire snapshot for value arguments.",
+                      f"        static member FromJson(value: JsonElement) = {view}(NativeTypeView.FromSnapshot(value))", ""]
         if record["qualified_name"] in self.components:
             lines += ["        /// Capture this component instance. Future accesses reject a removed or replaced instance.",
                       f"        static member From(entity: Entity) = {view}(NativeTypeView.FromNative(entity.GetNativeComponent({record['schema_name']})))", ""]
-        elif not record["bases"] and 0 < len(record["fields"]) <= 20 and not record.get("snapshot_only"):
+        elif (not record["bases"] and 0 < len(record["fields"]) <= 20
+              and not record.get("snapshot_only") and not record.get("native_view_only")):
             candidates = [(field, self.mapping(field["type"])) for field in record["fields"]]
             if all(mapping.supported and mapping.writable and not field["type"].get("is_const") and
                    "reflgen::readonly" not in self.attributes(field) for field, mapping in candidates):
@@ -744,6 +885,21 @@ class Generator:
                 for field, mapping in candidates:
                     lines.append(f"            fields.Add({quoted(self.serialized_name(field))}, ({mapping.codec}).Encode({identifier(field['name'])}))")
                 lines += [f"            {view}(NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(fields)))", ""]
+        if record["qualified_name"] == "wave::ClipKey":
+            lines += ["        /// Preserve a legacy clip name even when its text happens to be a GUID.",
+                      "        static member CreateText(text: string) =",
+                      "            if isNull text then nullArg (nameof text)",
+                      "            let fields = System.Collections.Generic.Dictionary<string, JsonElement>(System.StringComparer.Ordinal)",
+                      "            fields.Add(\"text\", JsonSerializer.SerializeToElement(text))",
+                      "            fields.Add(\"isGuid\", JsonSerializer.SerializeToElement(false))",
+                      f"            {view}(NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(fields)))", "",
+                      "        /// Construct an asset identity without conflating it with a legacy clip name.",
+                      "        static member CreateGuid(guid: System.Guid) =",
+                      "            if guid = System.Guid.Empty then invalidArg (nameof guid) \"A clip asset GUID must be nonzero.\"",
+                      "            let fields = System.Collections.Generic.Dictionary<string, JsonElement>(System.StringComparer.Ordinal)",
+                      "            fields.Add(\"text\", JsonSerializer.SerializeToElement(guid.ToString(\"D\")))",
+                      "            fields.Add(\"isGuid\", JsonSerializer.SerializeToElement(true))",
+                      f"            {view}(NativeTypeView.FromSnapshot(JsonSerializer.SerializeToElement(fields)))", ""]
         if record["qualified_name"] == "RHIShaderBlob":
             lines += ["        /// Read-only indexed bytes from the explicit RHIShaderBlob runtime adapter.",
                       "        member this.Bytes : NativeArray<byte> = this.Read(NativeCodecs.Array(NativeCodecs.UInt8))", ""]

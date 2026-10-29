@@ -57,7 +57,11 @@ type RuntimeBootstrap private () =
     static member private WithServices(action: NativeServices -> int) =
         try
             match services with
-            | Some value when NativeApi.IsGameThread -> action value
+            | Some value when NativeApi.IsGameThread ->
+                NativeCallbackRuntime.Drain()
+                let result = action value
+                NativeCallbackRuntime.Drain()
+                result
             | _ -> -1
         with error ->
             RuntimeBootstrap.Report(error)
@@ -70,6 +74,7 @@ type RuntimeBootstrap private () =
             else
                 let value = NativeServices()
                 try
+                    NativeCallbackRuntime.PrepareGeneration()
                     value.Registry.Initialize()
                     value.Continuations.Install()
                     AssetReleaseQueue.Drain()
@@ -86,25 +91,36 @@ type RuntimeBootstrap private () =
     [<UnmanagedCallersOnly>]
     static member Shutdown() : int =
         RuntimeBootstrap.WithServices(fun value ->
-            let mutable failed = false
-            let cleanup action =
-                try action ()
+            // Host return contract: 1 defers shutdown without changing the
+            // runtime; -1 reports an error after cleanup has been attempted.
+            let retired =
+                try
+                    NativeCallbackRuntime.EndGeneration()
+                    true
                 with error ->
-                    failed <- true
                     RuntimeBootstrap.Report(error)
-            cleanup (fun () -> AssetReleaseQueue.Drain())
-            cleanup (fun () -> value.Loader.Unload())
-            cleanup (fun () -> value.Registry.Clear())
-            cleanup (fun () -> value.Registry.ClearRegistrations())
-            cleanup (fun () -> value.Auxiliary.Trees.Clear())
-            cleanup (fun () -> value.Auxiliary.Factories.ClearAnimations())
-            cleanup (fun () -> value.Auxiliary.Factories.ClearNodes())
-            cleanup (fun () -> value.Continuations.DropPending() |> ignore)
-            cleanup (fun () -> value.Continuations.Uninstall())
-            cleanup (fun () -> value.Registry.ReleaseLookup())
-            cleanup (fun () -> Physics.SetContacts(None))
-            services <- None
-            if failed then -1 else 0)
+                    false
+            if not retired then 1
+            else
+                let mutable failed = false
+                let cleanup action =
+                    try action ()
+                    with error ->
+                        failed <- true
+                        RuntimeBootstrap.Report(error)
+                cleanup (fun () -> AssetReleaseQueue.Drain())
+                cleanup (fun () -> value.Loader.Unload())
+                cleanup (fun () -> value.Registry.Clear())
+                cleanup (fun () -> value.Registry.ClearRegistrations())
+                cleanup (fun () -> value.Auxiliary.Trees.Clear())
+                cleanup (fun () -> value.Auxiliary.Factories.ClearAnimations())
+                cleanup (fun () -> value.Auxiliary.Factories.ClearNodes())
+                cleanup (fun () -> value.Continuations.DropPending() |> ignore)
+                cleanup (fun () -> value.Continuations.Uninstall())
+                cleanup (fun () -> value.Registry.ReleaseLookup())
+                cleanup (fun () -> Physics.SetContacts(None))
+                services <- None
+                if failed then -1 else 0)
 
     [<UnmanagedCallersOnly>]
     static member LoadScripts(path: nativeint) : int =
@@ -167,7 +183,9 @@ type RuntimeBootstrap private () =
         try
             match services with
             | Some value when NativeApi.IsGameThread ->
+                NativeCallbackRuntime.Drain()
                 value.Registry.UpdateTick(dt)
+                NativeCallbackRuntime.Drain()
                 value.Registry.ActiveCount
             | _ -> -1
         with error ->
@@ -180,7 +198,9 @@ type RuntimeBootstrap private () =
             match services with
             | Some value when NativeApi.IsGameThread ->
                 AssetReleaseQueue.Drain()
+                NativeCallbackRuntime.Drain()
                 value.Registry.PrePhysicsTick(dt)
+                NativeCallbackRuntime.Drain()
                 value.Registry.ActiveCount
             | _ -> -1
         with error ->
@@ -193,7 +213,9 @@ type RuntimeBootstrap private () =
             match services with
             | Some value when NativeApi.IsGameThread ->
                 AssetReleaseQueue.Drain()
+                NativeCallbackRuntime.Drain()
                 value.Registry.PostPhysicsTick(dt)
+                NativeCallbackRuntime.Drain()
                 value.Registry.ActiveCount
             | _ -> -1
         with error ->

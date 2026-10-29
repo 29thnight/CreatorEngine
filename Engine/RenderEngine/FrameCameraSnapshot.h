@@ -11,7 +11,7 @@
 //
 // 여기 없는 카메라 값을 렌더 스레드가 읽고 있다면 그건 아직 이식되지 않은
 // 경로다. 새로 필요해지면 이 구조체에 추가하고 호출부를 스냅샷으로 돌린다.
-struct FrameCameraSnapshot
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] FrameCameraSnapshot
 {
     math::matrix4x4 view{};
     math::matrix4x4 projection{};

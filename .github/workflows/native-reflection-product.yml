@@ -1,0 +1,113 @@
+name: Native reflection actual Editor and Player
+
+# A trusted workstation runner must already have the private F# tooling checkout,
+# a usable DX12 device, audio output, VS 2026 and vcpkg MSBuild integration.
+# Public pull requests never execute code on this runner automatically.
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: Native/managed configuration
+        type: choice
+        options: [Release, Debug]
+        default: Release
+      runner_labels:
+        description: JSON labels for the trusted Windows workstation runner
+        type: string
+        default: '["self-hosted","Windows","X64"]'
+      tools_revision:
+        description: Exact commit of the preinstalled private FSharp tooling sibling
+        type: string
+        default: 'dcfa051e1354a6caa3ab4389b168429f73a2342e'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-reflection-product-${{ inputs.runner_labels }}
+  cancel-in-progress: false
+
+jobs:
+  actual-products:
+    runs-on: ${{ fromJSON(inputs.runner_labels) }}
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: CreatorEngine
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: CreatorEngine
+      - name: Check trusted runner and private tooling prerequisites
+        env:
+          EXPECTED_TOOLS_REVISION: ${{ inputs.tools_revision }}
+          PRODUCT_CONFIGURATION: ${{ inputs.configuration }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (![OperatingSystem]::IsWindows()) { throw 'The actual products require Windows.' }
+          if ($env:EXPECTED_TOOLS_REVISION -notmatch '^[0-9a-f]{40}$') { throw 'Specify an exact tooling commit.' }
+          $tools = Join-Path $env:GITHUB_WORKSPACE 'FSharp_Tool_Pakage_for_CreatorEngine'
+          if (!(Test-Path "$tools/src/CreatorEngine.FSharp.Build/build/CreatorEngine.FSharp.Build.targets")) {
+            throw "Preinstall the authorized private FSharp tooling checkout at $tools. This workflow has no private-source token."
+          }
+          $toolsRevision = (& git -C $tools rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -or $toolsRevision -cne $env:EXPECTED_TOOLS_REVISION) { throw 'Private tooling revision mismatch.' }
+          $toolsStatus = & git -C $tools status --porcelain
+          if ($LASTEXITCODE -or $toolsStatus) { throw 'The private tooling checkout must be clean.' }
+          if (!(dotnet --list-sdks | Where-Object { $_ -match '^10\.' })) { throw '.NET 10 SDK is required.' }
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (!$vs) { throw 'Visual Studio 2026 C++ build tools are required.' }
+          Import-Module (Join-Path $vs 'Common7/Tools/Microsoft.VisualStudio.DevShell.dll')
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
+          $msbuild = Join-Path $vs 'MSBuild/Current/Bin/amd64/MSBuild.exe'
+          $properties = & $msbuild Editor/CreatorEditor.vcxproj "/p:Configuration=$env:PRODUCT_CONFIGURATION" /p:Platform=x64 /nologo '-getProperty:VcpkgRoot,VcpkgEnabled,VcpkgInstalledDir,PlatformToolset' | ConvertFrom-Json
+          if ($LASTEXITCODE -or $properties.Properties.PlatformToolset -cne 'v145' -or $properties.Properties.VcpkgEnabled -ine 'true') {
+            throw 'Configure VS 2026 v145 and vcpkg MSBuild integration on this trusted runner.'
+          }
+          $vcpkg = Join-Path $properties.Properties.VcpkgRoot 'vcpkg.exe'
+          if (!(Test-Path $vcpkg)) { throw 'Integrated vcpkg executable is missing.' }
+          $manifest = Get-Content vcpkg.json -Raw | ConvertFrom-Json
+          $vcpkgRevision = (& git -C $properties.Properties.VcpkgRoot rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -or $vcpkgRevision -cne $manifest.'builtin-baseline') { throw 'Use the engine-pinned vcpkg revision on this runner.' }
+          New-Item -ItemType Directory -Force Build/Verification | Out-Null
+          @{toolsRevision=$toolsRevision;vcpkgRevision=$vcpkgRevision;configuration=$env:PRODUCT_CONFIGURATION;scope='prerequisites only'} |
+            ConvertTo-Json | Set-Content Build/Verification/native-reflection-prerequisites.json -Encoding utf8
+          # Install before project evaluation so the pinned reflgen targets exist.
+          & $vcpkg install --triplet x64-windows "--x-install-root=$($properties.Properties.VcpkgInstalledDir)"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Build and verify an immutable engine distribution
+        env:
+          PRODUCT_CONFIGURATION: ${{ inputs.configuration }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build BuildTool/CreatorBuildTool.csproj -c $env:PRODUCT_CONFIGURATION --nologo -v:q
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $tool = "./Bin/x64-$env:PRODUCT_CONFIGURATION/Tools/CreatorBuildTool/CreatorBuildTool.exe"
+          & $tool publish-engine --repository $PWD --config $env:PRODUCT_CONFIGURATION --build --no-pointer --output-root Build/Verification/NativeReflectionDistribution *> Build/Verification/native-reflection-publish.log
+          if ($LASTEXITCODE) { throw 'Engine publication failed; inspect native-reflection-publish.log.' }
+          $manifests = @(Get-ChildItem Build/Verification/NativeReflectionDistribution -Filter engine.manifest.json -Recurse | Where-Object { $_.FullName -notmatch '[\\/]\.candidate-' })
+          if ($manifests.Count -ne 1) { throw 'Expected exactly one verified distribution.' }
+          "CREATOR_PRODUCT_DISTRIBUTION=$($manifests[0].DirectoryName)" >> $env:GITHUB_ENV
+      - name: Run actual Editor, packaging renderer smoke and cooked Player
+        env:
+          PRODUCT_CONFIGURATION: ${{ inputs.configuration }}
+        run: |
+          ./Tools/regression/verify-fsharp-native-product.ps1 -Configuration $env:PRODUCT_CONFIGURATION -EngineDistribution $env:CREATOR_PRODUCT_DISTRIBUTION -Work Build/Verification/NativeReflectionProduct
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-reflection-actual-products-${{ inputs.configuration }}
+          # Only bounded diagnostic evidence; no private tooling, distributions,
+          # managed backup assemblies, credentials or temporary endpoint files.
+          path: |
+            CreatorEngine/Build/Verification/native-reflection-prerequisites.json
+            CreatorEngine/Build/Verification/native-reflection-publish.log
+            CreatorEngine/Build/Verification/NativeReflectionProduct/*.json
+            CreatorEngine/Build/Verification/NativeReflectionProduct/*.jsonl
+            CreatorEngine/Build/Verification/NativeReflectionProduct/*.log
+            CreatorEngine/Build/Verification/NativeReflectionProduct/*.out
+            CreatorEngine/Build/Verification/NativeReflectionProduct/*.err
+          if-no-files-found: warn

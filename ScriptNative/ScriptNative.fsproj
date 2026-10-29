@@ -33,6 +33,7 @@
     <Compile Include="Assets.fs" />
     <Compile Include="ComponentLifetime.fs" />
     <Compile Include="Entity.fs" />
+    <Compile Include="NativeReflectionCallbacks.fs" />
     <Compile Include="NativeReflectionExtensions.fs" />
     <Compile Include="ReflectedNativeComponent.fs" />
     <Compile Include="ScriptComponent.fs" />

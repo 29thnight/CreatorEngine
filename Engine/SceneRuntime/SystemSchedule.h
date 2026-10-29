@@ -99,7 +99,7 @@ public:
     // "잔존"이므로 컴포넌트가 UnsubscribeAll로 완전히 빠지면 줄어든다. 부분 해지
     // (Unsubscribe, 페이즈 하나만)는 건드리지 않는다 — 다른 페이즈에 남아 있을
     // 수 있어서다. 프로파일러 연동은 범위 밖 — 카운터만 노출한다.
-    struct SubscriptionCounts
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] SubscriptionCounts
     {
         size_t implicitCount;
         size_t explicitCount;

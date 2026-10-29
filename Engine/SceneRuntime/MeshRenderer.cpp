@@ -8,6 +8,7 @@ import Creator.Core.Ownership;
 #include <stdio.h>
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "MeshRenderer.h"
+#include "MaterialAssetReferenceState.h"
 #include "../Utility_Framework/Authoring/AuthoringParsedDocument.h"
 #include "../Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-4
 #include "../Utility_Framework/Reflection/ReflectionYml.h"
@@ -26,18 +27,6 @@ import Creator.Core.Ownership;
 #include <mathematics/transform.hpp>
 
 #include "ModelConsumptionDiagnostics.h" // MBC10: 읽기 전용 계수(무조건 stdout 출력 제거)
-
-// The last observed values distinguish a fresh instance edit from an authored
-// override that happens to equal the next asset generation's default.
-struct MaterialAssetReferenceState
-{
-    material_graph::InstanceDocument overrides;
-    own::shared_owner<const material_graph::Instance> observed;
-    bool overrideDoubleSided{};
-    bool overrideBlendMode{};
-    bool observedDoubleSided{};
-    MaterialRenderingMode observedBlendMode = MaterialRenderingMode::Opaque;
-};
 
 namespace
 {

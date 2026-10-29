@@ -37,6 +37,7 @@ import Creator.Platform.Windows;
 #include "MaterialGraphWindow.h"
 #include "../Editing/ReflectionUndo.h"
 #include "../../../Engine/Utility_Framework/Reflection/ReflgenRuntime.h"
+#include "../../../Engine/Utility_Framework/Runtime/RuntimeResults.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.AppBackend.WinAPI.h"
 #else
@@ -721,6 +722,14 @@ void Editor::EditorMain::Finalize()
 	// 여기서부터는 표시/렌더 소비 스레드가 없다. 이제 해체해도 안전하다.
     SceneManagers->BindAudioPlayback(nullptr);
     ConsoleCommandSystem::Get().SetAudioDiagnosticsReader({});
+    const auto audioCounters = m_audioHost->Counters();
+    Diagnostics::RuntimeResults::Emit("audio.host", [&](Diagnostics::Node data)
+    {
+        data["outputMode"] << static_cast<int>(m_audioHost->Mode());
+        data["backendCountersAvailable"] << audioCounters.backendCountersAvailable;
+        data["callbackCount"] << audioCounters.callbackCount;
+        data["backendFailures"] << audioCounters.voices.backendFailures;
+    });
     m_audioPlayback->Shutdown();
     m_audioCatalog->Clear();
     m_audioHost->Shutdown();

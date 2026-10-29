@@ -93,7 +93,7 @@ enum class TransformSyncPoint : uint8_t
 	Count
 };
 
-struct TransformTopologyMutationCounters
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TransformTopologyMutationCounters
 {
 	// Scene graph membership changes, not GameObject allocation lifetime. A
 	// cross-scene/DDOL transfer is therefore one removal plus one insertion.
@@ -117,7 +117,7 @@ enum class ReparentResult : uint8_t
 
 const char* ReparentResultName(ReparentResult result);
 
-struct HierarchyIntegrityMetrics
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] HierarchyIntegrityMetrics
 {
 	uint64_t parentChildMismatch = 0;
 	uint64_t orphan = 0;
@@ -133,7 +133,7 @@ struct HierarchyIntegrityMetrics
 // TransformUpdatePlan X4의 compiled projection 진단 표면. ExecIndex와 packed
 // 배열 자체는 Scene.cpp의 비공개 상태에만 존재한다. 외부에는 stable EntityHandle과
 // 집계만 노출해 실행 위치가 저작 identity/직렬화 포맷으로 새지 않게 한다.
-struct ExecutionGraphCompileMetrics
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ExecutionGraphCompileMetrics
 {
 	bool success = false;
 	uint64_t topologyVersion = 0;
@@ -161,7 +161,7 @@ struct ExecutionGraphCompileMetrics
 	}
 };
 
-struct ExecutionGraphRelationDiagnostics
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ExecutionGraphRelationDiagnostics
 {
 	bool spatialMember = false;
 	bool layoutMember = false;
@@ -171,7 +171,7 @@ struct ExecutionGraphRelationDiagnostics
 	uint32_t layoutSubtreeSize = 0;
 };
 
-struct SpatialResolveMetrics
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] SpatialResolveMetrics
 {
 	bool resolved = false;
 	bool sparseRequested = false;
@@ -188,7 +188,7 @@ struct SpatialResolveMetrics
 	uint64_t worldWrites = 0;
 };
 
-struct SpatialPullMetrics
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] SpatialPullMetrics
 {
 	bool attempted = false;
 	bool resolved = false;
@@ -210,7 +210,7 @@ struct SpatialPullMetrics
 // TransformUpdatePlan X7: worker pose/physics 결과를 frame barrier 뒤 packed
 // transform storage에 합치는 계측이다. bindLookups는 skeleton serial 또는
 // topology가 바뀐 binding pass에서만 증가해야 하며 steady pose upload에서는 0이다.
-struct AnimatorPoseUploadMetrics
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] AnimatorPoseUploadMetrics
 {
 	bool attempted = false;
 	bool uploaded = false;
@@ -234,13 +234,13 @@ struct AnimatorPoseUploadMetrics
 	bool paletteChanged = false;
 };
 
-struct TransformWorldWrite
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TransformWorldWrite
 {
 	EntityHandle target{};
 	math::matrix4x4 world{ math::matrix4x4::identity() };
 };
 
-struct TransformBulkWriteMetrics
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TransformBulkWriteMetrics
 {
 	TransformWriteReason reason = TransformWriteReason::CppSetter;
 	bool packed = false;
@@ -257,7 +257,7 @@ struct TransformBulkWriteMetrics
 // TransformUpdatePlan X0 진단 스냅샷. ui/spatial/dispatch는 한 번의 sync가 실제로
 // 걸린 wall time이고, visit/compose/multiply/decompose는 병렬 worker에서 합산한
 // CPU work다. 따라서 worker 합계를 wall time에 다시 더하면 안 된다.
-struct TransformUpdateMetrics
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TransformUpdateMetrics
 {
 	TransformSyncPoint syncPoint = TransformSyncPoint::Unspecified;
 	bool uiDomainResolved = false;
@@ -286,7 +286,7 @@ struct TransformUpdateMetrics
 	uint64_t rectDirtyCount = 0;
 };
 
-struct TransformWriteMetrics
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TransformWriteMetrics
 {
 	uint64_t publishEpoch = 0;
 	uint64_t windowStartEpoch = 0;
@@ -310,6 +310,7 @@ public:
     {
         return m_preparedTextureImagePins;
     }
+    [[reflgen::script_once]]
     own::shared_owner<TextureFramePins> TakePreparedTextureImagePins()
     {
         return std::exchange(m_preparedTextureImagePins, {});
@@ -696,7 +697,10 @@ public:
     /// 구독자가 0인 리스트의 크기를 진단으로 남겨 봐야 항상 0만 찍혔다
     /// (SystemSchedule.h 클래스 주석 참고). destroyWatch는 원래도 이 구조체에
     /// 없었다 — 그 관례를 그대로 따른다.
-    struct RegistryCounts { size_t pendingInitialize, pendingSimulation; };
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RegistryCounts
+    {
+        size_t pendingInitialize, pendingSimulation;
+    };
     RegistryCounts GetRegistryCounts() const;
 
     /// 진단용 — 암묵/명시 구독 잔존 수(트랙 L4 래칫 측정 기반). 프로파일러

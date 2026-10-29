@@ -28,6 +28,23 @@ namespace
     std::uint64_t __stdcall ReflectionExecute(ScriptObjectHandle, const char*, int) { return 0; }
     int __stdcall ReflectionRead(std::uint64_t, char*, int) { return -1; }
     void __stdcall ReflectionRelease(std::uint64_t) {}
+    // The table-layout fixture does not run retained callbacks. Use correctly
+    // typed rejection stubs; calling a void() placeholder through one of the
+    // API 49 signatures would itself violate the ABI being tested.
+    std::uint64_t __stdcall CallbackBeginGeneration() { return 0; }
+    std::uint64_t __stdcall CallbackRegister(std::uint64_t, int,
+        ce::script::binding::ScriptCallbackDispatch, std::uint64_t) { return 0; }
+    int __stdcall CallbackDisable(std::uint64_t) { return 0; }
+    std::uint64_t __stdcall CallbackTakeRetired() { return 0; }
+    int __stdcall CallbackEndGeneration(std::uint64_t) { return 0; }
+    void SetCallbackSlots()
+    {
+        table.NativeCallback_BeginGeneration = &CallbackBeginGeneration;
+        table.NativeCallback_Register = &CallbackRegister;
+        table.NativeCallback_Disable = &CallbackDisable;
+        table.NativeCallback_TakeRetired = &CallbackTakeRetired;
+        table.NativeCallback_EndGeneration = &CallbackEndGeneration;
+    }
     template<typename T>
     void SetUnused(T& slot)
     {
@@ -310,6 +327,7 @@ extern "C" __declspec(dllexport) ScriptApiTable* __cdecl ProbeTable()
     table.NativeReflection_Execute = &ReflectionExecute;
     table.NativeReflection_Read = &ReflectionRead;
     table.NativeReflection_Release = &ReflectionRelease;
+    SetCallbackSlots();
     return &table;
 }
 
@@ -337,6 +355,7 @@ extern "C" __declspec(dllexport) ScriptApiTable* __cdecl ProbeHeadlessTable()
     table.NativeReflection_Execute = &ReflectionExecute;
     table.NativeReflection_Read = &ReflectionRead;
     table.NativeReflection_Release = &ReflectionRelease;
+    SetCallbackSlots();
     table.Entity_IsAlive = &IsAlive;
     return &table;
 }
@@ -351,6 +370,15 @@ extern "C" __declspec(dllexport) void __cdecl ProbeMissingReflectionSlot(int slo
     if (slot == 0) table.NativeReflection_Execute = nullptr;
     else if (slot == 1) table.NativeReflection_Read = nullptr;
     else if (slot == 2) table.NativeReflection_Release = nullptr;
+}
+
+extern "C" __declspec(dllexport) void __cdecl ProbeMissingCallbackSlot(int slot)
+{
+    if (slot == 0) table.NativeCallback_BeginGeneration = nullptr;
+    else if (slot == 1) table.NativeCallback_Register = nullptr;
+    else if (slot == 2) table.NativeCallback_Disable = nullptr;
+    else if (slot == 3) table.NativeCallback_TakeRetired = nullptr;
+    else if (slot == 4) table.NativeCallback_EndGeneration = nullptr;
 }
 
 extern "C" __declspec(dllexport) int __cdecl ProbeInitialize(

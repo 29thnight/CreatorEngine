@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <FSharpCoreImplicitPackageVersion>10.0.112</FSharpCoreImplicitPackageVersion>
+    <AssemblyName>NativeReflectionProduct.Compile</AssemblyName>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../ScriptNative/ScriptNative.fsproj" />
+    <Compile Include="FSharpNativeReflectionProductProbe.fs" />
+  </ItemGroup>
+</Project>

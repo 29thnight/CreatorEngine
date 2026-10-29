@@ -19,7 +19,7 @@ namespace ce::physics
 class CollisionGeometryLibrary final
 {
   public:
-    struct statistics
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] statistics
     {
         std::uint64_t cache_hits = 0, cooks = 0, failures = 0, imports = 0;
         std::size_t assets = 0;

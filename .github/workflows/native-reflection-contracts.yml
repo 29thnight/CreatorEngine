@@ -24,6 +24,13 @@ on:
       - 'Tools/build/Contracts.targets'
       - 'Tools/build/Windows*.props'
       - 'Tools/regression/ScriptReflectionProbe/**'
+      - 'Tools/regression/reflection_callbacks_probe.cpp'
+      - 'Tools/regression/reflection_runtime_value_adapters_probe.cpp'
+      - 'Tools/regression/test_fsharp_native_facades.py'
+      - 'Tools/regression/NativeReflectionProduct/**'
+      - 'Tools/regression/*NativeReflectionProduct*.ps1'
+      - 'Tools/regression/verify-native-reflection-product-results.ps1'
+      - 'Tools/regression/verify-fsharp-native-product.ps1'
       - 'Tools/regression/verify-native-reflection-inventory.py'
       - 'Tools/regression/verify-native-reflection-ownership.py'
       - 'Tools/regression/verify-native-reflection-surface.py'
@@ -53,6 +60,13 @@ on:
       - 'Tools/build/Contracts.targets'
       - 'Tools/build/Windows*.props'
       - 'Tools/regression/ScriptReflectionProbe/**'
+      - 'Tools/regression/reflection_callbacks_probe.cpp'
+      - 'Tools/regression/reflection_runtime_value_adapters_probe.cpp'
+      - 'Tools/regression/test_fsharp_native_facades.py'
+      - 'Tools/regression/NativeReflectionProduct/**'
+      - 'Tools/regression/*NativeReflectionProduct*.ps1'
+      - 'Tools/regression/verify-native-reflection-product-results.ps1'
+      - 'Tools/regression/verify-fsharp-native-product.ps1'
       - 'Tools/regression/verify-native-reflection-inventory.py'
       - 'Tools/regression/verify-native-reflection-ownership.py'
       - 'Tools/regression/verify-native-reflection-surface.py'
@@ -128,6 +142,12 @@ jobs:
           cmake --build $probeBuild --parallel 4
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ctest --test-dir $probeBuild --output-on-failure --no-tests=error
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Compile the exact real-host probe against public native bindings.
+          # This is a compile/result-consumer gate, not an Editor/Player run.
+          dotnet build Tools/regression/NativeReflectionProduct/NativeReflectionProduct.Compile.fsproj -c ${{ matrix.configuration }} "-p:ScriptNativeGenerator=$generator" --nologo -v:q
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./Tools/regression/verify-native-reflection-product-results.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python Tools/regression/verify-native-reflection-surface.py --generator $generator --reflgen-root $dependency --vcpkg (Join-Path $env:GITHUB_WORKSPACE 'Build/ReflectionVcpkg/vcpkg.exe') --configuration ${{ matrix.configuration }} --work (Join-Path $env:RUNNER_TEMP 'NativeReflectionSurface')
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

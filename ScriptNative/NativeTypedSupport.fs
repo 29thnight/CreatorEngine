@@ -84,6 +84,11 @@ module internal NativeTypedJson =
                 // MSVC's type-name spelling uses -1 for span's unsigned
                 // dynamic_extent sentinel. This equivalence is span-specific.
                 if name = "std::span" && parts.[1] = "-1" then parts.[1] <- "std::dynamic_extent"
+            if name = "ce::func_detail::owning_func" && parts.Count >= 6 then
+                // Inline capacity/alignment are size_t arguments. Their numeric
+                // identity is independent of MSVC's hexadecimal type spelling.
+                parts.[4] <- extentKey parts.[4]
+                parts.[5] <- extentKey parts.[5]
             let defaults (item: string) =
                 item.StartsWith("std::allocator<", StringComparison.Ordinal) ||
                 item.StartsWith("std::char_traits<", StringComparison.Ordinal) ||
@@ -193,6 +198,21 @@ type private NativeTypedBacking =
     | Live of NativeValue
     | Snapshot of JsonElement
 
+/// One serialized value or a live native path. Native paths are resolved and
+/// type-checked by the engine; they never encode a process address.
+[<Sealed>]
+type NativeCallArgument private (value: JsonElement, binding: NativeValue option, callback: uint64 option) =
+    member internal _.Value = value.Clone()
+    member internal _.Binding = binding
+    member internal _.Callback = callback
+    static member FromJson(value: JsonElement) = NativeCallArgument(value.Clone(), None, None)
+    static member FromNative(value: NativeValue) =
+        ArgumentNullException.ThrowIfNull(value)
+        NativeCallArgument(NativeTypedJson.nullValue, Some value, None)
+    static member FromCallback(token: uint64) =
+        if token = 0UL then invalidArg "token" "Callback tokens must be nonzero."
+        NativeCallArgument(NativeTypedJson.nullValue, None, Some token)
+
 /// Shared backing for generated native types. Live paths retain component identity;
 /// detached invocation results are immutable JSON snapshots.
 type NativeTypeView private (backing: NativeTypedBacking, validate: unit -> unit) =
@@ -292,6 +312,25 @@ type NativeTypeView private (backing: NativeTypedBacking, validate: unit -> unit
             let method = spec.Resolve()
             if not method.CanInvoke then NativeTypedJson.fail "unsupported" method.UnavailableReason
             value.InvokeOverload(method.Name, method.Signature, arguments |> Array.map (fun item -> box (item.Clone())))
+    member _.AsNativeArgument() =
+        validate ()
+        match backing with
+        | Live value -> NativeCallArgument.FromNative(value)
+        | Snapshot _ -> NativeTypedJson.fail "detached_argument" "This parameter requires a live native object or owner; a JSON snapshot has no native identity."
+    member this.AsValueArgument() = NativeCallArgument.FromJson(this.ReadJson())
+    /// Invoke with native paths and serialized values. Returned native objects
+    /// are read once within the request and exposed only as detached snapshots.
+    member _.InvokeBound(spec: NativeMethodSpec, arguments: NativeCallArgument array, ?discardResult: bool) =
+        validate ()
+        match backing with
+        | Snapshot _ -> NativeTypedJson.fail "read_only" "Detached native snapshots cannot invoke native methods."
+        | Live value ->
+            let method = spec.Resolve()
+            if not method.CanInvokeBound then NativeTypedJson.fail "unsupported" method.BoundUnavailableReason
+            value.InvokeBoundOverload(method.Name, method.Signature,
+                arguments |> Array.map (fun argument -> box argument.Value),
+                arguments |> Array.map _.Binding, ?discardResult = discardResult,
+                callbackTokens = (arguments |> Array.map _.Callback))
     member _.Borrow(spec: NativeMethodSpec, arguments: JsonElement array) =
         validate ()
         match backing with

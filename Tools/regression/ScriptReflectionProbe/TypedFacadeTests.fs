@@ -75,7 +75,56 @@ let run (check: bool -> string -> unit) (rejected: (unit -> unit) -> string -> s
     view.SucceedOutcome()
     check (view.outcome.Value = 92) "generated expected success graph"
     check (view.RawArgument_Unavailable.Reason.Contains("pointer")) "unsafe native member has explicit generated reason"
-    check (view.UnsafeRecord_Unavailable.Reason.Contains("pointer")) "generated record arguments reject recursive pointer storage"
+    let cycleBefore = view.cycle.value
+    let callsBeforeCycle = view.calls
+    view.UnsafeRecord(view.cycle)
+    check (view.cycle.value = cycleBefore + 1 && view.calls = callsBeforeCycle + 1) "generated pointer-bearing record input binds native identity instead of serializing its cycle"
+    let detachedCycle = reflection_probe_CycleView(NativeTypeView.FromSnapshot(
+        JsonSerializer.SerializeToElement(dict [ "value", box 9; "next", null ])))
+    let beforeDetachedCycle = view.calls
+    rejected (fun () -> view.UnsafeRecord(detachedCycle)) "generated pointer-bearing record rejects detached identity" |> ignore
+    check (view.calls = beforeDetachedCycle && view.cycle.value = cycleBefore + 1) "detached native record rejection occurs before effects"
+
+    let beforeCreate = view.calls
+    let created = view.CreateSettings(101)
+    check (not created.IsLive && created.Value.count = 101 && view.calls = beforeCreate + 1) "generated mutating pointer result is an immediate detached snapshot"
+    check (created.Value.count = 101 && created.Value.label = "nested" && view.calls = beforeCreate + 1) "reading a mutating method result never replays native invocation"
+    rejected (fun () -> created.Value.count <- 102) "generated mutating pointer result cannot become a live writable alias" |> ignore
+    view.UpdateNativeSettings(view.shared, 103)
+    check (view.shared.Value.count = 103 && view.ReadNativeSettings(view.shared) = 103) "generated pointer arguments bind a live typed pointee"
+    check (view.ReadNativeSettings(view.missingSettings) = -1) "generated native pointer parameter preserves typed null"
+    check (created.Value.count = 101) "native changes do not rewrite the retained result snapshot"
+    let beforeDetached = view.calls
+    rejected (fun () -> view.UpdateNativeSettings(created, 104)) "generated raw pointer parameter rejects detached snapshot" |> ignore
+    rejected (fun () -> view.BindSharedSettings(created)) "generated owner parameter rejects detached snapshot" |> ignore
+    check (view.calls = beforeDetached && view.shared.Value.count = 103) "detached pointer and owner arguments fail before native mutation"
+    let beforeReadonly = view.calls
+    let readonlyCount = view.lockedShared.Value.count
+    check (view.ReadNativeSettings(view.lockedShared) = readonlyCount) "const pointer parameter accepts a readonly native owner target"
+    rejected (fun () -> view.UpdateNativeSettings(view.lockedShared, 105)) "generated raw pointer parameter preserves readonly pointee access" |> ignore
+    rejected (fun () -> view.BindSharedSettings(view.lockedShared)) "readonly owner cannot be copied into a writable alias" |> ignore
+    check (view.calls = beforeReadonly && view.lockedShared.Value.count = readonlyCount) "readonly native arguments fail before effects"
+    view.BindSharedSettings(view.shared)
+    check (view.calls = beforeReadonly + 1 && view.shared.Value.count = 103) "generated owner argument binds the native owner wrapper"
+    let beforeRemove = view.calls
+    view.RemoveNativeSettings(view.shared)
+    check (view.calls = beforeRemove + 1 && not view.shared.HasValue) "native deletion executes once without reading a destroyed argument afterward"
+    check (view.ReadNativeSettings(view.shared) = -1) "generated nullable pointer input accepts an empty typed native owner"
+    check (created.Value.count = 101) "detached result remains valid after the native target is destroyed"
+    view.ResetShared()
+    let beforeTake = view.calls
+    let taken = view.TakeShared()
+    check (not taken.IsLive && taken.Value.count = 7 && not view.shared.HasValue && view.calls = beforeTake + 1) "script_once native owner method uses one-shot snapshot invocation"
+    let takeSpec = NativeMethodSpec("ProbeComponent", "TakeShared", false, [||], [||])
+    rejected (fun () -> view.Borrow(takeSpec).ReadJson() |> ignore) "script_once native method cannot be replayed as a getter path" |> ignore
+    check (taken.Value.count = 7 && view.calls = beforeTake + 1) "script_once result reads and rejected borrowing never reinvoke the method"
+    view.ResetShared()
+
+    // A mixed native/value call must retain output values while omitting the
+    // external native argument slots that a mutating method may invalidate.
+    let adjust = NativeMethodSpec("ProbeComponent", "Adjust", true, [|"int"|], [|"mutable_reference"|])
+    let adjusted = view.InvokeBound(adjust, [|NativeCallArgument.FromJson(NativeCodecs.Int32.Encode(5))|])
+    check (adjusted.Arguments.[0].GetInt32() = view.settings.count + 5) "bound invocation preserves mutable JSON reference output"
 
     // Argument-bearing const lookup is a retained, read-only live path. It is
     // re-evaluated once for a value access, and arguments are checked first.
@@ -85,6 +134,9 @@ let run (check: bool -> string -> unit) (rejected: (unit -> unit) -> string -> s
     check (lookup.Value.count = expected && view.lookupCalls = beforeLookup + 1) "generated const lookup executes once per resolved access"
     rejected (fun () -> lookup.Value.count <- 1) "generated argument lookup cannot expose writable native memory" |> ignore
     check (not (view.FindSettings("missing").HasValue)) "generated const lookup preserves null result"
+    let beforeBoundLookup = view.lookupCalls
+    rejected (fun () -> view.ReadNativeSettings(lookup) |> ignore) "native binding paths cannot replay a getter during argument resolution" |> ignore
+    check (view.lookupCalls = beforeBoundLookup) "rejected getter binding never executes the getter"
     let lookupSpec = NativeMethodSpec("ProbeComponent", "FindSettings", true, [|"std::string"|], [|"const_reference"|])
     let beforeMalformed = view.lookupCalls
     let malformed = view.Borrow(lookupSpec, [| NativeCodecs.Int32.Encode(1) |])

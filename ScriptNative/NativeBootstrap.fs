@@ -14,20 +14,29 @@ type NativeBootstrap private () =
     static let mutable ownerThread = 0
     static let mutable fastEntityAlive: EntityAliveCall = null
     static let mutable fastEntityAliveDirect = false
+    static let mutable callbackRebindGuard: Func<bool> = null
+
+    // Installed by the later callback layer without introducing a compilation
+    // cycle. A live rooted generation must retire before replacing the ABI.
+    static member internal SetCallbackRebindGuard(guard: Func<bool>) =
+        callbackRebindGuard <- guard
 
     [<UnmanagedCallersOnly>]
     static member Initialize(address: nativeint, availableBytes: unativeint, fingerprint: uint64, headless: int) : int =
         try
             lock gate (fun () ->
                 let thread = Environment.CurrentManagedThreadId
-                if ownerThread <> 0 && ownerThread <> thread then
+                if (ownerThread <> 0 && ownerThread <> thread)
+                   || (not (isNull callbackRebindGuard) && not (callbackRebindGuard.Invoke())) then
                     -1
                 else
                     let required =
                         set [ "Asset_RequestTyped"; "Asset_TryAcquireTyped"; "Camera_NotifyCameraCut"
                               "Simulation_Status"; "Simulation_Submit"; "Simulation_Read"
                               "ExtraComponent_Exists"; "ExtraComponent_GetEnabled"; "ExtraComponent_SetEnabled"
-                              "NativeReflection_Execute"; "NativeReflection_Read"; "NativeReflection_Release" ]
+                              "NativeReflection_Execute"; "NativeReflection_Read"; "NativeReflection_Release"
+                              "NativeCallback_BeginGeneration"; "NativeCallback_Register"; "NativeCallback_Disable"
+                              "NativeCallback_TakeRetired"; "NativeCallback_EndGeneration" ]
                     let candidate =
                         match headless with
                         | 0 -> ScriptApi.Bind(address, availableBytes, fingerprint)
@@ -46,7 +55,8 @@ type NativeBootstrap private () =
     static member Shutdown() : int =
         try
             lock gate (fun () ->
-                if ownerThread <> Environment.CurrentManagedThreadId then
+                if ownerThread <> Environment.CurrentManagedThreadId
+                   || (not (isNull callbackRebindGuard) && not (callbackRebindGuard.Invoke())) then
                     -1
                 else
                     Volatile.Write(&ownerThread, 0)

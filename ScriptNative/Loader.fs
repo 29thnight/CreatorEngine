@@ -241,6 +241,9 @@ type internal Loader(registry: Registry, auxiliary: IAuxiliaryRegistry) =
         match context with
         | None -> ()
         | Some loaded ->
+            // Native gates close and in-flight calls drain before script
+            // cleanup can release delegates or the collectible context.
+            NativeCallbackRuntime.EndGeneration()
             registry.Clear()
             registry.ClearRegistrations()
             auxiliary.ClearAnimations()
@@ -262,6 +265,7 @@ type internal Loader(registry: Registry, auxiliary: IAuxiliaryRegistry) =
             assemblyPath <- Some(Path.GetFullPath(path))
 
             try
+                NativeCallbackRuntime.PrepareGeneration()
                 let path = assemblyPath.Value
                 let entries = readAssemblySet path
 
@@ -279,6 +283,9 @@ type internal Loader(registry: Registry, auxiliary: IAuxiliaryRegistry) =
 
     [<MethodImpl(MethodImplOptions.NoInlining)>]
     member private _.Validate(path: string) =
+        // Candidate module initializers must not install rooted callbacks into
+        // the live generation before validation accepts the replacement.
+        use callbackRegistrationPause = NativeCallbackRuntime.SuspendRegistration()
         let mutable probe: ScriptLoadContext option = None
 
         try

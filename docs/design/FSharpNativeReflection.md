@@ -2,9 +2,10 @@
 
 ## 목적과 진입점
 
-API 48은 기존 네이티브 테이블 끝에 `NativeReflection_Execute`,
-`NativeReflection_Read`, `NativeReflection_Release` 세 슬롯을 추가한다.
-F# `CreatorEngine.NativeBindings`가 이 슬롯을 직접 호출한다.
+API 48에서 추가한 `NativeReflection_Execute`, `NativeReflection_Read`,
+`NativeReflection_Release` 세 슬롯으로 F# `CreatorEngine.NativeBindings`가
+네이티브 반사 서비스를 직접 호출한다. API 49는 등록된 콜백의 세대·수명을
+관리하는 다섯 슬롯을 테이블 끝에 추가한다.
 `CreatorEngine.NativeTypes`에는 등록된 네이티브 컴포넌트 27개의 개별 F# 구현과
 각 멤버에서 사용하는 레코드·컬렉션·반환 타입의 뷰가 있다. 공통
 `NativeObject` / `NativeValue` 경로는 동적 타입 탐색과 도구 작성에도 사용한다.
@@ -67,9 +68,9 @@ if state.HasValue then
 렌더 프로필·스프라이트·스프라이트 시트·상태 기계·지형 래퍼 역시 `.Native`에서
 생성된 멤버를 사용한다.
 
-생성 기준은 실제 RenderEngine/SceneRuntime 선언 302개이며, 별도로 정의된
-수학·Lattice·물리 핸들 등의 런타임 스키마 22개를 더해 레코드 뷰 324개를
-제공한다. `EnumTags.fs`의 열거형 84개는 각 네이티브 타입을 구분하는
+생성 기준은 실제 RenderEngine/SceneRuntime 선언과 별도로 정의된
+수학·Lattice·물리·렌더 핸들·씬 서비스 등의 런타임 스키마다.
+`EnumTags.fs`의 열거형은 각 네이티브 타입을 구분하는
 `NativeEnumValue<Tag>`로 표현한다. 이름이나 숫자는 해당 `*Values` 모듈에서
 만들며, 유효성은 네이티브 직렬화 규약에 따라 검사한다.
 
@@ -86,13 +87,12 @@ if state.HasValue then
 F# `byref` 인자로 생성하며, 호출 뒤의 네이티브 인자 배열을 새 값에 반영한다.
 `span<const T>` 입력과 mutable 출력 버퍼는 서로 다른 오버로드로 유지한다.
 
-`coverage.json`은 모든 추출된 필드·메서드의 F# 이름, 상태와 미지원 사유를
-기록한다. 현재 2,355개 멤버에 타입이 있는 접근 코드를 생성하고, 357개에는
-`*_Unavailable` 설명을 제공한다. 생명주기 내부 훅, SDK 객체, callback,
-네이티브 포인터 입력처럼 안전한 호출 규약이 없는 항목은 호출 가능한 것으로
-표시하지 않는다. 생성된 메서드도 실행 시 네이티브 서술자의 직렬화·호출
-가능 여부를 확인한다. 이 수치는 코드 생성 범위이며 모든 제품 메서드를
-실행했다는 뜻이 아니다.
+`coverage.json`은 모든 추출된 필드·메서드의 F# 이름, 상태, 호출 방식,
+반환 수명과 미지원 사유를 기록한다. 지원되지 않는 항목에는
+`*_Unavailable` 설명을 제공한다. 생명주기 내부 훅, 임의 메모리 버퍼,
+소유권 이전과 별도 수명 규약이 필요한 타입은 호출 가능으로 표시하지 않는다.
+생성된 메서드도 실행 시 네이티브 서술자의 직렬화·호출 가능 여부를 확인한다.
+생성 범위와 실제로 실행해 검증한 제품 메서드의 범위는 구분한다.
 
 오버로드는 원래 C++ 이름·인자 타입·참조 전달 방식·const 여부로 현재 네이티브
 카탈로그에서 하나를 고른 뒤 정확한 런타임 서명을 사용한다. C++ 선언 문자열을
@@ -148,11 +148,64 @@ let value = terrain.BorrowOverload(methodInfo.Name, methodInfo.Signature).Derefe
 이름은 필드 서술자의 `SerializedName`을 사용한다. 경로의 `Field(name)`과 문자열
 인덱서는 원래 네이티브 필드 이름인 `Name`을 사용한다.
 
+## 기존 네이티브 객체를 받는 호출
+
+`InvokeBound`는 JSON으로 만들 수 있는 값과 이미 존재하는 네이티브 객체를
+하나의 호출에 섞어 전달한다. 생성기는 포인터·소유자·내부 포인터가 있는
+레코드 인자를 받으면 이 경로를 선택한다. F# 뷰는 주소 대신 소유자 generation,
+컴포넌트 instance와 필드·컨테이너 경로를 보낸다. 네이티브 쪽은 모든 인자의
+정확한 타입, const 상태와 생존 여부를 검증한 뒤 메서드를 한 번 호출한다.
+분리된 JSON 스냅샷을 기존 네이티브 객체처럼 넘길 수 없다.
+
+인자 경로는 필드·원소·키·역참조로만 구성한다. 인자 안의 getter 실행은 앞서
+해석한 객체를 무효화할 수 있으므로 허용하지 않는다. 이 규칙 때문에 임의
+조회 결과를 저장한 것처럼 사용하려면 별도의 안정된 신원 API가 필요하다.
+콜백은 아래의 등록 토큰으로 별도 해석한다.
+
+호출의 반환값과 JSON으로 생성한 mutable 참조 인자 출력은 요청 안에서
+직렬화한다. 기존 네이티브 객체를 넘긴 인자의 출력 슬롯은 `null`이다.
+메서드가 그 객체를 제거했을 수 있으므로 호출 뒤 다시 읽지 않는다.
+반환된 값은 읽기 전용 스냅샷이며 살아 있는 가변 객체 핸들이 아니다.
+`AddState` 같은 생성 메서드의 포인터 반환도 이 규칙을 따른다.
+
+`reflgen::script_once`는 인자가 없는 소유권 소비 메서드도 재실행되는 getter
+경로에서 제외한다. `TakePreparedTextureImagePins`가 이 표기를 사용한다.
+결과를 읽기 전에 쓰기 알림을 발행하면 알림이 반환 저장소를 무효화할 수 있어,
+응답을 먼저 캡처하고 `NotifyPropertyChanged`를 호출한다.
+
+## F# 콜백 등록과 해제
+
+`NativeCallbacks.Void`, `Float`, `Vector2`, `Text`, `Condition`은 각각
+`void()`, `void(float)`, `void(math::vector2)`, `void(const std::string&)`,
+`bool(const BlackBoard&)`에 맞는 `NativeCallback<'T>`를 만든다. 등록할 때
+관리 컴포넌트를 지정하며 해당 컴포넌트 수명에 해제를 연결한다.
+조건 콜백은 네이티브 BlackBoard 주소 대신 해당 호출의 읽기 전용 값 스냅샷을
+받는다. 지원 서명에 맞는 메서드 인자에만 이 래퍼를 생성한다.
+
+```fsharp
+let button = entity.GetComponent<UIButton>()
+let click = NativeCallbacks.Void(button, fun () -> printfn "clicked")
+button.Native.SetClickFunction(click)
+// 필요할 때 click.Dispose()로 해제할 수 있다.
+```
+
+관리 함수와 네이티브 dispatch delegate는 등록 기간 동안 root를 유지한다.
+`Dispose`는 네이티브 복사본을 먼저 비활성화하고, 실행 중인 호출이 끝난 뒤
+root를 해제한다. 콜백 안에서 자기 자신을 해제하는 경우에도 현재 호출의
+root는 유지된다. 스크립트 재로딩은 이전 세대를 종료한 뒤 관리 어셈블리를
+내린다. 콜백 실행 중 재진입한 세대 종료는 거절한다.
+
+콜백 등록 경로가 엔진 기능의 구현을 추가하지는 않는다. 기존 ActionMap의
+float 실행 분기와 StateMachine의 주석 처리된 Tick은 별도 엔진 기능 작업이다.
+콜백 필드를 JSON으로 교체하거나 네이티브 에셋 I/O 콜백을 관리 코드로
+넘기는 기능은 제공하지 않는다.
+
 ## 타입 정보와 쓰기 규약
 
 `NativeReflection.Types`는 컴포넌트와 도달 가능한 타입의 전체 서술을 반환한다.
 필드의 `CanRead` / `CanWrite`, 메서드의 `CanInvoke` / `CanBorrowResult` /
-`CanBorrowWithArguments`, `UnavailableReason` / `BorrowUnavailableReason`을
+`CanBorrowWithArguments` / `CanInvokeBound`, `UnavailableReason` /
+`BorrowUnavailableReason` / `BoundUnavailableReason`을
 확인할 수 있다. 실제 경로의 읽기 전용 상태는
 `NativeValue.Describe()`에서 확인한다.
 
@@ -169,7 +222,7 @@ public 참조 데이터 멤버는 getter 기반 필드 서술로 원래 이름�
 불변 조건이 있는 상태는 해당 엔진 API로 변경한다.
 
 `reflgen::script_internal`인 생명주기·소유자·신원 변경 훅은 메타데이터에 남지만
-스크립트에서 직접 호출할 수 없다. 임의 네이티브 주소, SDK 객체, callback,
+스크립트에서 직접 호출할 수 없다. 임의 네이티브 주소, SDK 객체, 등록되지 않은 콜백,
 호출 수명으로 안전하게 표현할 수 없는 인자는 지원하지 않는 이유를 반환한다.
 공개 템플릿 함수의 임의 인스턴스화는 런타임 호출 대상이 아니다.
 
@@ -182,7 +235,7 @@ public 참조 데이터 멤버는 getter 기반 필드 서술로 원래 이름�
 Execute는 응답 ticket을 먼저 확보한 뒤 요청을 한 번 실행한다. Read의 크기 조회와
 버퍼 복사는 같은 결과만 읽는다. F#은 예외가 나도 `finally`에서 ticket을 해제한다.
 요청은 1 MiB, 응답은 8 MiB, 경로는 64단계로 제한하며 큰 자산은 좁은 필드·원소
-경로로 읽는다. API 48 Headless 바인딩도 이 세 슬롯을 필수로 검사한다.
+경로로 읽는다. Headless 바인딩도 반사와 콜백 슬롯 및 정확한 API 버전을 검사한다.
 
 이 경로는 JSON 직렬화와 관리 할당이 있는 범용 API다. 매 프레임 반복되는 이동,
 물리 등은 기존 전용 테이블 호출을 계속 사용할 수 있다.
@@ -215,4 +268,7 @@ Windows 계약 CI는 실제 헤더에서 새로 추출한 두 모듈의 선언�
 
 Windows 계약 CI는 고정된 reflgen 의존성으로 Debug/Release 네이티브·F# 경로를
 검증한다. 전체 Editor/Player의 렌더링·오디오·물리 실행 결과는 별도 제품 회귀
-검증으로 기록해야 한다.
+검증으로 기록해야 한다. `verify-fsharp-native-product.ps1`와 수동
+`native-reflection-product.yml`은 실제 호스트 PID, API 버전, 렌더링, 물리 이동,
+오디오 출력 모드와 콜백 수를 확인한다. 필수 장치나 비공개 빌드 도구가 없으면
+실패하며 계약 테스트의 성공을 제품 실행 성공으로 대신하지 않는다.

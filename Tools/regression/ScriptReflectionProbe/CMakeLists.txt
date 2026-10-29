@@ -40,7 +40,8 @@ add_custom_command(
         "${ENGINE_ROOT}/Engine/SceneRuntime/SimulationExchangeABI.h"
         "${ENGINE_ROOT}/Engine/Utility_Framework/Runtime/ScriptApiVersion.h"
     VERBATIM)
-add_library(ScriptReflectionProvider SHARED native.cpp "${generated}/reflgen_script_reflection_probe.cpp" "${table}/reflgen_creator_script_native.cpp")
+add_library(ScriptReflectionProvider SHARED native.cpp "${generated}/reflgen_script_reflection_probe.cpp" "${table}/reflgen_creator_script_native.cpp"
+    "${ENGINE_ROOT}/Engine/SceneRuntime/ScriptReflectionCallbacks.cpp")
 target_compile_features(ScriptReflectionProvider PRIVATE cxx_std_23)
 target_include_directories(ScriptReflectionProvider PRIVATE "${REFLGEN_INCLUDE_DIR}" "${generated}" "${math_include}")
 target_compile_definitions(ScriptReflectionProvider PRIVATE CE_CONTRACT_STANDALONE=1)
@@ -54,6 +55,33 @@ endif()
 
 add_test(NAME script_reflection_component_inventory
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../verify-native-reflection-inventory.py" --engine "${ENGINE_ROOT}")
+add_executable(ScriptReflectionValueAdaptersProbe "${CMAKE_CURRENT_SOURCE_DIR}/../reflection_runtime_value_adapters_probe.cpp")
+target_compile_features(ScriptReflectionValueAdaptersProbe PRIVATE cxx_std_23)
+target_compile_definitions(ScriptReflectionValueAdaptersProbe PRIVATE CE_CONTRACT_STANDALONE=1)
+target_include_directories(ScriptReflectionValueAdaptersProbe PRIVATE "${REFLGEN_INCLUDE_DIR}")
+if(MSVC)
+    target_compile_options(ScriptReflectionValueAdaptersProbe PRIVATE /utf-8 /EHsc /bigobj /permissive- /Zc:__cplusplus /wd5030)
+else()
+    target_compile_options(ScriptReflectionValueAdaptersProbe PRIVATE -Wno-attributes)
+endif()
+add_test(NAME script_reflection_value_adapters COMMAND ScriptReflectionValueAdaptersProbe)
+add_executable(ScriptReflectionCallbacksProbe
+    "${CMAKE_CURRENT_SOURCE_DIR}/../reflection_callbacks_probe.cpp"
+    "${ENGINE_ROOT}/Engine/SceneRuntime/ScriptReflectionCallbacks.cpp")
+target_compile_features(ScriptReflectionCallbacksProbe PRIVATE cxx_std_23)
+target_compile_definitions(ScriptReflectionCallbacksProbe PRIVATE CE_CONTRACT_STANDALONE=1)
+target_include_directories(ScriptReflectionCallbacksProbe PRIVATE "${REFLGEN_INCLUDE_DIR}" "${math_include}")
+target_link_libraries(ScriptReflectionCallbacksProbe PRIVATE Threads::Threads)
+if(MSVC)
+    target_compile_options(ScriptReflectionCallbacksProbe PRIVATE /utf-8 /EHsc /bigobj /permissive- /Zc:__cplusplus /wd5030)
+else()
+    target_compile_definitions(ScriptReflectionCallbacksProbe PRIVATE __stdcall= __cdecl=)
+    target_compile_options(ScriptReflectionCallbacksProbe PRIVATE -Wno-attributes)
+endif()
+add_test(NAME script_reflection_callbacks COMMAND ScriptReflectionCallbacksProbe)
+set_tests_properties(script_reflection_callbacks PROPERTIES TIMEOUT 30)
+add_test(NAME script_reflection_facade_mapping
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../test_fsharp_native_facades.py")
 add_test(NAME script_reflection_fsharp
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/run_probe.py"
         --dotnet "${DOTNET_EXECUTABLE}" --generator "${REFLGEN_EXECUTABLE}"

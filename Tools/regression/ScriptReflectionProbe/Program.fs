@@ -5,6 +5,7 @@ open System.Text
 open System.Text.Json
 open CreatorEngine
 open CreatorEngine.NativeTypes
+open CreatorEngine.ProbeNativeTypes
 open CreatorEngine.Native
 open CreatorEngine.Native.reflgen_creator_script_native
 
@@ -249,6 +250,21 @@ let main _ =
     rejectRaw (pathRequest ("[" + String.concat "," (Array.create 65 "{\"field\":\"settings\"}") + "]")) "limit_exceeded" "member path length limit"
     rejectRaw "{\"op\":\"get\",\"component\":\"ProbeComponent\",\"instance\":18446744073709551616,\"path\":[]}" "invalid_value" "out-of-range component identity"
 
+    // Bound-call options are part of preflight; malformed response projection
+    // cannot execute a mutation and then merely hide its successful result.
+    let boundCreate extras =
+        sprintf "{\"op\":\"invoke_bound\",\"component\":\"ProbeComponent\",\"instance\":%d,\"path\":[],\"method\":\"CreateSettings\",\"arguments\":[999],\"bindings\":[null],%s}" reflected.InstanceId extras
+    let beforeMalformedBound = ProbeReflectionCalls()
+    rejectRaw (boundCreate "\"discardResult\":\"invalid\"") "invalid_request" "bound discard flag checked before mutation"
+    rejectRaw (boundCreate "\"resultPath\":\"invalid\"") "invalid_request" "bound result path shape checked before mutation"
+    rejectRaw (boundCreate "\"resultPath\":[{\"field\":\"count\",\"index\":0}]") "invalid_request" "ambiguous bound result segment checked before mutation"
+    rejectRaw (boundCreate ("\"resultPath\":[" + String.concat "," (Array.create 65 "{\"deref\":true}") + "]")) "limit_exceeded" "bound result path limit checked before mutation"
+    check (ProbeReflectionCalls() = beforeMalformedBound) "malformed bound-call options have no native side effects"
+    let readNative = byName.["ProbeComponent"].Methods |> Array.find (fun item -> item.Name = "ReadNativeSettings")
+    let emptyPointer = reflected.InvokeBoundOverload("ReadNativeSettings", readNative.Signature,
+        [|null|], [|Some reflected.["missingSettings"]|])
+    check (emptyPointer.Read<int>() = -1) "bound calls preserve an exact typed null native pointer"
+
     let callsBeforeCapacity = ProbeReflectionCalls()
     let reserved = Array.init 64 (fun _ -> pinned request (fun address -> ProbeReflectionExecute(nativeOwner (), address, request.Length)))
     check (reserved |> Array.forall ((<>) 0UL)) "bounded response table accepts its documented ticket capacity"
@@ -263,6 +279,7 @@ let main _ =
     check (threadError = "wrong_thread") "worker rejection is explicit"
     let staleTypedPath = TypedSupportTests.run check rejected reflected
     let staleTypedGetter = TypedFacadeTests.run check rejected entity
+    CallbackTests.run(entity, check)
     ProbeReflectionEnablePhysics()
     let body = wrapper<PhysicsBodyComponent> owner reflected.InstanceId
     let movement = wrapper<CharacterMovementComponent> owner reflected.InstanceId
@@ -281,6 +298,7 @@ let main _ =
     check (body.Reflected.InstanceId = body.ComponentId && body.Reflected.["value"].Read<int>() = 61) "physics wrapper reflection preserves its captured native identity"
     check (movement.Reflected.InstanceId = movement.ComponentId && movement.Reflected.["value"].Read<int>() = 71) "character wrapper reflection preserves its captured native identity"
     let oldNested = reflected.["settings"].["count"]
+    let oldNativeArgument = CreatorEngine.ProbeNativeTypes.reflection_probe_ComponentView.From(entity).shared
     ProbeReflectionReplace()
     rejected staleTypedPath "typed field view rejects removed or replaced component identity" |> ignore
     rejected staleTypedGetter "generated typed getter rejects removed or replaced component identity" |> ignore
@@ -292,6 +310,10 @@ let main _ =
     rejected (fun () -> invalidScript.Native.m_errorMessage |> ignore) "invalid script typed wrapper rejects replacement instance" |> ignore
     let replacement = entity.GetNativeComponent("ProbeComponent")
     check (replacement.InstanceId <> reflected.InstanceId && replacement.["settings"].["count"].Read<int>() = 7) "replacement has a fresh identity"
+    let replacementTyped = CreatorEngine.ProbeNativeTypes.reflection_probe_ComponentView.From(entity)
+    let beforeStaleBinding = ProbeReflectionCalls()
+    rejected (fun () -> replacementTyped.UpdateNativeSettings(oldNativeArgument, 777)) "typed native argument preserves the stale component identity" |> ignore
+    check (ProbeReflectionCalls() = beforeStaleBinding && replacementTyped.shared.Value.count = 7) "stale typed pointer argument fails before mutating the replacement"
     let replacementBody = wrapper<PhysicsBodyComponent> owner replacement.InstanceId
     check (replacementBody.Reflected.InstanceId = replacement.InstanceId) "new physics wrapper resolves its replacement identity"
     ProbeReflectionRemove()

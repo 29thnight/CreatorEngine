@@ -79,7 +79,7 @@ inline void SetRHIUploadDigestEnabled(bool enabled)
 /// 캐시는 GPU 리소스의 소유권을 계속 들고, 패스는 이 값으로 그 프레임의
 /// 뷰만 요청한다. 포맷을 RHI 어휘로 두어 DX12/Vulkan 캐시가 같은
 /// `IRenderTextureCache`를 구현할 수 있게 한다.
-struct RHITextureEntry
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RHITextureEntry
 {
     RHITextureHandle handle;
     RHIFormat        format{ RHIFormat::Unknown };
@@ -133,7 +133,7 @@ struct RHITextureEntry
 
 /// 테이블에 걸 뷰 하나. 정적 팩토리로 만든다 — 필드를 직접 채우면
 /// 위 실수들이 그대로 돌아온다.
-struct RHIBindingDesc
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RHIBindingDesc
 {
     enum class Kind : uint8_t { ShaderResource, UnorderedAccess };
     enum class Dim  : uint8_t { Default, Texture2D, Texture2DArray, TextureCube, Texture3D, Buffer };

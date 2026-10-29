@@ -4,6 +4,7 @@ open System.Reflection
 open System.Collections.Generic
 open System.IO
 open System.Runtime.CompilerServices
+open System.Text.Json
 open CreatorEngine
 open CreatorEngine.Native
 open CreatorEngine.Native.reflgen_creator_script_native
@@ -30,6 +31,9 @@ extern void ProbeMissingRequiredSlot()
 
 [<DllImport("ScriptNativeProvider.dll", CallingConvention = CallingConvention.Cdecl)>]
 extern void ProbeMissingReflectionSlot(int slot)
+
+[<DllImport("ScriptNativeProvider.dll", CallingConvention = CallingConvention.Cdecl)>]
+extern void ProbeMissingCallbackSlot(int slot)
 
 [<DllImport("ScriptNativeProvider.dll", CallingConvention = CallingConvention.Cdecl)>]
 extern uint64 reflgen_creator_script_native_abi_fingerprint()
@@ -66,6 +70,39 @@ let reject action message =
     try action () with :? ArgumentException -> rejected <- true
     check rejected message
 
+let verifyManifest (path: string) (fingerprint: uint64) =
+    use document = JsonDocument.Parse(File.ReadAllText(path))
+    let manifest = document.RootElement
+    let tables = manifest.GetProperty("tables")
+    check (manifest.GetProperty("format").GetString() = "reflgen.fsharp-native"
+           && manifest.GetProperty("namespace").GetString() = "CreatorEngine.Native"
+           && manifest.GetProperty("pointer_width").GetInt32() = IntPtr.Size * 8
+           && tables.GetArrayLength() = 1) "direct native/F# manifest identity"
+    let table = tables[0]
+    check (table.GetProperty("name").GetString() = "ScriptApi"
+           && table.GetProperty("version").GetInt32() = ScriptApiVersion
+           && table.GetProperty("size").GetInt32() = ScriptApiSize) "native manifest and loaded F# API constants agree"
+    let nativeNames =
+        table.GetProperty("fields").EnumerateArray()
+        |> Seq.skip 2
+        |> Seq.map (fun field -> field.GetProperty("name").GetString())
+        |> Seq.toArray
+    let managedNames =
+        typeof<ScriptApi>.GetProperties(BindingFlags.Public ||| BindingFlags.Instance)
+        |> Array.filter (fun property -> typeof<Delegate>.IsAssignableFrom(property.PropertyType))
+        |> Array.sortBy _.MetadataToken
+        |> Array.map _.Name
+    check (nativeNames = managedNames) "native manifest and loaded F# delegate slots have identical order"
+    let manifestFingerprint =
+        UInt64.Parse(manifest.GetProperty("fingerprint").GetString(),
+            Globalization.NumberStyles.AllowHexSpecifier, Globalization.CultureInfo.InvariantCulture)
+    check (manifestFingerprint = fingerprint && fingerprint = AbiFingerprint) "native proof, manifest and loaded F# ABI fingerprints agree"
+    check (typeof<RuntimeBootstrap>.Assembly = typeof<NativeBootstrap>.Assembly
+           && typeof<NativeBootstrap>.Assembly.GetName().Name = "CreatorEngine.NativeBindings"
+           && not (typeof<NativeBootstrap>.Assembly.GetReferencedAssemblies()
+                   |> Array.exists (fun assembly -> assembly.Name = "ScriptCore"))) "resident F# runtime uses the direct native binding assembly"
+    printfn "SCRIPT_NATIVE_TABLE_ORDER_OK slots=%d version=%d bridge=C#-free" nativeNames.Length ScriptApiVersion
+
 [<MethodImpl(MethodImplOptions.NoInlining)>]
 let private isRegistered (registry: Registry) instance =
     not (isNull (registry.Find(instance)))
@@ -88,7 +125,8 @@ let private measureContacts (contacts: IContactDispatcher) (stream: ContactStrea
     GC.GetAllocatedBytesForCurrentThread() - before
 
 [<EntryPoint>]
-let main _ =
+let main arguments =
+    check (arguments.Length = 1) "usage: ScriptNativeTableProbe <native ABI manifest.json>"
     check (Marshal.SizeOf<PhysicsBodyState>() = 60 && Marshal.SizeOf<PhysicsShapeState>() = 88) "physics body and shape ABI sizes"
     check (Marshal.SizeOf<CharacterMovementState>() = 88 && Marshal.OffsetOf<CharacterMovementState>("Tick").ToInt32() = 56) "character ABI size and tick offset"
     check (Marshal.SizeOf<PhysicsHit>() = 64 && Marshal.SizeOf<PhysicsQueryRequest>() = 48 && Marshal.SizeOf<PhysicsBatchResult>() = 16) "physics query ABI sizes"
@@ -96,6 +134,7 @@ let main _ =
     let table = ProbeTable()
     let size = unativeint ScriptApiSize
     let fingerprint = reflgen_creator_script_native_abi_fingerprint()
+    verifyManifest arguments[0] fingerprint
     let getEntry name =
         typeof<NativeBootstrap>.GetMethod(name, BindingFlags.Public ||| BindingFlags.Static).MethodHandle.GetFunctionPointer()
     let initialize = getEntry "Initialize"
@@ -103,6 +142,13 @@ let main _ =
     let isAlive = getEntry "EntityIsAlive"
     check (ProbeInitialize(initialize, table, size, fingerprint ^^^ 1UL, 0) = -1) "native initialization rejects wrong fingerprint"
     check (ProbeInitialize(initialize, table, size, fingerprint, 0) = 0) "native invokes F# initialization"
+    check (NativeReflection.ApiVersion = ScriptApiVersion) "resident F# runtime exposes the bound native API version"
+    let callbackApi = NativeBootstrap.TryGet().Value
+    check (callbackApi.NativeCallback_BeginGeneration.Invoke() = 0UL
+           && callbackApi.NativeCallback_Register.Invoke(0UL, 0, 0n, 0UL) = 0UL
+           && callbackApi.NativeCallback_Disable.Invoke(0UL) = 0
+           && callbackApi.NativeCallback_TakeRetired.Invoke() = 0UL
+           && callbackApi.NativeCallback_EndGeneration.Invoke(0UL) = 0) "API 49 callback slots call correctly typed native rejection stubs"
     check (NativeBootstrap.UsesDirectEntityAlive = System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported) "direct native entity call selected when dynamic code is supported"
     check (System.Threading.Tasks.Task.Run(fun () -> ProbeInitialize(initialize, table, size, fingerprint, 0)).Result = -1) "worker initialization rejected"
     check (ProbeEntityIsAlive(isAlive, 7u, 3u) = 1) "native calls F# which calls native table"
@@ -344,6 +390,10 @@ let main _ =
         let incomplete = ProbeHeadlessTable()
         ProbeMissingReflectionSlot(slot)
         check (ProbeInitialize(initialize, incomplete, size, fingerprint, 1) = -1) "headless provider requires every reflection transport slot"
+    for slot in 0 .. 4 do
+        let incomplete = ProbeHeadlessTable()
+        ProbeMissingCallbackSlot(slot)
+        check (ProbeInitialize(initialize, incomplete, size, fingerprint, 1) = -1) "headless provider requires every rooted callback slot"
     let headlessTable = ProbeHeadlessTable()
     check (ProbeInitialize(initialize, headlessTable, size, fingerprint, 1) = 0) "headless sparse table initializes"
     check (ProbeEntityIsAlive(isAlive, 7u, 3u) = 1) "headless supported entry remains callable"

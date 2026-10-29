@@ -32,7 +32,7 @@ struct ModelNode : public meta::polymorphic
 	ModelNode(std::string_view name) : m_name(name) {}
 };
 
-struct Vertex
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Vertex
 {
 	math::vector3 position{};
 	math::vector3 normal{};

@@ -4,9 +4,65 @@
 #include <reflgen/runtime/value_descriptor.h>
 #include <source_location>
 #include <filesystem>
+#include <atomic>
+#include <compare>
+#include <limits>
 
 namespace reflgen
 {
+    // Comparison results have a stable value representation without exposing
+    // an implementation-defined comparison-category object layout.
+    template<> struct runtime_value_traits<std::strong_ordering>
+    {
+        static constexpr value_shape shape = value_shape::signed_integer;
+        static constexpr bool deserializable = false;
+        static constexpr bool assignment_safe = false;
+        using children = type_list<>;
+        static void write(writer& out, const std::strong_ordering& value)
+        {
+            out.write_int(value < 0 ? -1 : value > 0 ? 1 : 0);
+        }
+    };
+
+    // Keep the native file-clock epoch and tick period. This is an exact integer
+    // timestamp, not a guessed conversion to Unix time or CLR DateTime ticks.
+    template<> struct runtime_value_traits<std::filesystem::file_time_type>
+    {
+        static constexpr value_shape shape = value_shape::signed_integer;
+        static constexpr bool assignment_safe = true;
+        using children = type_list<>;
+        using duration = std::filesystem::file_time_type::duration;
+        using rep = duration::rep;
+        static_assert(std::is_integral_v<rep> && std::is_signed_v<rep> && sizeof(rep) <= sizeof(std::int64_t));
+        static void write(writer& out, const std::filesystem::file_time_type& value)
+        {
+            out.write_int(static_cast<std::int64_t>(value.time_since_epoch().count()));
+        }
+        static void read(reader& in, std::filesystem::file_time_type& value)
+        {
+            const std::int64_t ticks = in.read_int();
+            if (ticks < (std::numeric_limits<rep>::min)() || ticks > (std::numeric_limits<rep>::max)())
+            {
+                throw serialization_error("native file-clock tick count is out of range");
+            }
+            value = std::filesystem::file_time_type(duration(static_cast<rep>(ticks)));
+        }
+    };
+
+    // Completion/publication flags may be inspected without treating their
+    // atomic object storage as bool or allowing a script to publish completion.
+    template<> struct runtime_value_traits<std::atomic<bool>>
+    {
+        static constexpr value_shape shape = value_shape::boolean;
+        static constexpr bool deserializable = false;
+        static constexpr bool assignment_safe = false;
+        using children = type_list<>;
+        static void write(writer& out, const std::atomic<bool>& value)
+        {
+            out.write_bool(value.load(std::memory_order_acquire));
+        }
+    };
+
     // A filesystem path is a textual value, even though its C++ iterator exposes
     // component paths. Treating it as a recursive range would lose that value.
     template<> struct runtime_value_traits<std::filesystem::path>

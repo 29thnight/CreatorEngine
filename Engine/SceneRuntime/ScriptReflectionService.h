@@ -215,6 +215,12 @@ namespace ce::script::reflection
         // Must re-resolve the supplied owner handle and reject stale owners.
         // Returned views only exist for this Execute call.
         std::function<std::vector<component_view>()> components;
+        // Optional cross-owner resolution for native arguments. The returned
+        // roots pin the selected entity/components for this request only.
+        std::function<std::vector<component_view>(std::uint32_t, std::uint32_t)> components_for;
+        // Opaque callback tokens resolve only to the exact registered native
+        // signature. The returned view retains the rooted callback wrapper.
+        std::function<reflgen::value_view(std::uint64_t, const reflgen::value_descriptor&)> bind_callback;
     };
 
     inline std::string_view passing_name(reflgen::parameter_passing passing)
@@ -337,6 +343,8 @@ namespace ce::script::reflection
                     {"returnType", public_type_name(method.result())}, {"parameters", std::move(parameters)},
                     {"callable", method.is_serialized_invocable()},
                     {"reason", method.serialized_unavailable_reason()},
+                    {"boundCallable", method.is_bound_invocable()},
+                    {"boundReason", method.bound_unavailable_reason()},
                     {"canBorrow", method.can_borrow_result()},
                     {"canBorrowWithArguments", method.can_borrow_result_with_arguments()},
                     {"borrowReason", method.borrow_unavailable_reason()}, {"isConst", method.is_const()}});
@@ -378,12 +386,56 @@ namespace ce::script::reflection
 
     private:
         static json_value perform(const host& environment, const json_value& request);
+        static void validate_path(const json_value::array& path, bool allowMethods);
         static reflgen::value_view resolve_path(reflgen::value_view current, const json_value::array& path,
             std::string& rootField, const std::function<bool()>& alive);
         static json_value read_value(reflgen::value_view value, std::size_t depth,
             std::set<std::pair<std::uint64_t, const void*>>& visiting, std::size_t& nodes);
         static void write_value(reflgen::value_view value, const json_value& replacement);
     };
+
+    inline void service::validate_path(const json_value::array& path, bool allowMethods)
+    {
+        if (path.size() > MaximumPathLength)
+        {
+            throw protocol_error("limit_exceeded", "member path exceeds 64 segments");
+        }
+        for (const auto& segment : path)
+        {
+            const auto& fields = segment.as_object();
+            const auto* member = segment.find("field");
+            const auto* index = segment.find("index");
+            const auto* key = segment.find("key");
+            const auto* dereference = segment.find("deref");
+            const auto* method = segment.find("method");
+            const auto* signature = segment.find("signature");
+            const auto* arguments = segment.find("arguments");
+            if ((member != nullptr) + (index != nullptr) + (key != nullptr) + (dereference != nullptr)
+                + (method != nullptr) != 1 || fields.size() != 1u + (signature ? 1u : 0u) + (arguments ? 1u : 0u)
+                || ((signature || arguments) && !method))
+            {
+                throw protocol_error("invalid_request", "a path segment must select exactly one field, index, key, deref or method");
+            }
+            if (method && !allowMethods)
+            {
+                throw protocol_error("unstable_argument", "native arguments require a field/container path; getter evaluation could invalidate an earlier binding");
+            }
+            if (member) (void)member->as_string();
+            if (key) (void)key->as_string();
+            if (method) (void)method->as_string();
+            if (signature) (void)signature->as_string();
+            if (arguments) (void)arguments->as_array();
+            if (index && index->as_unsigned() > (std::numeric_limits<std::size_t>::max)())
+            {
+                throw protocol_error("out_of_range", "container index exceeds the native size range");
+            }
+            if (dereference)
+            {
+                const auto* flag = std::get_if<bool>(&dereference->data);
+                if (!flag || !*flag) throw protocol_error("invalid_request", "deref must be true");
+            }
+        }
+    }
 
     inline reflgen::value_view service::resolve_path(reflgen::value_view current,
         const json_value::array& path, std::string& rootField, const std::function<bool()>& alive)
@@ -630,7 +682,8 @@ namespace ce::script::reflection
             }
             return result;
         }
-        if (operation != "describe" && operation != "get" && operation != "set" && operation != "invoke")
+        if (operation != "describe" && operation != "get" && operation != "set" && operation != "invoke"
+            && operation != "invoke_bound")
             throw protocol_error("invalid_operation", "unknown reflection operation '" + operation + "'");
 
         const auto& wanted = request.require("component").as_string();
@@ -685,6 +738,192 @@ namespace ce::script::reflection
             signature ? signature->as_string() : std::string_view{});
         if (!selected.is_writable() && !method.is_const())
             throw protocol_error("read_only", "cannot invoke a mutable method through a read-only path");
+        if (operation == "invoke_bound")
+        {
+            if (!method.is_bound_invocable())
+            {
+                throw protocol_error("unsupported", std::string(method.bound_unavailable_reason()));
+            }
+            const auto& arguments = request.require("arguments").as_array();
+            const auto& bindings = request.require("bindings").as_array();
+            if (arguments.size() != method.parameters().size() || bindings.size() != arguments.size())
+            {
+                throw protocol_error("invalid_request", "bound argument and binding counts must match the native method");
+            }
+            bool discard = false;
+            if (const auto* discardValue = request.find("discardResult"))
+            {
+                const auto* flag = std::get_if<bool>(&discardValue->data);
+                if (!flag) throw protocol_error("invalid_request", "discardResult must be a boolean");
+                discard = *flag;
+            }
+            const auto* resultPath = request.find("resultPath");
+            if (resultPath)
+            {
+                if (discard) throw protocol_error("invalid_request", "a discarded result cannot also have a projection");
+                validate_path(resultPath->as_array(), true);
+            }
+            for (const auto& binding : bindings)
+            {
+                if (!std::holds_alternative<std::monostate>(binding.data))
+                {
+                    if (const auto* callback = binding.find("callback"))
+                    {
+                        if (binding.as_object().size() != 1 || callback->as_unsigned() == 0)
+                            throw protocol_error("invalid_request", "a callback binding requires exactly one nonzero opaque token");
+                    }
+                    else
+                    {
+                        validate_path(binding.require("path").as_array(), false);
+                    }
+                }
+            }
+            // Keep every host-supplied pin alive until the call and response
+            // projection finish. Only paths, owner generations and component
+            // instances cross the ABI; no JSON number is a native address.
+            std::vector<std::vector<component_view>> argumentRoots;
+            argumentRoots.reserve(bindings.size());
+            std::vector<reflgen::value_view> nativeArguments(bindings.size());
+            std::vector<const component_view*> boundRoots(bindings.size());
+            std::vector<std::string> boundFields(bindings.size());
+            for (std::size_t index = 0; index < bindings.size(); ++index)
+            {
+                if (std::holds_alternative<std::monostate>(bindings[index].data))
+                {
+                    continue;
+                }
+                if (!std::holds_alternative<std::monostate>(arguments[index].data))
+                {
+                    throw protocol_error("invalid_request", "a bound native argument requires a null JSON placeholder");
+                }
+                const auto& binding = bindings[index];
+                if (const auto* callback = binding.find("callback"))
+                {
+                    if (!environment.bind_callback)
+                        throw protocol_error("unsupported", "this host does not resolve rooted callbacks");
+                    nativeArguments[index] = environment.bind_callback(callback->as_unsigned(),
+                        method.parameters()[index].value());
+                    if (!nativeArguments[index])
+                        throw protocol_error("invalid_callback", "callback token is expired or has a different native signature");
+                    continue;
+                }
+                const auto& bindingOwner = binding.require("owner");
+                const auto ownerIndex = bindingOwner.require("index").as_unsigned();
+                const auto ownerGeneration = bindingOwner.require("generation").as_unsigned();
+                if (ownerIndex > (std::numeric_limits<std::uint32_t>::max)()
+                    || ownerGeneration > (std::numeric_limits<std::uint32_t>::max)() || ownerGeneration == 0)
+                {
+                    throw protocol_error("invalid_request", "native argument owner is not a valid generation handle");
+                }
+                if (!environment.components_for)
+                {
+                    throw protocol_error("unsupported", "this host does not resolve native argument owners");
+                }
+                argumentRoots.push_back(environment.components_for(static_cast<std::uint32_t>(ownerIndex),
+                    static_cast<std::uint32_t>(ownerGeneration)));
+                const auto& bindingType = binding.require("component").as_string();
+                const auto bindingInstance = binding.require("instance").as_unsigned();
+                for (const auto& candidate : argumentRoots.back())
+                {
+                    if (candidate.type && candidate.type->name() == bindingType
+                        && candidate.instance == bindingInstance && candidate.address
+                        && (!candidate.alive || candidate.alive()))
+                    {
+                        boundRoots[index] = &candidate;
+                        break;
+                    }
+                }
+                const auto* bindingRoot = boundRoots[index];
+                if (!bindingRoot)
+                {
+                    throw protocol_error("stale_component", "the native argument component instance no longer exists");
+                }
+                nativeArguments[index] = resolve_path(bindingRoot->type->value().view(bindingRoot->address),
+                    binding.require("path").as_array(), boundFields[index], bindingRoot->alive);
+            }
+            // A later argument getter may remove an earlier owner/component.
+            // Recheck all roots immediately before invoking native code.
+            if (root->alive && !root->alive())
+            {
+                throw protocol_error("stale_component", "the invocation receiver was removed during argument resolution");
+            }
+            for (const auto* bindingRoot : boundRoots)
+            {
+                if (bindingRoot && bindingRoot->alive && !bindingRoot->alive())
+                {
+                    throw protocol_error("stale_component", "a native argument was removed during argument resolution");
+                }
+            }
+            const auto argumentText = json_text(json_value(arguments));
+            reflgen::json::reader in(argumentText, MaximumPathLength + 16);
+            auto call = method.invoke_bound(selected, in, nativeArguments);
+            in.finish();
+            const auto notify = [&]
+            {
+                if (!method.is_const() && root->notify)
+                {
+                    root->notify(rootField.empty() ? std::string_view("*") : std::string_view(rootField));
+                }
+                for (std::size_t index = 0; index < boundRoots.size(); ++index)
+                {
+                    const auto* bindingRoot = boundRoots[index];
+                    if (bindingRoot && nativeArguments[index].is_writable() && bindingRoot->notify)
+                    {
+                        bindingRoot->notify(boundFields[index].empty() ? std::string_view("*") : std::string_view(boundFields[index]));
+                    }
+                }
+            };
+            // Notifications may remove or reallocate the result's native
+            // storage. Capture the response first, then publish notifications.
+            // A failed projection still reports the mutation once.
+            struct notification_guard
+            {
+                const decltype(notify)& publish;
+                bool pending = true;
+                ~notification_guard()
+                {
+                    if (pending)
+                    {
+                        try { publish(); } catch (...) {}
+                    }
+                }
+            } notification{notify};
+            json_value::array outputArguments;
+            outputArguments.reserve(call.arguments.size());
+            for (const auto& argument : call.arguments)
+            {
+                std::set<std::pair<std::uint64_t, const void*>> visiting;
+                std::size_t nodes = 0;
+                outputArguments.push_back(read_value(argument, 0, visiting, nodes));
+            }
+            json_value result;
+            if (!discard && call.result)
+            {
+                if (root->alive && !root->alive())
+                {
+                    throw protocol_error("stale_component", "the receiver was removed before its result could be read");
+                }
+                auto value = std::move(call.result);
+                if (resultPath)
+                {
+                    reflgen::value_view readonly(value.descriptor(), value.data());
+                    readonly.retain_parent(value);
+                    std::string ignoredField;
+                    value = resolve_path(std::move(readonly), resultPath->as_array(), ignoredField, root->alive);
+                    if (root->alive && !root->alive())
+                    {
+                        throw protocol_error("stale_component", "the receiver was removed during result projection");
+                    }
+                }
+                std::set<std::pair<std::uint64_t, const void*>> visiting;
+                std::size_t nodes = 0;
+                result = read_value(value, 0, visiting, nodes);
+            }
+            auto response = json_value::object{{"result", std::move(result)}, {"arguments", std::move(outputArguments)}};
+            notification.pending = false;
+            notify();
+            return response;
+        }
         if (!method.is_serialized_invocable())
             throw protocol_error("unsupported", std::string(method.serialized_unavailable_reason()));
         const auto* arguments = request.find("arguments");

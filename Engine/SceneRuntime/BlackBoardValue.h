@@ -2,8 +2,7 @@
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
-#include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "../Utility_Framework/Foundation/Core.Minimal.h"
+#include <string>
 #include "BlackBoardEnum.h"
 
 struct [[reflgen::reflect, reflgen::public_methods]] BlackBoardValue

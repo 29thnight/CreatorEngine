@@ -1,6 +1,7 @@
 #include "../Containers/ContainerAPI.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "ScriptReflectionBindings.h"
+#include "ScriptReflectionCallbacks.h"
 #include "ScriptReflectionService.h"
 #include "ScriptObjectRegistry.h"
 #include "Component.h"
@@ -97,6 +98,11 @@ namespace
             host environment;
             environment.component_types = &ComponentTypes;
             environment.components = [owner] { return LiveComponents(owner); };
+            environment.components_for = [](std::uint32_t index, std::uint32_t generation)
+            {
+                return LiveComponents(ScriptObjectHandle{index, generation});
+            };
+            environment.bind_callback = &ResolveCallback;
             Meta::ScopedPropertyChangeSource source(Meta::PropertyChangeSource::Script);
             return service::execute(environment, std::string_view(request, static_cast<std::size_t>(bytes)));
         });
@@ -117,7 +123,10 @@ namespace ce::script::binding
 {
     void RegisterReflectionApi(ScriptApiTable& table)
     {
-        EndReflectionSession();
+        // Callback rebinding can refuse an active invocation. Perform that
+        // preflight before retiring any existing reflection-session state.
+        RegisterReflectionCallbackApi(table);
+        g_reflectionResponses.clear();
         {
             std::lock_guard lock(g_reflectionSessionMutex);
             g_reflectionOwner = std::this_thread::get_id();
@@ -130,6 +139,7 @@ namespace ce::script::binding
 
     void EndReflectionSession() noexcept
     {
+        EndReflectionCallbackSession();
         try
         {
             std::lock_guard lock(g_reflectionSessionMutex);

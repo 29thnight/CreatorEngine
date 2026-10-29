@@ -16,7 +16,7 @@ namespace wave
     //
     //   요청을 값으로 받으면 서비스는 컴포넌트를 모른다. 에디터 프리뷰도, 스크립트
     //   호출도, 테스트 fixture 도 같은 문으로 들어온다.
-    struct PlayRequest final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] PlayRequest final
     {
         ClipKey clip;
         BusId bus{ Buses::SFX };

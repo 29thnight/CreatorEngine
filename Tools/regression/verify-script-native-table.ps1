@@ -1,11 +1,70 @@
 [CmdletBinding()]
-param([ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug')
+param(
+    [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
+    [string]$ManifestPath,
+    [switch]$ValidateManifestOnly
+)
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $project = Join-Path $PSScriptRoot 'ScriptNativeTableProbe/ScriptNativeTableProbe.fsproj'
 $probe = Join-Path $PSScriptRoot 'ScriptNativeTableProbe'
 $output = Join-Path $probe "bin/$Configuration/net10.0"
 $proof = Join-Path $repo "ScriptNative/obj/$Configuration/native-bindings/reflgen_creator_script_native.cpp"
+if (!$ManifestPath) {
+    $ManifestPath = Join-Path $repo "ScriptNative/obj/$Configuration/native-bindings/reflgen_creator_script_native.json"
+}
+
+function Assert-NativeTableContract([string]$Path) {
+    $manifest = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    if ($manifest.format -cne 'reflgen.fsharp-native' -or $manifest.version -ne 1 -or
+        $manifest.module -cne 'creator_script' -or $manifest.namespace -cne 'CreatorEngine.Native' -or
+        $manifest.pointer_width -ne 64 -or @($manifest.tables).Count -ne 1 -or
+        $manifest.tables[0].name -cne 'ScriptApi') {
+        throw 'Expected the direct CreatorEngine.Native 64-bit ScriptApi manifest.'
+    }
+    $table = $manifest.tables[0]
+    $fields = @($table.fields)
+    if ($fields.Count -lt 3 -or $fields[0].name -cne 'version' -or $fields[0].offset -ne 0 -or
+        $fields[1].name -cne 'structSize' -or $fields[1].offset -ne 4) {
+        throw 'The native table must begin with the version and structSize header.'
+    }
+    $nativeFields = @($fields | Select-Object -Skip 2 | ForEach-Object { $_.name })
+    $source = Get-Content (Join-Path $repo 'Engine/SceneRuntime/ScriptApiTable.h') -Raw
+    $start = $source.IndexOf('struct ScriptApiTable', [StringComparison]::Ordinal)
+    $end = if ($start -ge 0) { $source.IndexOf('using ScriptApiBinding', $start, [StringComparison]::Ordinal) } else { -1 }
+    if ($start -lt 0 -or $end -le $start) { throw 'The canonical native API table declaration was not found.' }
+    $declaration = $source.Substring($start, $end - $start)
+    $sourceFields = @([regex]::Matches($declaration, '\(__stdcall\s*\*\s*(\w+)\s*\)') |
+        ForEach-Object { $_.Groups[1].Value })
+    if ($nativeFields.Count -ne $sourceFields.Count) {
+        throw "Native source and generated table slot counts differ: $($sourceFields.Count) and $($nativeFields.Count)."
+    }
+    for ($index = 0; $index -lt $nativeFields.Count; ++$index) {
+        if ($nativeFields[$index] -cne $sourceFields[$index] -or
+            $fields[$index + 2].offset -ne (8 + 8 * $index)) {
+            throw "Generated native slot $index differs from ScriptApiTable.h: $($nativeFields[$index])."
+        }
+    }
+    $versionSource = Get-Content (Join-Path $repo 'Engine/Utility_Framework/Runtime/ScriptApiVersion.h') -Raw
+    $version = [regex]::Match($versionSource, 'CreatorScriptApiVersion\s*=\s*(\d+)')
+    if (!$version.Success -or [int]$version.Groups[1].Value -lt 49 -or
+        [int]$version.Groups[1].Value -ne $table.version -or
+        $table.size -ne (8 + 8 * $nativeFields.Count)) {
+        throw 'Native source and generated ABI version or table size differ.'
+    }
+    foreach ($required in @('NativeCallback_BeginGeneration', 'NativeCallback_Register',
+        'NativeCallback_Disable', 'NativeCallback_TakeRetired', 'NativeCallback_EndGeneration')) {
+        if ($nativeFields -cnotcontains $required) { throw "API 49 is missing the required callback slot: $required" }
+    }
+    [pscustomobject]@{ Manifest = $manifest; Slots = $nativeFields.Count; Version = $table.version }
+}
+
+if ($ValidateManifestOnly) {
+    $contract = Assert-NativeTableContract $ManifestPath
+    "SCRIPT_NATIVE_TABLE_SOURCE_OK slots=$($contract.Slots) version=$($contract.Version)"
+    return
+}
+
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
 $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if (!$vs) { throw 'MSVC C++ tools are required.' }
@@ -13,34 +72,21 @@ Push-Location $repo
 try {
     & dotnet build $project -c $Configuration --nologo
     if ($LASTEXITCODE -ne 0) { throw 'F# table probe build failed.' }
-    $manifest = Get-Content (Join-Path $repo "ScriptNative/obj/$Configuration/native-bindings/reflgen_creator_script_native.json") -Raw | ConvertFrom-Json
-    $nativeFields = @($manifest.tables[0].fields | Select-Object -Skip 2 | ForEach-Object { $_.name })
-    $coreSource = Get-Content (Join-Path $repo 'ScriptCore/Native.cs') -Raw
-    $coreStart = $coreSource.IndexOf('internal unsafe struct ScriptApiTable')
-    $coreEnd = $coreSource.IndexOf('internal static unsafe class Native', $coreStart)
-    if ($coreStart -lt 0 -or $coreEnd -lt 0) { throw 'ScriptCore table declaration was not found.' }
-    $coreTable = $coreSource.Substring($coreStart, $coreEnd - $coreStart)
-    $managedFields = @([regex]::Matches($coreTable, 'public\s+delegate\*\s+unmanaged\s*<[^>]+>\s+(\w+)\s*;') | ForEach-Object { $_.Groups[1].Value })
-    if ($nativeFields.Count -ne $managedFields.Count) { throw "Native and ScriptCore slot counts differ: $($nativeFields.Count) and $($managedFields.Count)." }
-    for ($index = 0; $index -lt $nativeFields.Count; ++$index) {
-        if ($nativeFields[$index] -cne $managedFields[$index]) { throw "Native and ScriptCore slot $index differs: $($nativeFields[$index]) and $($managedFields[$index])." }
+    $contract = Assert-NativeTableContract $ManifestPath
+    if ($contract.Manifest.target -notmatch '^x86_64-.*windows') {
+        throw 'The Windows host probe requires a manifest generated for the Windows x64 target.'
     }
-    $expectedVersion = [regex]::Match($coreSource, 'ExpectedVersion\s*=\s*(\d+)')
-    $runtimeSource = Get-Content (Join-Path $repo 'ScriptRuntime/Runtime.fs') -Raw
-    $runtimeVersion = [regex]::Match($runtimeSource, 'member\s+_\.ScriptApi\s*=\s*(\d+)')
-    if (!$expectedVersion.Success -or !$runtimeVersion.Success -or
-        [int]$expectedVersion.Groups[1].Value -ne $manifest.tables[0].version -or
-        [int]$runtimeVersion.Groups[1].Value -ne $manifest.tables[0].version) {
-        throw 'Native, ScriptCore and F# runtime API versions differ.'
-    }
-    "SCRIPT_NATIVE_TABLE_ORDER_OK slots=$($nativeFields.Count) version=$($manifest.tables[0].version)"
+    # The native proof below compiles sizeof/offsetof/type checks from the same
+    # manifest. Program.fs independently compares that manifest with the loaded
+    # F# ScriptApi properties, constants and the provider's ABI fingerprint.
+    "SCRIPT_NATIVE_TABLE_SOURCE_OK slots=$($contract.Slots) version=$($contract.Version)"
     $vcvars = Join-Path $vs 'VC/Auxiliary/Build/vcvars64.bat'
     $native = Join-Path $probe 'native.cpp'
     $nativeDll = Join-Path $output 'ScriptNativeProvider.dll'
     $command = 'call "{0}" >nul && cl /nologo /utf-8 /std:c++20 /EHsc /LD "{1}" "{2}" /Fe:"{3}" /Fo:"{4}\\"' -f $vcvars, $native, $proof, $nativeDll, $output
     & $env:ComSpec /d /c $command
     if ($LASTEXITCODE -ne 0) { throw 'Native table probe build failed.' }
-    & dotnet (Join-Path $output 'ScriptNativeTableProbe.dll')
+    & dotnet (Join-Path $output 'ScriptNativeTableProbe.dll') $ManifestPath
     if ($LASTEXITCODE -ne 0) { throw 'Native table probe failed.' }
     $hostSource = Join-Path $probe 'hostfxr_probe.cpp'
     $hostExe = Join-Path $output 'ScriptNativeHostProbe.exe'

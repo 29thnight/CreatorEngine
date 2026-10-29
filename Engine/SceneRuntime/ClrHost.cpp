@@ -2993,7 +2993,22 @@ void ClrHost::Shutdown()
         return;
     }
 
-	if (nullptr != m_fnShutdown) m_fnShutdown();
+    if (nullptr != m_fnShutdown)
+    {
+        const int result = m_fnShutdown();
+        // F# returns 1 when a callback retirement barrier refused to begin
+        // shutdown. The managed runtime and native roots must stay bound until
+        // the caller retries after the active callback has returned. A -1
+        // reports cleanup errors after managed shutdown and retains the legacy
+        // behavior of completing native teardown.
+        if (result == 1)
+        {
+            Debug::PrintLog(spdlog::level::warn, "[CLR] Shutdown deferred until native callbacks have retired.");
+            return;
+        }
+        if (result != 0)
+            Debug::PrintLog(spdlog::level::warn, "[CLR] Managed shutdown completed with cleanup errors.");
+    }
     if (m_useFSharp && m_fnFSharpUnbind)
     {
         m_fnFSharpUnbind();

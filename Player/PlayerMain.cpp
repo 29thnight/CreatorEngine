@@ -70,6 +70,7 @@ import Creator.AppBackend.WinAPI;
 #include "../Engine/Utility_Framework/Time/TimeSystem.h"
 #include "UIManager.h"
 #include "../Engine/Utility_Framework/Runtime/RuntimeSettings.h"
+#include "../Engine/Utility_Framework/Runtime/RuntimeResults.h"
 #include "../Engine/Utility_Framework/Authoring/AuthoringParseTelemetry.h"
 #include "../Engine/Utility_Framework/Authoring/SerializationProfiler.h"
 #if !CE_SHIPPING
@@ -656,6 +657,14 @@ void Player::PlayerMain::Finalize()
 	ClrHost::Get().Shutdown();
 	TagManagers->Finalize();
     SceneManagers->BindAudioPlayback(nullptr);
+    const auto audioCounters = m_audioHost->Counters();
+    Diagnostics::RuntimeResults::Emit("audio.host", [&](Diagnostics::Node data)
+    {
+        data["outputMode"] << static_cast<int>(m_audioHost->Mode());
+        data["backendCountersAvailable"] << audioCounters.backendCountersAvailable;
+        data["callbackCount"] << audioCounters.callbackCount;
+        data["backendFailures"] << audioCounters.voices.backendFailures;
+    });
     m_audioPlayback->Shutdown();
     m_audioCatalog->Clear();
     m_audioHost->Shutdown();

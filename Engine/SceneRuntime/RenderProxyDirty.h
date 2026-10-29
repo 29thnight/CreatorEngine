@@ -33,7 +33,7 @@ constexpr bool AnyProxyDirty(ProxyDirty value) noexcept
 	return ProxyDirty::None != value;
 }
 
-struct RenderProxyCommitMetrics
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RenderProxyCommitMetrics
 {
 	std::uint64_t registered = 0;
 	std::uint64_t pending = 0;

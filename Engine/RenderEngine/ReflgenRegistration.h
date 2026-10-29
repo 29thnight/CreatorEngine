@@ -33,3 +33,6 @@ import Creator.Core.Ownership;
 #include "Assets/ModelMeshDescriptor.h"
 #include "Assets/ModelAnimationDescriptor.h"
 #include "../SceneRuntime/TweenManager.h"
+#include "../SceneRuntime/MaterialAssetReferenceState.h"
+#include "../SceneRuntime/ScriptReflectionAudioValues.h"
+#include "../SceneRuntime/ScriptReflectionSceneViews.h"

@@ -114,6 +114,8 @@ type NativeMethodDescriptor internal (metadata: JsonElement) =
     member _.IsConst = ReflectionJson.flag "isConst" metadata
     member _.Parameters = ReflectionJson.array "parameters" metadata |> Array.map NativeParameterDescriptor
     member _.CanInvoke = ReflectionJson.flag "callable" metadata
+    member _.CanInvokeBound = ReflectionJson.flag "boundCallable" metadata
+    member _.BoundUnavailableReason = ReflectionJson.text "boundReason" metadata
     member _.CanBorrowResult = ReflectionJson.flag "canBorrow" metadata
     member _.CanBorrowWithArguments = ReflectionJson.flag "canBorrowWithArguments" metadata
     member _.BorrowUnavailableReason = ReflectionJson.text "borrowReason" metadata
@@ -215,6 +217,41 @@ type NativeValue internal (owner: ObjectHandle, componentName: string, instance:
         ArgumentNullException.ThrowIfNull(arguments)
         NativeInvocationResult(this.Request("invoke", [ "method", box methodName; "signature", box signature;
                                                         "arguments", box arguments ]))
+    /// Resolve native arguments by generation-checked paths and invoke exactly once.
+    /// Results are detached snapshots. A bound argument's output slot is null,
+    /// because the method may have removed or relocated that native object.
+    member this.InvokeBoundOverload(methodName: string, signature: string, arguments: obj array,
+                                    bindings: NativeValue option array, ?discardResult: bool,
+                                    ?resultPath: Dictionary<string, obj> array,
+                                    ?callbackTokens: uint64 option array) =
+        ArgumentException.ThrowIfNullOrEmpty(methodName)
+        ArgumentException.ThrowIfNullOrEmpty(signature)
+        ArgumentNullException.ThrowIfNull(arguments)
+        ArgumentNullException.ThrowIfNull(bindings)
+        if arguments.Length <> bindings.Length then
+            invalidArg "bindings" "Every argument requires one optional native binding."
+        let callbacks = defaultArg callbackTokens (Array.create arguments.Length None)
+        if callbacks.Length <> arguments.Length then
+            invalidArg "callbackTokens" "Every argument requires one optional callback token."
+        let wireBindings =
+            Array.map2 (fun (binding: NativeValue option) callback ->
+                match binding, callback with
+                | Some _, Some _ -> invalidArg "callbackTokens" "An argument cannot bind both a native path and a callback."
+                | None, Some token ->
+                    if token = 0UL then invalidArg "callbackTokens" "Callback tokens must be nonzero."
+                    box (ReflectionJson.fields [ "callback", box token ])
+                | None, None -> null
+                | Some value, None ->
+                    box (ReflectionJson.fields [
+                        "owner", box (ReflectionJson.fields [ "index", box value.Owner.Index;
+                                                              "generation", box value.Owner.Generation ])
+                        "component", box value.ComponentName; "instance", box value.NativeInstance
+                        "path", box value.Path ])) bindings callbacks
+        let extras = [ "method", box methodName; "signature", box signature
+                       "arguments", box arguments; "bindings", box wireBindings
+                       "discardResult", box (defaultArg discardResult false) ]
+        let extras = match resultPath with Some path -> ("resultPath", box path) :: extras | None -> extras
+        NativeInvocationResult(this.Request("invoke_bound", extras))
 
 /// A generation-checked view of a concrete component, including types with no handwritten F# wrapper.
 [<Sealed>]
@@ -228,6 +265,11 @@ type NativeObject internal (owner: ObjectHandle, typeName: string, typeId: uint6
 /// Complete native component catalog and the recursively reachable reflected value graph.
 [<AbstractClass; Sealed>]
 type NativeReflection private () =
+    /// Version of the table accepted by the resident binding's ABI validation.
+    static member ApiVersion =
+        match NativeBootstrap.TryGet() with
+        | Some _ -> CreatorEngine.Native.reflgen_creator_script_native.ScriptApiVersion
+        | None -> raise (NativeReflectionException("unavailable", "The native reflection provider is not initialized."))
     static member Types =
         let response = NativeReflectionTransport.execute ObjectHandle.Invalid (ReflectionJson.fields [ "op", box "catalog" ])
         response.EnumerateArray() |> Seq.map (fun item -> NativeTypeDescriptor(item.Clone())) |> Seq.toArray

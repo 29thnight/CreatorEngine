@@ -21,7 +21,7 @@ namespace wave
     enum class SoundNodeKind : std::uint8_t { Clip, Random, Switch, Layer, GainPitch, Parameter, Output };
     enum class SoundSourceKind : std::uint8_t { Clip, Preset, Graph };
 
-    struct SoundSource final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] SoundSource final
     {
         SoundSourceKind kind{ SoundSourceKind::Clip };
         ClipKey asset;

@@ -59,6 +59,12 @@ namespace ce::script::binding
     static_assert(sizeof(AudioAssetId) == 16u);
     static_assert(sizeof(AudioPlaySettings) == 60u);
 
+    // Callback pointers enter only through this typed ABI, never through the
+    // reflection JSON protocol. UTF-8 data is borrowed for the call's duration.
+    // kind: 0=void, 1=float, 2=vector2, 3=string, 4=BlackBoard condition.
+    using ScriptCallbackDispatch = int (__stdcall*)(std::uint64_t context, int kind,
+        float x, float y, const char* utf8, int bytes);
+
 	struct ScriptApiTable
 	{
 		int version;
@@ -369,6 +375,15 @@ namespace ce::script::binding
         std::uint64_t (__stdcall* NativeReflection_Execute)(ScriptObjectHandle owner, const char* request, int bytes);
         int (__stdcall* NativeReflection_Read)(std::uint64_t ticket, char* output, int capacity);
         void (__stdcall* NativeReflection_Release)(std::uint64_t ticket);
+
+        // Append-only v49. Disable closes the native invocation gate first;
+        // TakeRetired releases managed roots only after in-flight calls finish.
+        std::uint64_t (__stdcall* NativeCallback_BeginGeneration)();
+        std::uint64_t (__stdcall* NativeCallback_Register)(std::uint64_t generation,
+            int kind, ScriptCallbackDispatch dispatch, std::uint64_t context);
+        int (__stdcall* NativeCallback_Disable)(std::uint64_t token);
+        std::uint64_t (__stdcall* NativeCallback_TakeRetired)();
+        int (__stdcall* NativeCallback_EndGeneration)(std::uint64_t generation);
 
 	};
 

@@ -88,6 +88,13 @@ let run (check: bool -> string -> unit) (rejected: (unit -> unit) -> string -> s
     let graph = NativeMethodSpec("ProbeComponent", "GraphAlternative", true,
         [|"std::variant<std::monostate,bool,long long,double,ce::fixed_array<double,0x3>,ce::fixed_array<double,0x4>,std::basic_string<char>>"|], [|"value"|])
     check ((root.Invoke(graph, [|(snapshot "[4,[1,2,3]]").ReadJson()|])).Read<int>() = 4) "typed selector normalizes actual material-style nested fixed-array extents"
+    let msvcCallback = NativeMethodSpec("ProbeComponent", "SetTickCallback", false,
+        [|"ce::func_detail::owning_func<void,false,true,false,0x30ui64,0x8ui64,ce::heap_allocator,float>"|], [|"value"|])
+    check (msvcCallback.Resolve().Name = "SetTickCallback") "typed selector normalizes callback inline capacity and alignment from MSVC metadata"
+    let differentCallback = NativeMethodSpec("ProbeComponent", "SetTickCallback", false,
+        [|"ce::func_detail::owning_func<void,false,true,false,0x40ui64,0x8ui64,ce::heap_allocator,float>"|], [|"value"|])
+    check (rejected (fun () -> differentCallback.Resolve() |> ignore) "different callback inline storage retains a distinct native type" = "method_not_found")
+        "callback numeric spelling normalization preserves unequal layout identity"
     let wrongExtent = NativeMethodSpec("ProbeComponent", "ChooseSpan", true, [|"std::span<int,0x3>"|], [|"value"|])
     check (rejected (fun () -> root.Invoke(wrongExtent, [|spanInput|]) |> ignore) "fixed extent cannot become dynamic" = "method_not_found") "typed selector preserves unequal extent identity"
     let trailingPointee = NativeMethodSpec("ProbeComponent", "EchoCString", true, [|"char const *"|], [|"value"|])
