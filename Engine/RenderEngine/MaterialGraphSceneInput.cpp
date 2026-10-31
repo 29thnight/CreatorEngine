@@ -35,6 +35,24 @@ namespace material_graph
                    handle.assetSetId == origin.assetSetId && handle.manifestRevision == origin.manifestRevision;
         }
 
+        bool MatchesGeometryIdentityOrder(std::span<const EnhancedDrawItem> draws,
+                                          std::span<const SceneDrawInput> previous)
+        {
+            if (draws.size() != previous.size())
+            {
+                return false;
+            }
+            for (size_t index = 0; index < draws.size(); ++index)
+            {
+                if (enhanced_draw::GeometryKey(draws[index]) != previous[index].geometryKey ||
+                    draws[index].modelMeshView.handle != previous[index].mesh)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         bool Finite(std::span<const float> values)
         {
             return std::ranges::all_of(values,
@@ -116,7 +134,11 @@ namespace material_graph
         }
         {
             ce::profile_scope identityProfile{ce::marker<"MaterialSceneSealGeometryIdentities">()};
-            if (!enhanced_draw::ValidateGeometryIdentities(draws, error))
+            // A successfully sealed input already proved collision freedom. Reuse
+            // that proof only for the exact ordered keys and complete handles;
+            // owner/payload provenance is still validated for every current draw.
+            if ((!previous || !MatchesGeometryIdentityOrder(draws, previous->Draws())) &&
+                !enhanced_draw::ValidateGeometryIdentities(draws, error))
             {
                 return false;
             }
@@ -261,8 +283,21 @@ namespace material_graph
                         return Fail(error, "Scene graph granular geometry needs descriptor and CPU-use pin tables.");
                     }
                     const auto& pins = candidate->modelPins_->meshes;
-                    const auto pin = std::ranges::find_if(
-                        pins, [&](const auto& owner) { return owner && MatchesMeshDescriptor(input.mesh, *owner); });
+                    auto pin = pins.end();
+                    if (draw.modelPinIndex < pins.size())
+                    {
+                        const auto& hinted = pins[draw.modelPinIndex];
+                        if (hinted && &*hinted == geometry.sourceDescriptor &&
+                            MatchesMeshDescriptor(input.mesh, *hinted))
+                        {
+                            pin = pins.begin() + draw.modelPinIndex;
+                        }
+                    }
+                    if (pin == pins.end())
+                    {
+                        pin = std::ranges::find_if(
+                            pins, [&](const auto& owner) { return owner && MatchesMeshDescriptor(input.mesh, *owner); });
+                    }
                     if (pin == pins.end() || &**pin != geometry.sourceDescriptor)
                     {
                         return Fail(error, "Scene graph descriptor has no exact owner in its frame pin table.");
@@ -294,8 +329,17 @@ namespace material_graph
                     if (candidate->modelPins_)
                     {
                         const auto& pins = candidate->modelPins_->generations;
-                        const auto pin = std::ranges::find_if(pins, [&](const auto& owner)
-                                                              { return owner && owner->Handle() == input.model; });
+                        auto pin = pins.end();
+                        if (draw.modelPinIndex < pins.size() && pins[draw.modelPinIndex] &&
+                            pins[draw.modelPinIndex]->Handle() == input.model)
+                        {
+                            pin = pins.begin() + draw.modelPinIndex;
+                        }
+                        if (pin == pins.end())
+                        {
+                            pin = std::ranges::find_if(pins, [&](const auto& owner)
+                                                       { return owner && owner->Handle() == input.model; });
+                        }
                         if (pin == pins.end())
                         {
                             return Fail(error,
@@ -307,10 +351,9 @@ namespace material_graph
             }
             input.materialSlot = draw.materialGraphSlot;
             input.materialPinIndex = collectedPins ? collectedPins->Retain(draw.materialGraphInstance)
-                                                   : candidate->materialPins_->Find(*instance);
-            input.material = candidate->materialPins_->Borrow(input.materialPinIndex);
-            if (!input.material || &*input.material != &*instance ||
-                InstanceFramePins::Identity(*input.material) != InstanceFramePins::Identity(*instance))
+                                                   : draw.materialGraphPinIndex;
+            input.material = candidate->materialPins_->BorrowExact(*instance, input.materialPinIndex);
+            if (!input.material)
             {
                 return Fail(error, "Scene graph draw has no exact instance in its frame pin table.");
             }

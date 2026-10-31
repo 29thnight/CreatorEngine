@@ -60,7 +60,8 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
         return false;
     }
     uint32_t recordingFrame = 0;
-    std::atomic<uint32_t> callerRecordings{ 0 };
+    const auto recordingOwner = std::this_thread::get_id();
+    std::atomic<uint32_t> unexpectedRecordings{ 0 };
 
     RHIReadback readback{};
     if (!resources.CreateReadback(kParallelWidth, kParallelHeight,
@@ -76,6 +77,7 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
     const auto renderOnce = [&](bool parallel, RHIReadbackImage& outImage,
         EnhancedRenderGraph::Stats& outStats) -> bool
     {
+        std::atomic<uint32_t> ownerRecordings{0};
         if (!resources.BeginFrame(error)) return false;
         const uint32_t frameSlot = recordingFrame++ % VulkanDeviceResources::kFrameCount;
         if (parallel) pool.BeginFrame(frameSlot);
@@ -97,7 +99,17 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
                 { { target, RHIResourceState::RenderTarget } },
                 [&, passIndex](const EnhancedRenderGraph::ExecuteContext& context)
                 {
-                    if (parallel && !thread_pool::is_worker_thread()) ++callerRecordings;
+                    if (parallel)
+                    {
+                        if (std::this_thread::get_id() == recordingOwner && !thread_pool::is_worker_thread())
+                        {
+                            ++ownerRecordings;
+                        }
+                        else
+                        {
+                            ++unexpectedRecordings;
+                        }
+                    }
                     const RHITextureHandle color = context.ResolveHandle(target);
                     const RHIRenderTargetBinding binding =
                         resources.CreateRenderTargets({ &color, 1 });
@@ -153,6 +165,14 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
             return false;
         }
         outStats = graph.GetStats();
+        // 모든 패스가 같은 target을 갱신하는 직렬 run이다. 리스트는 네 개를
+        // 보존하되 worker handoff 없이 소유자가 한 번씩 기록해야 한다.
+        if (parallel && (ownerRecordings != kColorPassCount || outStats.recordingJobDispatchCount != 0 ||
+                         outStats.recordingDispatcherHandoffCount != 0 || outStats.recordingOwnerJoinCount != 0 ||
+                         outStats.recordingWorkerJobCount != 0))
+        {
+            ++unexpectedRecordings;
+        }
 
         if (!resources.EndFrame(error))
         {
@@ -232,8 +252,8 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
             break;
         }
     }
-    outLog += "[jobs] physical workers=1/4, logical lanes=4, frame slot reuse pixel parity: "
-        + std::string(repeatedPixels && 0 == callerRecordings ? "passed\n" : "failed\n");
+    outLog += "[jobs] physical workers=1/4, logical lanes=4, ordered owner run and frame slot reuse pixel parity: "
+        + std::string(repeatedPixels && 0 == unexpectedRecordings ? "passed\n" : "failed\n");
 
     const bool sameShape = sequential.width == parallel.width &&
         sequential.height == parallel.height && sequential.rowPitch == parallel.rowPitch &&
@@ -253,7 +273,7 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
     std::string validation;
     const uint32_t problems = resources.DrainDebugMessages(validation);
     bool passed = samePixels && expectedColor && parallelShape && repeatedPixels &&
-        0 == callerRecordings &&
+        0 == unexpectedRecordings &&
         0 == stubs && 0 == problems;
 
     outLog += "[4/4] 순차/병렬 픽셀 " + std::string(samePixels ? "일치" : "불일치")

@@ -26,6 +26,23 @@ struct RHIRecordingExecutionOptions
     uint64_t* waitBeginNanoseconds{nullptr};
 };
 
+// 소유자 기록에서도 worker와 같은 재진입 금지를 유지한다. 바깥 그래프가
+// 빌린 계획·command target을 중첩 기록이 초기화하기 전에 진입점에서 검사한다.
+class RHIInlineCommandRecordingScope final
+{
+  public:
+    RHIInlineCommandRecordingScope() noexcept : m_previous(m_active) { m_active = true; }
+    ~RHIInlineCommandRecordingScope() { m_active = m_previous; }
+    RHIInlineCommandRecordingScope(const RHIInlineCommandRecordingScope&) = delete;
+    RHIInlineCommandRecordingScope& operator=(const RHIInlineCommandRecordingScope&) = delete;
+
+    static bool IsActive() noexcept { return m_active; }
+
+  private:
+    inline static thread_local bool m_active{};
+    bool m_previous{};
+};
+
 // RG4 and owned queue recording share the same engine jobs and join contract.
 // A completed handle has released every callback, including on job failure.
 inline void RHIRunCommandRecordingJobs(job_scheduler& scheduler, const ce::owned_func<void(uint32_t)>& job,
@@ -35,9 +52,21 @@ inline void RHIRunCommandRecordingJobs(job_scheduler& scheduler, const ce::owned
     {
         return;
     }
-    if (thread_pool::is_worker_thread())
+    if (thread_pool::is_worker_thread() || RHIInlineCommandRecordingScope::IsActive())
     {
-        throw std::logic_error("command recording cannot wait from a job worker");
+        throw std::logic_error("command recording cannot run from a job worker or recording callback");
+    }
+    if (targetCount == 1)
+    {
+        // 함께 진행할 target이 없으면 소유자가 바로 기록한다. 종료 뒤 실행과
+        // worker 재진입은 기존처럼 거절하며 콜백을 복사하거나 보관하지 않는다.
+        if (!scheduler.is_running())
+        {
+            throw std::runtime_error("job_scheduler is stopped");
+        }
+        const RHIInlineCommandRecordingScope recordingScope;
+        job(0);
+        return;
     }
     // Share one indexed callback instead of allocating a task vector and one
     // function wrapper per command target. Completion still releases all
@@ -54,9 +83,9 @@ inline void RHIRunCommandRecordingTaskGraph(job_scheduler& scheduler, const RHIR
     {
         return;
     }
-    if (thread_pool::is_worker_thread())
+    if (thread_pool::is_worker_thread() || RHIInlineCommandRecordingScope::IsActive())
     {
-        throw std::logic_error("command recording cannot wait from a job worker");
+        throw std::logic_error("command recording cannot run from a job worker or recording callback");
     }
     for (size_t node = 0; node < graph.nodes.size(); ++node)
     {
@@ -67,6 +96,12 @@ inline void RHIRunCommandRecordingTaskGraph(job_scheduler& scheduler, const RHIR
                 throw std::invalid_argument("recording dependencies must precede their task");
             }
         }
+    }
+    if (graph.nodes.size() == 1 && !options.diagnostics && !options.waitBeginNanoseconds)
+    {
+        // 진단 요청에는 실제 제출·합류 시각을 남기는 기존 실행 경로를 유지한다.
+        RHIRunCommandRecordingJobs(scheduler, job, 1);
+        return;
     }
     if (options.batchSubmit)
     {

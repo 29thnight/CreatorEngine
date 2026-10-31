@@ -1,11 +1,6 @@
 #include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
-#if defined(CE_CONTRACT_STANDALONE)
-#include "../../Platform/WindowsSDK/Creator.ComSupport.h"
-#else
-import winrt_base;
-#endif
 #include <stddef.h>
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 

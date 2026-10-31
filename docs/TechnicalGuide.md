@@ -145,14 +145,16 @@ Editor의 Scene·Game·재질 미리보기와 ImGui 표시는 DX12로 고정되�
 
 ### 최적화와 채택 조건
 
-- **Transient aliasing:** 단일 전체 순서의 수명 증명과 DX12 배치·회수 경로가 있습니다. 기본 OFF이며 다중 큐 실행에 같은 증명을 재사용하지 않습니다.
-- **병렬 기록:** 독립 recording target과 의존성 wave를 사용합니다. 명시적인 owner-thread 기록 부작용이 있는 그래프는 owner 기록을 유지합니다.
-- **큐 실행:** graphics·compute 배치, 큐별 상태·hazard 계획, release/acquire와 완료 수명 처리가 구현되어 있습니다. `render.queue.mode 0|1|2`로 기본/owned graphics/compute overlap 요청을 구분합니다.
-- **측정 기반 fallback:** 측정 누락·미지원 상태·불충분한 이득은 직렬 경로를 유지합니다. normal frame과 진단 capture의 비용 이력은 구분합니다.
+- **Transient aliasing:** 모든 live 사용 사이의 DAG happens-before를 증명한 자원만 같은 heap 구간을 공유합니다. DX12 배치·회수 경로가 있으며 기본 OFF입니다. 부분 범위 graph는 committed 경로를 유지합니다. 이 안전성 규칙과 RG7·RG8 조합의 제품 성능 수용은 별도입니다.
+- **병렬 기록:** 독립 recording target과 의존성 task graph를 사용합니다. 독립 target이 하나뿐이면 owner에서 바로 기록해 worker 제출·합류를 생략합니다. task graph의 진단·wait timestamp 요청은 기존 scheduler 경로를 유지합니다. 명시적인 owner-thread 기록 부작용이 있는 그래프도 owner 기록을 유지합니다.
+- **큐 실행:** graphics·compute 배치, 큐별 상태·hazard 계획, release/acquire와 완료 수명 처리가 구현되어 있습니다. `render.queue.mode 0|1|2`는 기본 경로/owned graphics 요청/명시적 async 요청 허용을 구분합니다. 실제 compute 배치가 없으면 공통 primary graphics 경로를 사용합니다.
+- **명시적 async 정책:** `DeclareComputeCompatible`은 실행 가능성을, `DeclareAsyncCompute`는 실제 compute 큐 요청을 뜻합니다. GPU 시간은 진단 입력이며 자동 배치 탐색이나 측정 기반 큐 재배치를 수행하지 않습니다. 제품 pass의 async 요청은 0이고 기본 mode 0을 유지합니다.
 
-RG8은 master에 구현이 있지만 제품 수용은 진행 상태이며 기본 OFF입니다. 과거 종료 문서의 done 판정은 후속 구조 감사에서 철회됐습니다. 통합 hazard 실행 변경의 소스 착지를 전체 성능·overlap 수용으로 표시하지 않습니다. 일반 cross-queue read 공유, subresource별 독립 스케줄링과 다중 큐 aliasing은 현재 구현 범위로 주장하지 않습니다.
+RG8은 2026-10-23 명시적 async 기반과 graphics-only fallback 범위를 제품 수용했습니다. 실제 제품 pass의 overlap·전체 프레임 개선과 RG7 조합 검증은 RG8-F에 남아 있습니다. 10월 9일의 철회된 done 판정과 이 범위를 구분합니다. 불변 imported texture의 read 공유는 backend capability와 명시적 fanout/fanin 조건에서 지원하지만, 일반 cross-queue read 공유나 subresource별 독립 스케줄링을 뜻하지 않습니다.
 
-정본: [렌더 로드맵](plans/RenderPhaseRoadmap.md), [RenderGraph 계획](plans/RenderGraphDependencySchedulingPlan.md). 근거: [RG7·RG8 구조 감사](analysis/RenderRg7Rg8StructuralAudit20261009.md), [RG8 통합 실행 경계](analysis/RenderRg8UnifiedExecution20261009.md).
+RG9의 과거 검증은 mip 수와 접근 범위를 함께 바꿔 mip-only program 재사용 결함을 놓쳤습니다. 2026-10-31 수정은 transient 구조 비교에 mip 수를 포함하고 캐시/신규 컴파일의 미초기화 mip 읽기 거부를 대조합니다. 수정본의 native 재검증은 [후속 기록](analysis/RenderPipelineAuditFix20261031.md)을 따릅니다.
+
+정본: [렌더 로드맵](plans/RenderPhaseRoadmap.md), [RenderGraph 계획](plans/RenderGraphDependencySchedulingPlan.md), [program·실행 계약](design/RenderGraphProgramsAndExecution.md). 근거: [RG8 현재 수용 범위](analysis/RenderRg8MasterRefresh20261023.md), [RG9 검증 범위 정정](analysis/RenderRg9Implementation20261023.md).
 
 ### 메시렛·LOD·HZB
 
@@ -348,7 +350,7 @@ flowchart LR
 | 영역 | master 구현 | 추가로 구분할 범위 |
 |---|---|---|
 | Editor·백엔드 | DX12 Editor, DX12/Vulkan RHI·Player 경로 | Editor Vulkan 전환을 지원 기능으로 표시하지 않음; Player/backend별 수용은 별도 |
-| RenderGraph | 의존성·버전, 기록·수명과 opt-in 큐 실행 | RG7 aliasing·RG8 큐 최적화 기본 OFF; RG8 통합의 제품·성능 채택 미완료 |
+| RenderGraph | 의존성·버전, 기록·수명과 명시적 async 기반 | 기본 mode 0; 실제 제품 overlap·전체 프레임 개선은 RG8-F, RG9 수정본 native 재검증 미완료 |
 | LX geometry | 메시렛 프러스텀, CPU LOD, draw HZB와 fallback | GPU LOD·meshlet HZB·전체 GPU-driven/DXR 수용·성능 이득 |
 | 재질 | 자산 기반 그래프 저작·생성 제품·자동 게시 | 모든 조작·투명 preview·Blender 전 품질 대조의 완료는 별도 |
 | 텍스처 | DirectXTex 도구 cook, cooked Player 소비·자동 편집 | 전체 포맷·이미지 품질 코퍼스와 모든 GPU 소비자 수용 |

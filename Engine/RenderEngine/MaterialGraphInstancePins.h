@@ -67,6 +67,30 @@ namespace material_graph
             return index < instances_.size() ? instances_[index].borrow() : own::local_view<const Instance>{};
         }
 
+        // A producer index is only a hint. Resolve and validate the exact immutable
+        // instance under one lock; stale/foreign indices retain the lookup fallback.
+        own::local_view<const Instance> BorrowExact(const Instance& instance, std::size_t& index) const
+        {
+            std::lock_guard lock(mutex_);
+            const auto identity = Identity(instance);
+            const auto matches = [&](std::size_t candidate)
+            {
+                return candidate < instances_.size() && instances_[candidate] &&
+                       &*instances_[candidate] == &instance && Identity(*instances_[candidate]) == identity;
+            };
+            if (!matches(index))
+            {
+                const auto found = indices_.find(identity);
+                index = found != indices_.end() ? found->second : InvalidIndex;
+                if (!matches(index))
+                {
+                    index = InvalidIndex;
+                    return {};
+                }
+            }
+            return instances_[index].borrow();
+        }
+
         own::shared_owner<const Instance> Owner(std::size_t index) const
         {
             std::lock_guard lock(mutex_);

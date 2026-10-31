@@ -5908,12 +5908,14 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
         return false;
     }
     uint32_t recordingFrame = 0;
-    std::atomic<uint32_t> callerRecordings{ 0 };
+    const auto recordingOwner = std::this_thread::get_id();
+    std::atomic<uint32_t> unexpectedRecordings{ 0 };
 
     // 순차/병렬을 같은 코드로 돌린다. 그래야 차이가 '병렬이라서'로 좁혀진다.
     const auto renderOnce = [&](uint32_t workers, ce::dynamic_array<uint8_t>& outPixels,
         EnhancedRenderGraph::Stats& outStats, std::string& outStepError) -> bool
     {
+        std::atomic<uint32_t> ownerRecordings{0};
         if (!resources.BeginFrame(outStepError)) return false;
         const uint32_t frameSlot = recordingFrame++ % DX12DeviceResources::kFrameCount;
         pool.BeginFrame(frameSlot);
@@ -5949,7 +5951,14 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
                 { { target, RHIResourceState::RenderTarget } },
                 [&, i](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    if (!thread_pool::is_worker_thread()) ++callerRecordings;
+                    if (std::this_thread::get_id() == recordingOwner && !thread_pool::is_worker_thread())
+                    {
+                        ++ownerRecordings;
+                    }
+                    else
+                    {
+                        ++unexpectedRecordings;
+                    }
                     // 손으로 만든 RTV 힙이 사라졌다(V2-d). 띠 클리어가 원시
                     // 커맨드 리스트를 쓰던 유일한 이유였고, 이제 인코더가
                     // rect 클리어를 안다.
@@ -5994,6 +6003,14 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
         if (!GetRHISubmissionThread().EnqueueRecordedBatch(&resources,
             resources, std::move(batch), batchTicket, outStepError)) return false;
         outStats = graph.GetStats();
+        // 같은 target의 연속 갱신은 여러 리스트에서도 한 직렬 run이다.
+        // 단일 target과 합쳐진 run 모두 소유자 실행 및 실제 handoff 0을 검사한다.
+        if (ownerRecordings != kPassCount || outStats.recordingJobDispatchCount != 0 ||
+            outStats.recordingDispatcherHandoffCount != 0 || outStats.recordingOwnerJoinCount != 0 ||
+            outStats.recordingWorkerJobCount != 0)
+        {
+            ++unexpectedRecordings;
+        }
 
         if (!resources.EndFrame(outStepError)) return false;
         resources.WaitForGpu();
@@ -6042,9 +6059,9 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
             break;
         }
     }
-    passed = passed && repeatedPixels && 0 == callerRecordings;
-    outLog += "[jobs] physical workers=1/4, logical lanes=4, frame slot reuse pixel parity: "
-        + std::string(repeatedPixels && 0 == callerRecordings ? "passed\n" : "failed\n");
+    passed = passed && repeatedPixels && 0 == unexpectedRecordings;
+    outLog += "[jobs] physical workers=1/4, logical lanes=4, ordered owner run and frame slot reuse pixel parity: "
+        + std::string(repeatedPixels && 0 == unexpectedRecordings ? "passed\n" : "failed\n");
 
     size_t differing = sequential.size() == parallel.size() ? 0 : 1;
     for (size_t i = 0; i < sequential.size() && i < parallel.size(); ++i)

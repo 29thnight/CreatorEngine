@@ -162,38 +162,52 @@
   .map-row:hover .map-bar i { background: var(--accent); }
   .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
   @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
 </style>
 </head>
 <body>
 <div class="shell has-toc">
-<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#재사용한-구현">재사용한 구현</a></li><li><a href="#추가한-구현">추가한 구현</a></li><li><a href="#지원-행렬">지원 행렬</a></li><li><a href="#검증">검증</a></li><li><a href="#imgui-회귀-assertion-수정">ImGui 회귀 assertion 수정</a></li><li><a href="#증거-보존">증거 보존</a></li></ol></nav>
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#2026-10-31-정정--mip-only-program-무효화">2026-10-31 정정 — mip-only program 무효화</a></li><li><a href="#2026-10-23-구현검증-이력">2026-10-23 구현·검증 이력</a></li><li><a href="#재사용한-구현">재사용한 구현</a></li><li><a href="#추가한-구현">추가한 구현</a></li><li><a href="#지원-행렬">지원 행렬</a></li><li><a href="#검증">검증</a></li><li><a href="#imgui-회귀-assertion-수정">ImGui 회귀 assertion 수정</a></li><li><a href="#증거-보존">증거 보존</a></li></ol></nav>
 <main>
 <header class="page">
 <nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="RenderRg9Implementation20261023.md">원본 Markdown</a></nav>
 <p class="eyebrow">분석</p>
 <h1>RG9 범위·split barrier·Inspector 구현 — 2026-10-23</h1>
-<div class="meta"><p>master <code>0509753a3</code>와 기존 로컬 RG8·viewer 변경을 보존한 작업트리에서 진행했다.</p>
-</div>
+
 </header>
 
 <figure>
-<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
-<a class="map-row" href="#재사용한-구현"><span class="ve-label">§00</span><span class="map-name">재사용한 구현</span><span class="map-bar"><i style="width:24.7%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#추가한-구현"><span class="ve-label">§01</span><span class="map-name">추가한 구현</span><span class="map-bar"><i style="width:74.5%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#지원-행렬"><span class="ve-label">§02</span><span class="map-name">지원 행렬</span><span class="map-bar"><i style="width:37.9%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#검증"><span class="ve-label">§03</span><span class="map-name">검증</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#imgui-회귀-assertion-수정"><span class="ve-label">§04</span><span class="map-name">ImGui 회귀 assertion 수정</span><span class="map-bar"><i style="width:20.6%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#증거-보존"><span class="ve-label">§05</span><span class="map-name">증거 보존</span><span class="map-bar"><i style="width:19.6%"></i></span><span class="map-marks"></span></a>
+<div class="frame doc-map" role="img" aria-label="절 8개의 분량 막대">
+<a class="map-row" href="#2026-10-31-정정--mip-only-program-무효화"><span class="ve-label">§00</span><span class="map-name">2026-10-31 정정 — mip-only program 무효화</span><span class="map-bar"><i style="width:54.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2026-10-23-구현검증-이력"><span class="ve-label">§01</span><span class="map-name">2026-10-23 구현·검증 이력</span><span class="map-bar"><i style="width:5.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#재사용한-구현"><span class="ve-label">§02</span><span class="map-name">재사용한 구현</span><span class="map-bar"><i style="width:24.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#추가한-구현"><span class="ve-label">§03</span><span class="map-name">추가한 구현</span><span class="map-bar"><i style="width:74.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#지원-행렬"><span class="ve-label">§04</span><span class="map-name">지원 행렬</span><span class="map-bar"><i style="width:37.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#검증"><span class="ve-label">§05</span><span class="map-name">검증</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#imgui-회귀-assertion-수정"><span class="ve-label">§06</span><span class="map-name">ImGui 회귀 assertion 수정</span><span class="map-bar"><i style="width:20.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#증거-보존"><span class="ve-label">§07</span><span class="map-name">증거 보존</span><span class="map-bar"><i style="width:19.6%"></i></span><span class="map-marks"></span></a>
 </div>
-<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「검증」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+<figcaption><span class="fig-n">그림 1</span>절 8개 가운데 「검증」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
 </figure>
+<section class="doc-sec" id="sec-2026-10-31-정정--mip-only-program-무효화">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="2026-10-31-정정--mip-only-program-무효화">2026-10-31 정정 — mip-only program 무효화</h2></div>
+<div class="prose"><p>아래 표는 10월 23일 소스·바이너리의 실행 이력이다. 당시 transient mip 검사는 mip 수와 접근 범위를 함께 바꾸므로, <strong>mip 수만 바뀐 경우의 retained program 무효화는 입증하지 못했다.</strong> 구조 서명에는 mip 수가 들어가지만 재사용 선행 비교 <code>MatchesStructuralSchedule()</code>의 transient descriptor 비교에는 빠져 있었다.</p>
+<p>동일한 mip 0 부분 write와 전체 read를 유지한 채 1 mip에서 2 mip로 바꾸면, retained 경로는 이전 program을 재사용해 초기화하지 않은 mip 1 읽기를 허용했다. 같은 2-mip 선언의 신규 compile은 거부했다. 따라서 아래의 “풀/program 무효화 통과”를 mip-only 변경까지 검증한 것으로 해석하면 안 된다.</p>
+<p>후속 수정은 선행 비교에 <code>mipLevels</code>를 포함하고, 고정 접근 범위의 mip-only 변경 및 cached/fresh 오류 동치 회귀를 추가한다. 현재 수정본의 CPU 결과와 native 미실행 범위는 <a href="RenderPipelineAuditFix20261031.html">렌더 파이프라인 감사 수정 기록</a>에 분리한다. 이 정정으로 과거 native 실행 결과를 새 소스의 제품 수용으로 재사용하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2026-10-23-구현검증-이력">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="2026-10-23-구현검증-이력">2026-10-23 구현·검증 이력</h2></div>
+<div class="prose"><p>master <code>0509753a3</code>와 기존 로컬 RG8·viewer 변경을 보존한 작업트리에서 진행했다.</p>
+</div>
+</section>
 <section class="doc-sec" id="sec-재사용한-구현">
-<div class="sec-head"><p class="ve-label">§00</p><h2 id="재사용한-구현">재사용한 구현</h2></div>
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="재사용한-구현">재사용한 구현</h2></div>
 <div class="prose"><p><code>EnhancedRenderGraphSubresources.cpp</code>의 mip/layer/aspect·buffer byte-range 검증, 접근 cell 분할, RAW/WAR/WAW·culling, backend state granularity와 범위별 barrier 계획을 재사용했다. RHI range 자료형과 DX12/Vulkan 변환, snapshot·HTTP range 직렬화도 기존 구현이다. 기존 Matrix·Queue·DAG·Freeze/Refresh와 선택 모델을 유지했다.</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-추가한-구현">
-<div class="sec-head"><p class="ve-label">§01</p><h2 id="추가한-구현">추가한 구현</h2></div>
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="추가한-구현">추가한 구현</h2></div>
 <div class="prose"><ul>
 <li><code>RGTextureDesc.mipLevels</code>를 transient 생성·declaration packet·resource description·pool key·alias allocation key·placed-resource identity·program 구조 서명에 전달한다. 0과 크기보다 긴 mip chain은 선언 단계에서 거부한다. 기본값은 1이다.</li>
 <li>중립 transition에 Full/Begin/End를 추가했다. DX12는 BEGIN_ONLY/END_ONLY로 기록하며 software command 복사도 해당 값을 보존한다. 직접 device 전이와 encoder 전이가 같은 flag 변환을 사용한다.</li>
@@ -204,7 +218,7 @@
 </div>
 </section>
 <section class="doc-sec" id="sec-지원-행렬">
-<div class="sec-head"><p class="ve-label">§02</p><h2 id="지원-행렬">지원 행렬</h2></div>
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="지원-행렬">지원 행렬</h2></div>
 <div class="prose"><div class="table-scroll"><table>
 <thead><tr><th>기능</th><th>DX12</th><th>Vulkan</th></tr></thead>
 <tbody><tr><td>texture mip/layer/aspect</td><td>native subresource 전이</td><td>image subresource 전이</td></tr>
@@ -216,7 +230,7 @@
 </div>
 </section>
 <section class="doc-sec" id="sec-검증">
-<div class="sec-head"><p class="ve-label">§03</p><h2 id="검증">검증</h2></div>
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="검증">검증</h2></div>
 <div class="prose"><p>최종 소스 hash와 Debug/Release exe·runtime hash가 실행 신원과 일치한다.</p>
 <div class="table-scroll"><table>
 <thead><tr><th>검증</th><th>결과</th></tr></thead>
@@ -237,18 +251,18 @@
 </div>
 </section>
 <section class="doc-sec" id="sec-imgui-회귀-assertion-수정">
-<div class="sec-head"><p class="ve-label">§04</p><h2 id="imgui-회귀-assertion-수정">ImGui 회귀 assertion 수정</h2></div>
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="imgui-회귀-assertion-수정">ImGui 회귀 assertion 수정</h2></div>
 <div class="prose"><p>추가한 range 표시 검사가 새 자동 크기 창의 첫 프레임에서 곧바로 정점 수를 단정해 abort했다. 창 크기를 명시하고 안정된 다음 프레임을 검사하도록 수정했다. 테스트 실행파일은 CRT assertion을 stderr로 보내고 abort 보고 팝업을 끈다. wrapper도 stderr를 로그에 포함한다. 수정 후 모델·실제 snapshot 자료형을 사용하는 ImGui 검사와 선택 클릭이 통과했다.</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-증거-보존">
-<div class="sec-head"><p class="ve-label">§05</p><h2 id="증거-보존">증거 보존</h2></div>
+<div class="sec-head"><p class="ve-label">§07</p><h2 id="증거-보존">증거 보존</h2></div>
 <div class="prose"><p>시작 시 기존 수정 파일의 hash와 작업 대상 원본을 보관했다. 작업 외 기존 수정은 byte 단위로 비교한다. 이전 RG8 측정의 프레임·캡처 원장은 유지한다. 초기 호환 확인에서 이전 RG8 보조 CPU runner를 사용해 그 폴더의 graph-probe 실행파일·빌드/결과 로그를 재생성했다. 이후 RG9 CPU 실행과 native·빌드 증거는 모두 새 RG9 폴더에 분리했다.</p>
 </div>
 </section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="RenderRg9Implementation20261023.md"><code>docs/analysis/RenderRg9Implementation20261023.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="RenderRg9Implementation20261023.md"><code>docs/analysis/RenderRg9Implementation20261023.md</code></a> · 마지막 커밋 2026-10-30 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>

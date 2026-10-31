@@ -162,11 +162,12 @@
   .map-row:hover .map-bar i { background: var(--accent); }
   .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
   @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
 </style>
 </head>
 <body>
 <div class="shell has-toc">
-<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#2026-10-23-rg8-제품-수용--현재-판정">2026-10-23 RG8 제품 수용 — 현재 판정</a></li><li><a href="#rg8-f-미래-계획--제품-장면-전체-프레임-개선">RG8-F 미래 계획 — 제품 장면 전체 프레임 개선</a></li><li><a href="#2026-10-23-rg9-제품-수용">2026-10-23 RG9 제품 수용</a></li><li><a href="#이전-판정-이력">이전 판정 이력</a></li><li><a href="#적용할-구조와-경계">적용할 구조와 경계</a></li><li><a href="#현재-추적-상태">현재 추적 상태</a></li><li><a href="#master-소스-근거">master 소스 근거</a></li><li><a href="#검증-경계">검증 경계</a></li></ol></nav>
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#2026-10-31-rg9-후속-정정재검증">2026-10-31 RG9 후속 정정·재검증</a></li><li><a href="#2026-10-23-rg8-제품-수용--현재-판정">2026-10-23 RG8 제품 수용 — 현재 판정</a></li><li><a href="#rg8-f-미래-계획--제품-장면-전체-프레임-개선">RG8-F 미래 계획 — 제품 장면 전체 프레임 개선</a></li><li><a href="#2026-10-23-rg9-제품-수용">2026-10-23 RG9 제품 수용</a></li><li><a href="#이전-판정-이력">이전 판정 이력</a></li><li><a href="#적용할-구조와-경계">적용할 구조와 경계</a></li><li><a href="#현재-추적-상태">현재 추적 상태</a></li><li><a href="#master-소스-근거">master 소스 근거</a></li><li><a href="#검증-경계">검증 경계</a></li></ol></nav>
 <main>
 <header class="page">
 <nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/plans/</span><a href="RenderGraphDependencySchedulingPlan.md">원본 Markdown</a></nav>
@@ -174,21 +175,20 @@
 <h1>RenderGraph 리소스 의존성 스케줄링 계획 (PHASE 4.3 · 트랙 RG)</h1>
 
 </header>
-<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">3<span class="unit">곳</span></span>
-<div class="stack" role="img" aria-label="완료·통과 2, 차단·중단 1"><i class="ok" style="flex:2"></i><i class="risk" style="flex:1"></i></div>
-<span class="legend"><span class="chip ok">완료·통과 2</span><span class="chip risk">차단·중단 1</span></span></div></div>
+
 <figure>
-<div class="frame doc-map" role="img" aria-label="절 8개의 분량 막대">
-<a class="map-row" href="#2026-10-23-rg8-제품-수용--현재-판정"><span class="ve-label">§01</span><span class="map-name">2026-10-23 RG8 제품 수용 — 현재 판정</span><span class="map-bar"><i style="width:16.5%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#rg8-f-미래-계획--제품-장면-전체-프레임-개선"><span class="ve-label">§02</span><span class="map-name">RG8-F 미래 계획 — 제품 장면 전체 프레임 개선</span><span class="map-bar"><i style="width:18%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#2026-10-23-rg9-제품-수용"><span class="ve-label">§03</span><span class="map-name">2026-10-23 RG9 제품 수용</span><span class="map-bar"><i style="width:20.2%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#이전-판정-이력"><span class="ve-label">§04</span><span class="map-name">이전 판정 이력</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#적용할-구조와-경계"><span class="ve-label">§05</span><span class="map-name">적용할 구조와 경계</span><span class="map-bar"><i style="width:7.2%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#현재-추적-상태"><span class="ve-label">§06</span><span class="map-name">현재 추적 상태</span><span class="map-bar"><i style="width:11.7%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">2</span> <span class="chip risk" title="차단·중단">1</span></span></a>
-<a class="map-row" href="#master-소스-근거"><span class="ve-label">§07</span><span class="map-name">master 소스 근거</span><span class="map-bar"><i style="width:62.1%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#검증-경계"><span class="ve-label">§08</span><span class="map-name">검증 경계</span><span class="map-bar"><i style="width:12%"></i></span><span class="map-marks"></span></a>
+<div class="frame doc-map" role="img" aria-label="절 9개의 분량 막대">
+<a class="map-row" href="#2026-10-31-rg9-후속-정정재검증"><span class="ve-label">§01</span><span class="map-name">2026-10-31 RG9 후속 정정·재검증</span><span class="map-bar"><i style="width:16.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2026-10-23-rg8-제품-수용--현재-판정"><span class="ve-label">§02</span><span class="map-name">2026-10-23 RG8 제품 수용 — 현재 판정</span><span class="map-bar"><i style="width:16.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#rg8-f-미래-계획--제품-장면-전체-프레임-개선"><span class="ve-label">§03</span><span class="map-name">RG8-F 미래 계획 — 제품 장면 전체 프레임 개선</span><span class="map-bar"><i style="width:18%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2026-10-23-rg9-제품-수용"><span class="ve-label">§04</span><span class="map-name">2026-10-23 RG9 제품 수용</span><span class="map-bar"><i style="width:20.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#이전-판정-이력"><span class="ve-label">§05</span><span class="map-name">이전 판정 이력</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#적용할-구조와-경계"><span class="ve-label">§06</span><span class="map-name">적용할 구조와 경계</span><span class="map-bar"><i style="width:7.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#현재-추적-상태"><span class="ve-label">§07</span><span class="map-name">현재 추적 상태</span><span class="map-bar"><i style="width:13.9%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span> <span class="chip risk" title="차단·중단">1</span></span></a>
+<a class="map-row" href="#master-소스-근거"><span class="ve-label">§08</span><span class="map-name">master 소스 근거</span><span class="map-bar"><i style="width:62.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#검증-경계"><span class="ve-label">§09</span><span class="map-name">검증 경계</span><span class="map-bar"><i style="width:12%"></i></span><span class="map-marks"></span></a>
 </div>
-<figcaption><span class="fig-n">그림 1</span>절 8개 가운데 「이전 판정 이력」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+<figcaption><span class="fig-n">그림 1</span>절 9개 가운데 「이전 판정 이력」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
 </figure>
 <section class="prose"><blockquote>
 <p>2026-10-20 정리 · master <code>27de3f5a02aadde7456aab680db3184c36ee735e</code> · 잔여 구현·수용 계획</p>
@@ -196,15 +196,21 @@
 <p>판정 기준은 위 master의 커밋된 소스다. 작업 중인 로컬 코드 변경은 포함하지 않는다. 완료된 구현 단계·날짜별 실행 일지는 제거했다. 대시보드는 SRP 저작 전환 취소에 해당하는 항목만 제거하고, 나머지 상태·공수·링크를 보존한다.</p>
 <p><a href="MasterPlanAudit20261020.html">전체 문서 대조·충돌 판정</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/RenderGraphDependencySchedulingPlan.md">정리 전 원문</a></p>
 </section>
+<section class="doc-sec" id="sec-2026-10-31-rg9-후속-정정재검증">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="2026-10-31-rg9-후속-정정재검증">2026-10-31 RG9 후속 정정·재검증</h2></div>
+<div class="prose"><p>transient mip 수만 바뀌는 retained program 경로에 구조 비교 누락이 확인됐다. 1 mip의 부분 write/전체 read program을 2 mip에 재사용하면 신규 compile이 거부하는 미초기화 mip 읽기를 허용했다. 기존 CPU 검사는 mip 수와 접근 범위를 동시에 바꿔 이 경우를 덮지 못했다.</p>
+<p>구조 비교 보완과 고정 범위 회귀를 <a href="../analysis/RenderPipelineAuditFix20261031.html">감사 수정 기록</a>에 추적한다. 아래 10월 23일 RG9 done·100/100인일은 당시 수용 이력이며, 이 결함이 발견된 현재 소스나 수정본의 native 재검증 완료를 뜻하지 않는다. 수정본의 Windows Debug/Release·RG9 GPU·병렬 기록·재질 수명 검증은 열려 있다. RG8-F의 실제 제품 overlap/전체 프레임 개선도 계속 별도 미완료다.</p>
+</div>
+</section>
 <section class="doc-sec" id="sec-2026-10-23-rg8-제품-수용--현재-판정">
-<div class="sec-head"><p class="ve-label">§01</p><h2 id="2026-10-23-rg8-제품-수용--현재-판정">2026-10-23 RG8 제품 수용 — 현재 판정</h2></div>
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="2026-10-23-rg8-제품-수용--현재-판정">2026-10-23 RG8 제품 수용 — 현재 판정</h2></div>
 <div class="prose"><p>현행 master <code>0509753a3</code>와 보존 로컬 변경을 제품 수용한다. DeclareAsyncCompute 명시적 요청, graphics-only 공통 primary 경로, 실제 compute의 owned 큐·GPU wait·retirement가 수용 범위다. 기본 mode 0과 제품 async 태그 0을 유지한다. 자동 비용 모델·배치 탐색은 제거된 상태다.</p>
 <p>D/R 빌드와 native 441·계획 82·전체 회귀가 통과했고 제품 128출력 오차는 0이다. 진단 OFF 양방향 전체 RT p50은 mode 2가 1.49/2.84% 낮고 p95는 -7.32/+1.67%로 일관된 개선은 없었다. 사용자 결정에 따라 RG8을 done·수용 16인일로 종료한다. 아래 10월 22일 미수용 판정은 당시 이력이며 현재 판정은 이 절을 따른다. <a href="../analysis/RenderRg8MasterRefresh20261023.html">측정 원장</a>.</p>
 <p><span id="rg8-f"></span></p>
 </div>
 </section>
 <section class="doc-sec" id="sec-rg8-f-미래-계획--제품-장면-전체-프레임-개선">
-<div class="sec-head"><p class="ve-label">§02</p><h2 id="rg8-f-미래-계획--제품-장면-전체-프레임-개선">RG8-F 미래 계획 — 제품 장면 전체 프레임 개선</h2></div>
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="rg8-f-미래-계획--제품-장면-전체-프레임-개선">RG8-F 미래 계획 — 제품 장면 전체 프레임 개선</h2></div>
 <div class="prose"><p>현재 리팩토링 공수와 RG8 종료 조건에서 제외한다. 착수 시 대표 장면·대상 pass·예산을 다시 산정한다.</p>
 <ul>
 <li>제품 compute pass의 독립 구간과 graphics 병렬 실행 여지를 측정하고 필요한 pass에만 DeclareAsyncCompute를 적용한다.</li>
@@ -216,13 +222,13 @@
 </div>
 </section>
 <section class="doc-sec" id="sec-2026-10-23-rg9-제품-수용">
-<div class="sec-head"><p class="ve-label">§03</p><h2 id="2026-10-23-rg9-제품-수용">2026-10-23 RG9 제품 수용</h2></div>
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="2026-10-23-rg9-제품-수용">2026-10-23 RG9 제품 수용</h2></div>
 <div class="prose"><p>기존 subresource 선언·의존성·barrier·snapshot을 재사용하고 transient mip 생성·풀/alias 키·program 서명, 동일 반복 pass phase 사이의 DX12 split과 Full fallback, Inspector 범위·split 단계·큐 표시를 마쳤다. 미세 buffer 접근은 DX12 whole-buffer 상태 단위를 지키며 Vulkan은 range 전이를 사용한다.</p>
 <p>D/R 빌드 오류 0. 각각 512프레임·13,315검사에서 픽셀 오차·GPU validation 오류 0. 기존 큐 실행 441·계획 82·전체 RenderGraph 회귀 D/R, software RHI Debug, CPU 범위/복구/풀/캐시, ImGui 및 할당 10항목도 통과했다. RG9 done·10인일 수용으로 PHASE 4.3은 100/100인일이다. RG8 기본 OFF와 RG8-F 미래 개선을 유지한다. Vulkan 실제 장치 비교는 PHASE 4.9가 소유한다. <a href="../analysis/RenderRg9Implementation20261023.html">구현·지원 행렬·실행 원장</a>.</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-이전-판정-이력">
-<div class="sec-head"><p class="ve-label">§04</p><h2 id="이전-판정-이력">이전 판정 이력</h2></div>
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="이전-판정-이력">이전 판정 이력</h2></div>
 <div class="prose"><h3 id="2026-10-22-제품-장면전체-프레임-비용-후속">2026-10-22 제품 장면·전체 프레임 비용 후속</h3>
 <p>현재 작업트리의 TestShadow에서는 mode 2가 실제 compute와 overlap을 실행한다. 직전 빈 SampleScene의 <code>insufficient-gain</code>을 제품 장면 전체의 탈락으로 확대하지 않는다. 같은 compiled 구조·queue assignment의 CPU hazard topology와 planning scratch를 재사용해 의존성 계산 중앙값을 2.12→0.56~0.58ms로 줄였다. Debug/Release native 437·planning 131·전체 RenderGraph GPU 회귀가 통과했다.</p>
 <p>Release 양방향 수집에서 수정 후 전체 RenderThreadFrame p50은 OFF 3.18<del>3.45ms, mode 2 10.07</del>10.89ms였다. GPU span도 mode 2가 증가했다. 48 batch·23 wait·약 1,968 barrier의 제출/전이 비용을 약 0.20ms overlap이 회수하지 못한다. 이 측정으로 자동 배치 탐색 실험을 중단했다. 기본 OFF·progress·제품 수용 0을 유지하며, 후속 구현은 아래 명시적 async 정책을 따른다. <a href="../analysis/RenderRg8Overlap20261022.html">측정 조건·전후 p50/p95·검증 원장</a>.</p>
@@ -242,23 +248,23 @@
 </div>
 </section>
 <section class="doc-sec" id="sec-적용할-구조와-경계">
-<div class="sec-head"><p class="ve-label">§05</p><h2 id="적용할-구조와-경계">적용할 구조와 경계</h2></div>
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="적용할-구조와-경계">적용할 구조와 경계</h2></div>
 <div class="prose"><p><code>live pipeline → explicit graph versions → dependency recording → queue execution → completion retirement</code></p>
 <p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-현재-추적-상태">
-<div class="sec-head"><p class="ve-label">§06</p><h2 id="현재-추적-상태">현재 추적 상태</h2></div>
+<div class="sec-head"><p class="ve-label">§07</p><h2 id="현재-추적-상태">현재 추적 상태</h2></div>
 <div class="prose"><div class="table-scroll"><table>
 <thead><tr><th>추적 ID</th><th>소유 단위 (잔여 작업은 위 목록)</th><th>대시보드 보존 상태</th></tr></thead>
 <tbody><tr><td><code>RG8</code> · PHASE 4.3</td><td>명시적 async·primary fallback 제품 수용</td><td><span class="chip ok">done · 16인일</span></td></tr>
 <tr><td><code>RG8-F</code> · 미래 계획</td><td>제품 pass opt-in·RG7 조합·전체 프레임 개선</td><td><span class="chip risk">보류 · 현재 공수 제외</span></td></tr>
-<tr><td><code>RG9</code> · PHASE 4.3</td><td>범위·transient mip·동일 반복 pass split·Inspector</td><td><span class="chip ok">done · 10인일</span></td></tr></tbody></table></div>
+<tr><td><code>RG9</code> · PHASE 4.3</td><td>범위·transient mip·동일 반복 pass split·Inspector; mip-only 수정본 native 재검증 필요</td><td>10월 23일 done · 10인일 보존; 10월 31일 후속 검증 열림</td></tr></tbody></table></div>
 <p>대시보드 상태는 인계용 식별 정보다. 위 구현 기반에서 이미 충족한 하위 요구는 재작성하지 않고, 남은 제품/실패/비용 수용을 수행한다.</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-master-소스-근거">
-<div class="sec-head"><p class="ve-label">§07</p><h2 id="master-소스-근거">master 소스 근거</h2></div>
+<div class="sec-head"><p class="ve-label">§08</p><h2 id="master-소스-근거">master 소스 근거</h2></div>
 <div class="prose"><p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
 <ul>
 <li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L75">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:75</a> — <code>enum class RGSchedulingMode { DeclarationOrder, ExplicitSingleWriter, ExplicitVersioned };</code></li>
@@ -275,7 +281,7 @@
 </div>
 </section>
 <section class="doc-sec" id="sec-검증-경계">
-<div class="sec-head"><p class="ve-label">§08</p><h2 id="검증-경계">검증 경계</h2></div>
+<div class="sec-head"><p class="ve-label">§09</p><h2 id="검증-경계">검증 경계</h2></div>
 <div class="prose"><p>2026-10-20 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이며 새 엔진 실행 결과가 아니다. 2026-10-22 작업트리의 빌드·회귀·제품 장면 성능 실행은 위 후속 절과 연결 원장에 별도로 기록했다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
 <details><summary>이전 절 링크 호환</summary>
 

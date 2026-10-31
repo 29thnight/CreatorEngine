@@ -1928,13 +1928,25 @@ namespace material_graph
             const auto& program = draw.material->generation->cooked.product.program;
             return program.surface || program.volume;
         };
+        // Decisions belong to this selection call. All draws of a slot share one
+        // exact instance/coverage, so readiness and preview pins need one lookup.
+        struct SelectionSource
+        {
+            const SceneDrawInput* draw{};
+            Slot* slot{};
+            bool readinessDecided{};
+            bool usePreview{};
+            own::local_view<const Instance> preview;
+            std::size_t previewPin{InstanceFramePins::InvalidIndex};
+            SceneCoverage previewQueue{};
+        };
         // Validate shared Material identities before mutating request revisions.
-        ce::engine_ordered_map<std::uint64_t, const SceneDrawInput*> sources;
+        ce::engine_ordered_map<std::uint64_t, SelectionSource> sources;
         for (const auto& draw : requested->Draws())
         {
-            const auto [entry, inserted] = sources.emplace(draw.materialSlot, &draw);
-            if (!draw.materialSlot || (!inserted && (!SamePinnedObject(entry->second->material, draw.material) ||
-                                                     !sameCoverage(entry->second->coverage, draw.coverage))))
+            const auto [entry, inserted] = sources.emplace(draw.materialSlot, SelectionSource{&draw});
+            if (!draw.materialSlot || (!inserted && (!SamePinnedObject(entry->second.draw->material, draw.material) ||
+                                                     !sameCoverage(entry->second.draw->coverage, draw.coverage))))
             {
                 return Fail(error,
                             "METEOR Scene Material slots must identify one exact instance and coverage per view.");
@@ -1946,13 +1958,15 @@ namespace material_graph
                           const auto [epoch, viewId, slot] = item.first;
                           return viewId == view.viewId && (epoch != view.sceneEpoch || !sources.contains(slot));
                       });
-        for (const auto& [id, draw] : sources)
+        for (auto& [id, source] : sources)
         {
+            const auto* draw = source.draw;
             auto& slot = slots_[{view.sceneEpoch, view.viewId, id}];
             if (!slot)
             {
                 slot = own::make_unique<Slot>();
             }
+            source.slot = &*slot;
             if (!SamePinnedObject(slot->requested, draw->material) ||
                 !sameCoverage(slot->requestedCoverage, draw->coverage))
             {
@@ -1980,11 +1994,21 @@ namespace material_graph
         // its source program prepares. Other material failures retain strict semantics.
         for (const auto& draw : requested->Draws())
         {
+            auto& source = sources.at(draw.materialSlot);
+            if (source.readinessDecided)
+            {
+                continue;
+            }
+            source.readinessDecided = true;
             if (!IsProgramReady(draw.material->generation, backend))
             {
-                const auto& slot = slots_.at({view.sceneEpoch, view.viewId, draw.materialSlot});
+                const auto* slot = source.slot;
                 if (slot->active && slot->active->editorPreview &&
-                    IsProgramReady(slot->active->generation, backend)) continue;
+                    IsProgramReady(slot->active->generation, backend))
+                {
+                    source.usePreview = true;
+                    continue;
+                }
                 const auto failed =
                     std::ranges::find_if(preparations_,
                                          [&](const auto& item)
@@ -2016,18 +2040,28 @@ namespace material_graph
                 return Fail(error, "METEOR Scene requested material program is still preparing.");
             }
         }
-        // Copy only after every requested program is ready. Geometry owners stay
-        // shared, and each draw record is copied exactly once.
+        // Copy only after every slot has a ready requested program or permitted
+        // preview. Geometry owners stay shared; revision publication stays per draw.
         auto selected = own::make_shared<SceneViewInput>(SceneViewInput::ConstructionKey{}, *requested);
         for (auto& draw : selected->draws_)
         {
-            const auto& slot = slots_.at({view.sceneEpoch, view.viewId, draw.materialSlot});
-            if (!IsProgramReady(draw.material->generation, backend))
+            auto& source = sources.at(draw.materialSlot);
+            auto* slot = source.slot;
+            if (source.usePreview)
             {
-                draw.materialPinIndex = selected->materialPins_->Retain(slot->active);
-                draw.material = selected->materialPins_->Borrow(draw.materialPinIndex);
+                if (!source.preview)
+                {
+                    source.previewPin = selected->materialPins_->Retain(slot->active);
+                    source.preview = selected->materialPins_->Borrow(source.previewPin);
+                    if (!ClassifySceneCoverage(slot->activeCoverage, source.previewQueue, error))
+                    {
+                        return false;
+                    }
+                }
+                draw.materialPinIndex = source.previewPin;
+                draw.material = source.preview;
                 draw.coverage = slot->activeCoverage;
-                if (!ClassifySceneCoverage(draw.coverage, draw.queue, error)) return false;
+                draw.queue = source.previewQueue;
             }
             if (slot->selectedRepresentation != draw.material->representationId)
             {
