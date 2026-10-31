@@ -35,3 +35,6 @@ foreach($mode in @('cadence','moving')){
 }
 @{result='N3_PACING_WIRING_OK';fixtureOnly=$true;registeredGroups=17;cases=$cases;productionSourcesChanged=$false}|ConvertTo-Json -Depth 8|Set-Content "$out/result.json" -Encoding utf8
 "N3_PACING_WIRING_OK evidence=$out"
+# The expected failing child runs leave LASTEXITCODE nonzero. GitHub's pwsh
+# wrapper propagates it unless this successful verification exits explicitly.
+exit 0
