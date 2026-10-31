@@ -7,7 +7,7 @@ $root=Join-Path $out 'Fixture'
 New-Item -ItemType Directory -Force "$root/Tools/regression","$root/Engine/Scripting/Bindings","$root/Stage"|Out-Null
 foreach($name in @('run-all.ps1','network_handoff_suite.py','network-handoff.suite.json')){Copy-Item "$PSScriptRoot/$name" "$root/Tools/regression"}
 $manifest=Get-Content "$root/Tools/regression/network-handoff.suite.json" -Raw|ConvertFrom-Json
-$products=@('verify-simulation-exchange-http.ps1','verify-scene-gc.ps1','verify-archive-parser-product.ps1','verify-n1-diagnostic-product.ps1','verify-n3-pacing-product.ps1')
+$products=@('verify-simulation-exchange-http.ps1','verify-scene-gc.ps1','verify-archive-parser-product.ps1','verify-n1-diagnostic-product.ps1','verify-n3-pacing-product.ps1','verify-headless-scene.ps1')
 foreach($path in @($manifest.gates.script)+@($products|ForEach-Object {'Tools/regression/'+$_})){
  $target=Join-Path $root $path;New-Item -ItemType Directory -Force (Split-Path $target)|Out-Null
  'param([string]$Configuration)'+"`nexit 0"|Set-Content $target -Encoding utf8
@@ -21,7 +21,10 @@ function Run([string]$label){
  return @{exit=$exit;data=(Get-Content (Join-Path $result.FullName 'result.json') -Raw|ConvertFrom-Json)}
 }
 $ok=Run 'coverage'
-if($ok.exit -ne 0 -or @($ok.data.passed).Count -ne 15){throw 'Fixture runner did not require all 15 registered groups'}
+if($ok.exit -ne 0 -or @($ok.data.passed).Count -ne 17 -or
+   $ok.data.passed -notcontains 'HeadlessBoundary-None' -or $ok.data.passed -notcontains 'HeadlessProduct'){
+ throw 'Fixture runner did not require all 17 registered groups including headless gates'
+}
 $cases=@()
 foreach($mode in @('cadence','moving')){
  $failure=if($mode -eq 'moving'){'if($MovingQuality){exit 37};exit 0'}else{'if(!$MovingQuality){exit 37};exit 0'}
@@ -30,5 +33,5 @@ foreach($mode in @('cadence','moving')){
  if($r.exit -eq 0 -or !($r.data.failures|Where-Object {$_.gate -eq $expected -and $_.exitCode -eq 37})){throw "N3 $mode failure was skipped"}
  $cases+=@{mode=$mode;gate=$expected;failedGateExit=37;propagated=$true}
 }
-@{result='N3_PACING_WIRING_OK';fixtureOnly=$true;registeredGroups=15;cases=$cases;productionSourcesChanged=$false}|ConvertTo-Json -Depth 8|Set-Content "$out/result.json" -Encoding utf8
+@{result='N3_PACING_WIRING_OK';fixtureOnly=$true;registeredGroups=17;cases=$cases;productionSourcesChanged=$false}|ConvertTo-Json -Depth 8|Set-Content "$out/result.json" -Encoding utf8
 "N3_PACING_WIRING_OK evidence=$out"
