@@ -5915,7 +5915,7 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
     const auto renderOnce = [&](uint32_t workers, ce::dynamic_array<uint8_t>& outPixels,
         EnhancedRenderGraph::Stats& outStats, std::string& outStepError) -> bool
     {
-        std::atomic<uint32_t> ownerRecordings{0};
+        std::atomic<uint32_t> expectedThreadRecordings{0};
         if (!resources.BeginFrame(outStepError)) return false;
         const uint32_t frameSlot = recordingFrame++ % DX12DeviceResources::kFrameCount;
         pool.BeginFrame(frameSlot);
@@ -5951,9 +5951,10 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
                 { { target, RHIResourceState::RenderTarget } },
                 [&, i](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    if (std::this_thread::get_id() == recordingOwner && !thread_pool::is_worker_thread())
+                    if ((workers == 1 && std::this_thread::get_id() == recordingOwner && !thread_pool::is_worker_thread()) ||
+                        (workers > 1 && std::this_thread::get_id() != recordingOwner && thread_pool::is_worker_thread()))
                     {
-                        ++ownerRecordings;
+                        ++expectedThreadRecordings;
                     }
                     else
                     {
@@ -6003,11 +6004,12 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
         if (!GetRHISubmissionThread().EnqueueRecordedBatch(&resources,
             resources, std::move(batch), batchTicket, outStepError)) return false;
         outStats = graph.GetStats();
-        // 같은 target의 연속 갱신은 여러 리스트에서도 한 직렬 run이다.
-        // 단일 target과 합쳐진 run 모두 소유자 실행 및 실제 handoff 0을 검사한다.
-        if (ownerRecordings != kPassCount || outStats.recordingJobDispatchCount != 0 ||
-            outStats.recordingDispatcherHandoffCount != 0 || outStats.recordingOwnerJoinCount != 0 ||
-            outStats.recordingWorkerJobCount != 0)
+        // DeclarationOrder records independent command lists concurrently; GPU
+        // submission retains their order. A single target stays on the owner.
+        const uint32_t dispatches = workers > 1 ? 1u : 0u;
+        if (expectedThreadRecordings != kPassCount || outStats.recordingJobDispatchCount != dispatches ||
+            outStats.recordingDispatcherHandoffCount != dispatches || outStats.recordingOwnerJoinCount != dispatches ||
+            outStats.recordingWorkerJobCount != (workers > 1 ? workers : 0u))
         {
             ++unexpectedRecordings;
         }
@@ -6060,7 +6062,7 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
         }
     }
     passed = passed && repeatedPixels && 0 == unexpectedRecordings;
-    outLog += "[jobs] physical workers=1/4, logical lanes=4, ordered owner run and frame slot reuse pixel parity: "
+    outLog += "[jobs] physical workers=1/4, owner-inline single target, parallel multi-target and frame slot reuse pixel parity: "
         + std::string(repeatedPixels && 0 == unexpectedRecordings ? "passed\n" : "failed\n");
 
     size_t differing = sequential.size() == parallel.size() ? 0 : 1;

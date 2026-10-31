@@ -77,7 +77,7 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
     const auto renderOnce = [&](bool parallel, RHIReadbackImage& outImage,
         EnhancedRenderGraph::Stats& outStats) -> bool
     {
-        std::atomic<uint32_t> ownerRecordings{0};
+        std::atomic<uint32_t> expectedThreadRecordings{0};
         if (!resources.BeginFrame(error)) return false;
         const uint32_t frameSlot = recordingFrame++ % VulkanDeviceResources::kFrameCount;
         if (parallel) pool.BeginFrame(frameSlot);
@@ -101,9 +101,9 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
                 {
                     if (parallel)
                     {
-                        if (std::this_thread::get_id() == recordingOwner && !thread_pool::is_worker_thread())
+                        if (std::this_thread::get_id() != recordingOwner && thread_pool::is_worker_thread())
                         {
-                            ++ownerRecordings;
+                            ++expectedThreadRecordings;
                         }
                         else
                         {
@@ -165,11 +165,11 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
             return false;
         }
         outStats = graph.GetStats();
-        // 모든 패스가 같은 target을 갱신하는 직렬 run이다. 리스트는 네 개를
-        // 보존하되 worker handoff 없이 소유자가 한 번씩 기록해야 한다.
-        if (parallel && (ownerRecordings != kColorPassCount || outStats.recordingJobDispatchCount != 0 ||
-                         outStats.recordingDispatcherHandoffCount != 0 || outStats.recordingOwnerJoinCount != 0 ||
-                         outStats.recordingWorkerJobCount != 0))
+        // DeclarationOrder records four command lists on workers and preserves
+        // their order at submission, even when they write the same texture.
+        if (parallel && (expectedThreadRecordings != kColorPassCount || outStats.recordingJobDispatchCount != 1 ||
+                          outStats.recordingDispatcherHandoffCount != 1 || outStats.recordingOwnerJoinCount != 1 ||
+                          outStats.recordingWorkerJobCount != 4))
         {
             ++unexpectedRecordings;
         }
@@ -252,7 +252,7 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
             break;
         }
     }
-    outLog += "[jobs] physical workers=1/4, logical lanes=4, ordered owner run and frame slot reuse pixel parity: "
+    outLog += "[jobs] physical workers=1/4, logical lanes=4, worker recording and frame slot reuse pixel parity: "
         + std::string(repeatedPixels && 0 == unexpectedRecordings ? "passed\n" : "failed\n");
 
     const bool sameShape = sequential.width == parallel.width &&
