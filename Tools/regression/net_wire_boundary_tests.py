@@ -123,7 +123,7 @@ with tempfile.TemporaryDirectory(prefix='nda-mutations-', dir=args.output.parent
     compatible_revision = copy.deepcopy(wire_change); compatible_revision['protocolVersion'] = 2
     check_evolution(compatible_revision, registry, baseline, registry)
     results.append({'name': 'legitimate_wire_protocol_revision', 'exitCode': 0, 'diagnostic': 'change policy accepted'})
-    suite = json.loads((root / 'Tools/regression/network-handoff.suite.json').read_text())
+    suite = json.loads((root / 'Tools/regression/network-handoff.suite.json').read_text(encoding='utf-8-sig'))
     validate(root, suite)
     for name, mutate in (
         ('remove_gate', lambda manifest: manifest['gates'].pop(0)),

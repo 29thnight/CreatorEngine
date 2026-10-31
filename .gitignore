@@ -686,3 +686,6 @@ Dynamic_CPP/Assets/Prefabs/BTSmokeProbe.prefab
 
 # Desloppify local analysis state
 /.desloppify/
+
+# Required native facade manifest (not a test coverage report).
+!Engine/Scripting/Bindings/GeneratedNative/coverage.json

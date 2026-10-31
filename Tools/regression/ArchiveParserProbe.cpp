@@ -19,7 +19,7 @@ int main(int argc,char** argv){try{
     Check(bool(text)&&error.empty(),"authoring parse");
     ArchiveSchemaFixture fromText;Authoring::ReflgenReader textReader(text.Root());reflgen::deserialize(textReader,fromText);
     Check(fromText.id==source.id&&fromText.name==source.name&&fromText.active&&fromText.samples==source.samples,"shared schema authoring");
-    std::vector<std::byte> bytes;Check(Authoring::EncodeCookedDocument(document.Root().Read(),bytes,error),"cook");
+    ce::dynamic_array<std::byte> bytes;Check(Authoring::EncodeCookedDocument(document.Root().Read(),bytes,error),"cook");
     auto cooked=Authoring::ParsedDocument::ParseCooked(bytes,error);Check(bool(cooked),"cooked strict read");
     ArchiveSchemaFixture fromCooked;Authoring::ReflgenReader cookedReader(cooked.Root());reflgen::deserialize(cookedReader,fromCooked);
     Check(fromCooked.id==source.id&&fromCooked.name==source.name&&fromCooked.active&&fromCooked.samples==source.samples,"shared schema cooked");

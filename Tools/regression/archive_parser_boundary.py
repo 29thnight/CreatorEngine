@@ -8,9 +8,10 @@ RUNTIME=('Player/','Engine/RuntimeHost/','Engine/SceneRuntime/','Engine/RenderEn
 NEUTRAL=('Engine/Utility_Framework/Authoring/DiagnosticDocument.h','Engine/Utility_Framework/Authoring/AuthoringDocument.h',
  'Engine/Utility_Framework/Authoring/AuthoringNodeView.h','Engine/Utility_Framework/Reflection/TypeTrait.h',
  'Engine/SceneRuntime/ComponentFactory.h','Engine/SceneRuntime/SceneObservation.h','Tools/regression/ArchiveSchemaFixture.h')
-FACADES={'Engine/Utility_Framework/'+name for name in ('AuthoringReadNode.h','AuthoringWriteNode.h',
- 'AuthoringParsedDocument.h','AuthoringNodeViewAccess.h','AuthoringDocumentAccess.h','AuthoringCookedDocument.h',
- 'ReflectionYml.h','ReflectionTypedYml.h','ReflgenAuthoring.h','ReflgenAuthoringSerializers.h')}
+FACADES={'Engine/Utility_Framework/Authoring/'+name for name in ('AuthoringReadNode.h','AuthoringWriteNode.h',
+ 'AuthoringParsedDocument.h','AuthoringNodeViewAccess.h','AuthoringDocumentAccess.h','AuthoringCookedDocument.h')}
+FACADES.update('Engine/Utility_Framework/Reflection/'+name for name in
+ ('ReflectionYml.h','ReflectionTypedYml.h','ReflgenAuthoring.h','ReflgenAuthoringSerializers.h'))
 LEX=re.compile(r'R"([^ ()\\\t\r\n]{0,16})\(.*?\)\1"|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|/\*.*?\*/|//[^\n]*',re.S)
 BACKEND_INCLUDE=re.compile(r'(?:^|/)(?:yaml-cpp|nlohmann|ryml|c4/yml)(?:/|\.|$)|^c4/format\.hpp$',re.I)
 BACKEND_SYMBOL=re.compile(r'\b(?:YAML|ryml|nlohmann|c4)\b')
@@ -46,6 +47,10 @@ def check(files):
         result=[];comments,symbols=parsed[p]
         for match in INCLUDE.finditer(comments):
             raw=match[2].strip();header=re.fullmatch(r'[<"]([^>"\r\n]+)[>"]\s*',raw)
+            # Contracts.targets binds this one SDK adapter to the configured v3
+            # GameInput header. It is an external SDK leaf, not an archive facade.
+            if match[1]=='include' and p=='Engine/Platform/WindowsSDK/Creator.GameInputSDK.h' and raw=='CE_GAMEINPUT_HEADER':
+                continue
             if match[1]=='include_next' or not header:raise BoundaryError('N1_INCLUDE: nonliteral include '+p+': '+raw)
             name=header[1].replace('\\','/')
             if BACKEND_INCLUDE.search(name):raise BoundaryError('N1_BACKEND_INCLUDE: '+p+' -> '+name)
