@@ -94,6 +94,8 @@ jobs:
           repository: 29thnight/FSharp_Tool_Pakage_for_CreatorEngine
           ref: 3351cbc80d7216eb10110c4c8b30dce98aef1d1f
           path: Build/CI/FSharpTools
+          ssh-key: ${{ secrets.CREATOR_FSHARP_DEPLOY_KEY }}
+          persist-credentials: false
       - name: Build pinned F# registry generator
         shell: pwsh
         run: |
