@@ -90,6 +90,65 @@ namespace
                 "invalid target accepted");
     }
 
+    void VerifyScalarPlanningScratchReuse()
+    {
+        if (!RenderContainerReuseEnabled())
+        {
+            return;
+        }
+        const std::array targets{0u, 1u, 0u}, waves{0u, 0u, 1u}, units{0u, 1u, 2u};
+        const std::array<uint64_t, 3> work{2, 13, 4};
+        std::array passes{RHIRecordingPassDependencies{false, {}}, RHIRecordingPassDependencies{false, {}},
+                          RHIRecordingPassDependencies{false, {0}}};
+        RHIRecordingTaskGraph graph;
+        Require(RHIBuildRecordingTaskGraph(targets, waves, units, work, passes, 4, graph) &&
+                    graph.CriticalWork() == 13,
+                "scalar scratch reuse seed failed");
+        const auto* previous = graph.scratch.previous.data();
+        const auto* completion = graph.completion.data();
+        for (unsigned repeat = 0; repeat < 32; ++repeat)
+        {
+            Require(graph.CriticalWork() == 13 && graph.completion.data() == completion,
+                    "critical-path calculation replaced retained scalar scratch");
+        }
+
+        Require(RHIBuildRecordingTaskGraph(std::array{0u}, std::array{0u}, std::array{0u},
+                                          std::array<uint64_t, 1>{7}, passes, 2, graph) &&
+                    graph.CriticalWork() == 7 && graph.scratch.previous.data() == previous &&
+                    graph.completion.data() == completion &&
+                    std::ranges::equal(graph.scratch.previous, std::array{0u, UINT32_MAX}),
+                "shrinking a graph lost scalar capacity or retained a previous target");
+        Require(RHIBuildRecordingTaskGraph({}, {}, {}, {}, {}, 2, graph) && graph.CriticalWork() == 0 &&
+                    graph.nodes.empty() && graph.completion.empty() &&
+                    graph.scratch.previous.data() == previous && graph.completion.data() == completion &&
+                    std::ranges::all_of(graph.scratch.previous, [](uint32_t value) { return value == UINT32_MAX; }),
+                "empty graph reset retained work or released reusable scalar storage");
+
+        Require(RHIBuildRecordingTaskGraph(targets, waves, units, work, passes, 16, graph) &&
+                    graph.CriticalWork() == 13 && graph.completion.data() == completion,
+                "growing target scratch changed the critical path");
+        const auto* grownPrevious = graph.scratch.previous.data();
+        passes[2].producers = {1};
+        Require(RHIBuildRecordingTaskGraph(targets, waves, units, work, passes, 2, graph) &&
+                    graph.CriticalWork() == 17 && graph.scratch.previous.data() == grownPrevious &&
+                    graph.completion.data() == completion &&
+                    std::ranges::equal(graph.nodes[2].dependencies, std::array{0u, 1u}),
+                "changed dependencies reused stale predecessor or completion values");
+        passes[2].producers = {0};
+        Require(RHIBuildRecordingTaskGraph(targets, waves, units, std::array<uint64_t, 3>{1, 1, 0},
+                                          passes, 16, graph) &&
+                    graph.CriticalWork() == 1 && graph.scratch.previous.data() == grownPrevious &&
+                    graph.completion.data() == completion &&
+                    std::ranges::equal(graph.completion, std::array<uint64_t, 3>{1, 1, 1}) &&
+                    std::ranges::all_of(std::span(graph.scratch.previous).subspan(2),
+                                       [](uint32_t value) { return value == UINT32_MAX; }),
+                "regrowing within capacity kept stale target or critical-path scratch");
+        Require(!RHIBuildRecordingTaskGraph({}, {}, {}, {}, {}, 0, graph) &&
+                    graph.nodes.size() == 3 && graph.CriticalWork() == 1 &&
+                    graph.scratch.previous.data() == grownPrevious && graph.completion.data() == completion,
+                "invalid zero-target graph replaced the accepted plan or its scalar scratch");
+    }
+
     void VerifyNoGlobalBarrier(job_scheduler& scheduler, const RHIRecordingExecutionOptions& options)
     {
         auto graph = Build({0, 1, 0}, {0, 0, 1}, {0, 1, 2}, {}, {{false, {}}, {false, {}}, {false, {0}}});
@@ -1117,6 +1176,7 @@ int main(int argc, char** argv)
         if (!recordingHelperOnly)
         {
             VerifyPlanning();
+            VerifyScalarPlanningScratchReuse();
             VerifyTopologyReasonsAndMapping();
             VerifyTopologyEntryLimit();
             VerifyTopologyDependencyLimit();

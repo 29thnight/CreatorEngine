@@ -46,6 +46,17 @@ def main():
     compiler = shutil.which(args.compiler)
     if not compiler:
         parser.error("a C++23 GCC/Clang compiler is required")
+    predefined = subprocess.check_output([compiler, "-dM", "-E", "-x", "c++", "-"], input="", text=True)
+    gcc = "#define __GNUC__ " in predefined and "#define __clang__ " not in predefined
+    fixture_flags = []
+    if gcc:
+        # GCC does not consume the reflection generator's scoped attributes.
+        # Keep the other diagnostics and -Werror: nonnull warns on unevaluated
+        # destructor noexcept checks. mismatched-dealloc follows a hypothetical
+        # over-aligned path in bulk_reallocate; its only caller first requires
+        # bulk_block, which guarantees alignment <= malloc_alignment. Both
+        # allocator warnings stay visible; ASan/UBSan exercises the actual path.
+        fixture_flags = ["-Wno-attributes=reflgen::", "-Wno-error=nonnull", "-Wno-error=mismatched-dealloc"]
     snapshots = {}
     adapted = {}
     pending = [root / path for path in CPP]
@@ -91,12 +102,12 @@ def main():
         shim.parent.mkdir(parents=True, exist_ok=True)
         shim.write_text("""#pragma once
 #include <cstddef>
-void* queue_probe_allocate(std::size_t, std::size_t);
+void* queue_probe_allocate(std::size_t, std::size_t) noexcept;
 void queue_probe_free(void*) noexcept;
-inline void* mi_malloc(std::size_t bytes) { return queue_probe_allocate(bytes, alignof(std::max_align_t)); }
-inline void* mi_malloc_aligned(std::size_t bytes, std::size_t alignment)
+inline void* mi_malloc(std::size_t bytes) noexcept { return queue_probe_allocate(bytes, alignof(std::max_align_t)); }
+inline void* mi_malloc_aligned(std::size_t bytes, std::size_t alignment) noexcept
 { return queue_probe_allocate(bytes, alignment); }
-inline void mi_free(void* pointer) { queue_probe_free(pointer); }
+inline void mi_free(void* pointer) noexcept { queue_probe_free(pointer); }
 """, encoding="utf-8")
         enkits = target / "include/enkiTS"
         enkits.mkdir(parents=True)
@@ -105,6 +116,7 @@ inline void mi_free(void* pointer) { queue_probe_free(pointer); }
         executable = target / "software-queue"
         command = [compiler, "-std=c++23", "-O2", "-g", "-pthread", "-DCE_CONTRACT_STANDALONE=1",
                    "-DCE_SHIPPING=1", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter", "-Wno-unknown-pragmas",
+                   *fixture_flags,
                    "-I", str(mirror), "-I", str(mirror / "Engine/Utility_Framework"),
                    "-I", str(mirror / "ThirdParty/Mathematics/include"),
                    "-I", str(mirror / "ThirdParty/ownership_cpp/include"),
@@ -114,7 +126,10 @@ inline void mi_free(void* pointer) { queue_probe_free(pointer); }
         if args.sanitize:
             command += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-fno-sanitize-recover=all"]
         print("Compiling actual software queue/recording/replay and actual JobScheduler/ThreadPool/enkiTS", flush=True)
-        subprocess.run(command, check=True, timeout=240)
+        compilation = subprocess.run(command, text=True, capture_output=True, timeout=240)
+        print(compilation.stdout, end="")
+        print(compilation.stderr, end="")
+        compilation.check_returncode()
         environment = os.environ.copy()
         if args.sanitize:
             environment["ASAN_OPTIONS"] = "detect_leaks=0:halt_on_error=1"
@@ -132,6 +147,8 @@ inline void mi_free(void* pointer) { queue_probe_free(pointer); }
             "sanitized": args.sanitize,
             "compiler": subprocess.check_output([compiler, "--version"], text=True).splitlines()[0],
             "flags": command[1:command.index("-I")],
+            "fixture_warning_policy": fixture_flags,
+            "compiler_warning_categories": sorted(set(re.findall(r"\[-W[^\]]+\]", compilation.stderr))),
             "boundary": "actual software queue/recording/replay + actual scheduler/enkiTS; CPU native recorder/fence fixture; malloc shim; no native GPU/frame execution",
             "service_header": "Complete production IRenderDeviceServices.h and transitive model/math/ownership headers unchanged",
             "rows": [json.loads(line) for line in result.stdout.splitlines() if line.strip()]}

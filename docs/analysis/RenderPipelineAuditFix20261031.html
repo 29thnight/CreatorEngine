@@ -167,26 +167,28 @@
 </head>
 <body>
 <div class="shell has-toc">
-<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#수정한-문제와-결과">수정한 문제와 결과</a></li><li><a href="#rg9-결함과-회귀">RG9 결함과 회귀</a></li><li><a href="#실행한-검증">실행한 검증</a></li><li><a href="#보고서-정정과-잔여-범위">보고서 정정과 잔여 범위</a></li></ol></nav>
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#수정한-문제와-결과">수정한 문제와 결과</a></li><li><a href="#rg9-결함과-회귀">RG9 결함과 회귀</a></li><li><a href="#후속-구현-실제-재할당과-재질-선택의-중복-작업">후속 구현: 실제 재할당과 재질 선택의 중복 작업</a></li><li><a href="#실행한-검증">실행한 검증</a></li><li><a href="#보고서-정정과-잔여-범위">보고서 정정과 잔여 범위</a></li></ol></nav>
 <main>
 <header class="page">
 <nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="RenderPipelineAuditFix20261031.md">원본 Markdown</a></nav>
 <p class="eyebrow">분석</p>
 <h1>렌더 파이프라인 감사 수정 — 2026-10-31</h1>
 <div class="meta"><p>기준은 master <code>f4264beb85a4183ab4373313a2492fe5c427c739</code>다. 이번 변경은 재현한 RG9 정확성 결함과 CPU 기록·입력 준비의 반복 비용을 수정한다. Windows native 빌드·GPU 출력·일반 프레임 성능은 이 환경에서 실행하지 않았다. 따라서 제품 성능 수용이나 PHASE 완료율을 올리지 않는다.</p>
+<p>초기 수정 커밋은 <code>4de854c4b7171619b942e7eba2541b6a9fdb88f9</code>다. 아래 후속 구현과 검증은 이 커밋에서 열려 있던 recording 전체 gate, translation consumer 검증과 재질 선택의 중복 작업을 다룬다. 초기 실패를 없던 일로 처리하지 않고 원인과 해결 범위를 함께 기록한다.</p>
 </div>
 </header>
 <div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">3<span class="unit">곳</span></span>
 <div class="stack" role="img" aria-label="완료·통과 2, 차단·중단 1"><i class="ok" style="flex:2"></i><i class="risk" style="flex:1"></i></div>
 <span class="legend"><span class="chip ok">완료·통과 2</span><span class="chip risk">차단·중단 1</span></span></div></div>
 <figure>
-<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
-<a class="map-row" href="#수정한-문제와-결과"><span class="ve-label">§00</span><span class="map-name">수정한 문제와 결과</span><span class="map-bar"><i style="width:56%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#rg9-결함과-회귀"><span class="ve-label">§01</span><span class="map-name">RG9 결함과 회귀</span><span class="map-bar"><i style="width:23.4%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#실행한-검증"><span class="ve-label">§02</span><span class="map-name">실행한 검증</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span> <span class="chip ok" title="완료·통과">2</span></span></a>
-<a class="map-row" href="#보고서-정정과-잔여-범위"><span class="ve-label">§03</span><span class="map-name">보고서 정정과 잔여 범위</span><span class="map-bar"><i style="width:16.7%"></i></span><span class="map-marks"></span></a>
+<div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
+<a class="map-row" href="#수정한-문제와-결과"><span class="ve-label">§00</span><span class="map-name">수정한 문제와 결과</span><span class="map-bar"><i style="width:36%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#rg9-결함과-회귀"><span class="ve-label">§01</span><span class="map-name">RG9 결함과 회귀</span><span class="map-bar"><i style="width:12.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#후속-구현-실제-재할당과-재질-선택의-중복-작업"><span class="ve-label">§02</span><span class="map-name">후속 구현: 실제 재할당과 재질 선택의 중복 작업</span><span class="map-bar"><i style="width:29.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실행한-검증"><span class="ve-label">§03</span><span class="map-name">실행한 검증</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span> <span class="chip ok" title="완료·통과">2</span></span></a>
+<a class="map-row" href="#보고서-정정과-잔여-범위"><span class="ve-label">§04</span><span class="map-name">보고서 정정과 잔여 범위</span><span class="map-bar"><i style="width:13.3%"></i></span><span class="map-marks"></span></a>
 </div>
-<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「실행한 검증」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+<figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「실행한 검증」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
 </figure>
 <section class="doc-sec" id="sec-수정한-문제와-결과">
 <div class="sec-head"><p class="ve-label">§00</p><h2 id="수정한-문제와-결과">수정한 문제와 결과</h2></div>
@@ -199,7 +201,9 @@
 <tr><td>재질 identity 검색과 borrow에 각각 lock</td><td><code>BorrowExact</code>의 한 lock에서 hint·검색·정확한 owner 확인</td><td>동일 값의 다른 instance와 pin되지 않은 generation 거부</td></tr>
 <tr><td>immutable draw의 material borrow를 반복 조회</td><td>자기 input의 실제 draw 주소와 source index가 일치하면 저장된 borrow 재사용</td><td>외부/복사 record는 table lookup, append-only pin table의 strong owner 유지</td></tr>
 <tr><td>동일 geometry identity 목록을 매번 정렬 검사</td><td>이전 sealed input과 순서·key·전체 handle이 같으면 O(N) 비교로 collision proof 재사용</td><td>변경된 입력은 원래 validator, 현재 owner/payload 검증은 계속 수행</td></tr>
-<tr><td>뷰별 generation 진단 scratch를 매번 새로 할당</td><td>LiveState의 값 전용 배열 capacity 재사용</td><td>에셋 owner를 추가로 보관하지 않음, 기존 진단 값과 정렬 방식 유지</td></tr></tbody></table></div>
+<tr><td>뷰별 generation 진단 scratch를 매번 새로 할당</td><td>LiveState의 값 전용 배열 capacity 재사용</td><td>에셋 owner를 추가로 보관하지 않음, 기존 진단 값과 정렬 방식 유지</td></tr>
+<tr><td>recording 계획의 scalar scratch가 capacity와 무관하게 재할당</td><td><code>previous</code>와 <code>completion</code>을 <code>resize</code> 후 fill하여 저장 공간 재사용</td><td>크기 축소·빈 계획·재확장 때 값 초기화, reuse OFF의 fresh storage 정책</td></tr>
+<tr><td>동일 material slot의 readiness·preview pin·coverage를 draw마다 다시 조회</td><td>한 번의 <code>SelectReadyInput</code> 호출 안에서 slot별 결정과 preview pin 재사용</td><td>정확한 instance·coverage·generation·backend 확인, 첫 draw 오류 순서, 마지막 정상 결과·제출 revision</td></tr></tbody></table></div>
 <p>이는 제거한 검색·정렬·잠금·제출 작업에 대한 설명이다. 실제 프레임 시간 감소나 GPU overlap 증가를 측정한 결과는 아니다. GPU queue 정책, 제품 async 태그, aliasing 기본값은 이번 변경의 대상이 아니다.</p>
 <p>교차 리뷰에서 inline callback의 재진입이 기존 worker 검사만으로는 막히지 않는 점을 확인했다. recording-plan TLS cache의 참조와 target 소유권을 보호하도록 callback 동안 RAII scope를 유지하고, PrepareParallel·RecordParallel·RecordSoftware·SubmitQueues 진입에서 중첩 기록을 거부한다. 예외 뒤 scope 복구도 검사한다. scheduler shutdown 자체를 inline callback 완료의 근거로 사용하지 않으며, 기존 owner/RenderThread join 순서가 native 해제보다 앞서야 한다.</p>
 </div>
@@ -211,48 +215,82 @@
 <p>공식 portable graph runner는 실제 graph translation unit을 빌드한다. native service와 platform allocation은 fixture이며, 사용하지 않는 worker 제출 경계는 여전히 명시적으로 거부한다. 미사용 WinRT 의존을 <code>RHIResourceTypes.h</code>에서 제거했고 SDK 대역 헤더를 production에 추가하지 않았다.</p>
 </div>
 </section>
+<section class="doc-sec" id="sec-후속-구현-실제-재할당과-재질-선택의-중복-작업">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="후속-구현-실제-재할당과-재질-선택의-중복-작업">후속 구현: 실제 재할당과 재질 선택의 중복 작업</h2></div>
+<div class="prose"><h3 id="recording-scratch">Recording scratch</h3>
+<p>초기 전체 recording gate의 <code>recording scratch or nested dependencies were reallocated or accumulated</code> 실패는 실제 구현 결함이었다. <code>ce::dynamic_array::assign(count, value)</code>는 여유 capacity가 있어도 새 배열을 만들고 swap한다. <code>RHIBuildRecordingTaskGraph</code>의 이전 target 배열과 <code>CriticalWork</code>의 완료 작업량 배열에 이 API를 사용하여, 재사용을 의도한 경로에서 매번 저장 공간이 교체됐다.</p>
+<p><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/RenderEngine/RHI/RHIRecordingTaskGraph.h" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">RHIRecordingTaskGraph.h</a>의 두 scalar 배열만 <code>resize</code>와 <code>std::ranges::fill</code>로 초기화하도록 변경했다. 기존 pointer-stability assertion을 유지했고, target 수 <code>4 → 2 → 16 → 2 → 16</code>, node 수 <code>3 → 1 → 0 → 3</code>, dependency·work 변경과 잘못된 target 수 거부를 추가로 검사했다. 전역 컨테이너 API나 scheduler 동작은 변경하지 않았다. 초기의 helper 선택 실행 761개 통과만으로 전체 gate를 통과 처리했던 것은 아니며, 후속 수정 후 기본 전체 gate 24,928개를 통과했다.</p>
+<h3 id="material-slot별-선택">Material slot별 선택</h3>
+<p><a href="https://github.com/29thnight/CreatorEngine/blob/e0edd56663b44930ae301c64ec2e57ead2c81b7c/Engine/RenderEngine/MaterialGraphSceneHost.cpp" title="소스 열람 기준: e0edd56663b44930ae301c64ec2e57ead2c81b7c. 측정 당시 소스 신원은 문서의 원본 기록 참조.">SelectReadyInput</a>의 기존 unique-slot 수집 결과에 이번 호출의 readiness 결정과 preview pin을 보관한다. <code>PollPrograms</code> 이후 현재 backend의 준비 상태를 판단하며, 첫 draw 등장 순서에서 pending·실패를 처리하고 selected draw 순서에서 revision을 게시한다. 함수가 반환하면 결정은 폐기한다. 다음 프레임이나 다른 세대의 준비 상태를 영속 cache로 재사용하지 않는다.</p>
+<p><code>RequestProgram</code>은 이전에도 slot별 한 번이었다. 새로 줄인 작업은 polling 이후 선택 단계의 중복 readiness scan과 동일 preview에 대한 <code>Retain</code>·<code>Borrow</code>·coverage 분류다. 다음 수치는 수정 전 커밋과 현재의 <strong>실제 선택 함수 본문</strong>을 같은 fixture에서 실행한 호출 수다. 축소한 <code>RequestProgram</code>/<code>PollPrograms</code> 내부의 작업, 엔진 전체 호출 수나 실행 시간은 포함하지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>입력과 선택 단계 작업</th><th style="text-align:right">수정 전</th><th style="text-align:right">수정 후</th></tr></thead>
+<tbody><tr><td>준비 완료 draw 160개·slot 2개: readiness 조회</td><td class="num" style="text-align:right">320</td><td class="num" style="text-align:right">2</td></tr>
+<tr><td>preview 대체 draw 80개·slot 1개: readiness 조회</td><td class="num" style="text-align:right">240</td><td class="num" style="text-align:right">2</td></tr>
+<tr><td>같은 preview 입력: <code>Retain</code></td><td class="num" style="text-align:right">80</td><td class="num" style="text-align:right">1</td></tr>
+<tr><td>같은 preview 입력: <code>Borrow</code></td><td class="num" style="text-align:right">80</td><td class="num" style="text-align:right">1</td></tr>
+<tr><td>같은 preview 입력: coverage 분류</td><td class="num" style="text-align:right">80</td><td class="num" style="text-align:right">1</td></tr></tbody></table></div>
+<p>선택 결과의 draw 복사는 유지한다. Seal의 revision 0 입력을 그대로 반환하면 제출 시 revision 일치에 기반한 active material 게시 계약을 깨뜨리기 때문이다. 새 검사는 이전 preview의 늦은 제출이 새 material을 덮어쓰지 못하는 것과 pending·failed slot의 두 입력 순서 모두를 확인한다. 임시 ordered-map 노드 할당은 여전히 남아 있다.</p>
+</div>
+</section>
 <section class="doc-sec" id="sec-실행한-검증">
-<div class="sec-head"><p class="ve-label">§02</p><h2 id="실행한-검증">실행한 검증</h2></div>
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="실행한-검증">실행한 검증</h2></div>
 <div class="prose"><p>환경: Linux x86-64, GCC 13.3, C++23 standalone/shipping 계약. enkiTS는 v1.12 commit <code>0289cf6ffce86697e1f46cb4eeca1c946bffec71</code>을 사용했다.</p>
 <div class="table-scroll"><table>
 <thead><tr><th>검사</th><th>결과</th><th>실제 범위</th></tr></thead>
 <tbody><tr><td>신규 RG9 회귀, 원래 matcher</td><td><span class="chip risk">2개 assertion 실패</span></td><td>mip-only 무효화와 cached/fresh 초기화 오류 동치의 RED</td></tr>
 <tr><td><code>verify-render-graph-program.py</code> 전체</td><td><span class="chip ok">통과</span></td><td>실제 CPU graph compiler/binding, 기존 범위·queue·alias·복구와 inline entry 검사; native device는 fixture</td></tr>
-<tr><td><code>verify-recording-task-graph.py --recording-helper-only</code></td><td>761검사 통과, wave-join mutation 검출</td><td>실제 helper·JobScheduler·ThreadPool, 물리 worker 1/4/8, 단일 owner·다중 worker·실패·수명·진단·재진입</td></tr>
-<tr><td>recording-helper ASan + UBSan</td><td>761검사 통과, mutation 검출, leak detection OFF</td><td>위 실제 CPU 실행 helper 범위만 해당</td></tr>
+<tr><td><code>verify-recording-task-graph.py</code> 기본 전체 gate</td><td>24,928검사 통과, wave-join mutation 검출</td><td>실제 계획·topology·scratch 재사용·helper·JobScheduler·ThreadPool, 물리 worker 1/4/8, legacy/native 실행 정책</td></tr>
+<tr><td>recording 전체 gate ASan + UBSan</td><td>24,928검사 통과, mutation 검출, leak detection OFF</td><td>위 실제 CPU DAG·실행 helper 범위만 해당; native 정책 명칭이 native GPU 실행을 뜻하지 않음</td></tr>
+<tr><td><code>verify-translation-work-queue.py --enkits …</code></td><td>통과; ASan + UBSan도 통과, leak detection OFF</td><td>정확한 production Translate 본문, 실제 recording helper·scheduler·enkiTS worker 1/4/8; RHI service·batch는 축소 fixture</td></tr>
+<tr><td><code>verify-rhi-software-queue.py --enkits …</code></td><td>8,104검사 통과; ASan + UBSan도 8,104개 통과, leak detection OFF</td><td>실제 software queue·recording·replay TU와 scheduler worker 8개; native recorder·fence는 CPU fixture</td></tr>
 <tr><td><code>verify-scene-input-reuse.py</code></td><td><span class="chip ok">2,124검사 통과</span></td><td>실제 ownership/containers/mesh handle 및 추출한 production 함수 본문; 전체 Seal TU는 아님</td></tr>
-<tr><td>scene-input ASan + UBSan</td><td>통과, leak detection OFF</td><td>위 portable 계약 범위만 해당</td></tr></tbody></table></div>
+<tr><td>scene-input ASan + UBSan</td><td>통과, leak detection OFF</td><td>위 portable 계약 범위만 해당</td></tr>
+<tr><td><code>verify-scene-selection.py</code></td><td>657개 동작 검사와 slot별 작업량 검사 통과</td><td>실제 선택 함수·pin table·coverage·readiness·제출 revision loop; 요청·완료와 view/program은 축소 fixture</td></tr>
+<tr><td>scene-selection 수정 전 커밋</td><td>동일한 657개 동작 검사 통과 후 작업량 검사 실패</td><td>과도한 per-draw 조회의 RED; <code>--behavior-only</code>는 통과</td></tr>
+<tr><td>scene-selection ASan + UBSan</td><td>통과, leak detection OFF</td><td>위 portable 선택 계약 범위만 해당; 전체 native SceneHost TU는 아님</td></tr></tbody></table></div>
 <p>scene-input 검사는 전체 mesh identity 19필드 변경, stale/범위 밖 hint, 같은 값의 다른 owner, generation 변경, 외부 draw 조작, 순서 변경·새 key collision, 1,021개 pin의 동시 append를 포함한다. 실제 <code>SceneViewInput::Seal</code>과 재질 경로를 쓰는 기존 native probe에도 회귀를 추가했지만, 작성된 native 검사를 실행 통과로 계산하지 않는다.</p>
 <p>graph entry 회귀는 실제 RAII scope를 직접 활성화해 <code>PrepareParallel</code>과 <code>SubmitQueues</code>가 native 준비·plan·출력·queue 동작을 변경하기 전에 거부되고 scope 종료 후 정상 동작하는지 검사한다. 실제 helper callback 안의 중첩 호출과 예외 복구는 recording-helper suite가 검사한다. <code>RecordParallelInternal</code>·<code>RecordSoftware</code>의 조기 guard 위치는 정적 검토 범위이며 이 fixture에서 두 경로의 전체 native 기록을 실행하지 않는다.</p>
+<p>translation fixture는 현재 profiling·provenance·backend scope API에 맞춰 복구했다. production profiling/provenance 타입과 backend TLS 구현을 사용하고, owner inline·다중 worker 실행, 정확히 한 번 replay, target 독점, 예외 뒤 owner-thread backend scope 복구와 CPU 출력 resource 수명을 검사한다. 고의 지연·admission 실패 시나리오는 fixture의 join하는 <code>std::thread</code> 경로이며, 실제 엔진 scheduler 실행은 worker 1/4/8 경로에서 별도로 확인한다. shipping 계약이므로 개발 빌드의 profiler context 전달·이벤트 기록은 검증하지 않는다.</p>
+<p>Translate의 단일 job 직접 실행은 기존에도 있던 동작이다. 이번 helper 변경의 실제 consumer 검증은 software-queue suite에 추가한 <code>IRHIQueueRecorder::RunParallel</code> 경로가 담당한다. 실제 software recording을 열고 target 1개는 owner inline, target 4개는 worker에서 기록하며 예외 전파·callback drain·inline scope 복구·resource 해제를 확인한다. 기존 queue 검사의 제출 준비·실패 진단·CPU fence retirement 조건도 그대로 실행한다.</p>
+<p>software-queue fixture의 오래된 <code>std::function</code> override를 <code>ce::owned_func</code>로 맞추고, mimalloc 대역의 실패는 현재 API 계약에 따라 <code>noexcept</code>에서 null을 반환하도록 복구했다. 실제 owning allocator가 <code>bad_alloc</code>을 발생시키고 storage를 반환하는 검사는 유지했다. GCC runner는 <code>-Werror</code>를 유지하되 <code>reflgen::</code> annotation만 제외하고 <code>nonnull</code>·<code>mismatched-dealloc</code>을 경고로 출력한다. 전자는 unevaluated destructor <code>noexcept</code> 검사에서, 후자는 <code>bulk_reallocate</code>의 가상 over-aligned 경로에서 발생한다. 실제 유일 caller의 <code>bulk_block</code> 조건은 <code>alignment &lt;= malloc_alignment</code>를 요구하므로 해당 aligned-delete 경로는 도달하지 않는다. 이 예외는 JSON 검증 결과에도 기록하며 production allocator를 변경하지 않는다.</p>
 <h3 id="재현-명령">재현 명령</h3>
-<p>저장소 루트에서 실행한다. recording runner는 위 commit의 로컬 enkiTS checkout 경로가 필요하며 의존성을 다운로드하지 않는다.</p>
+<p>저장소 루트에서 실행한다. recording·translation·software-queue runner는 위 commit의 로컬 enkiTS checkout 경로가 필요하며 의존성을 다운로드하지 않는다.</p>
 <pre><code class="language-bash">python Tools/regression/verify-render-graph-program.py
-python Tools/regression/verify-recording-task-graph.py --enkits /path/to/enkiTS --recording-helper-only
-ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 python Tools/regression/verify-recording-task-graph.py --enkits /path/to/enkiTS --recording-helper-only --sanitize
+python Tools/regression/verify-recording-task-graph.py --enkits /path/to/enkiTS
+ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 python Tools/regression/verify-recording-task-graph.py --enkits /path/to/enkiTS --sanitize
+python Tools/regression/verify-translation-work-queue.py --enkits /path/to/enkiTS
+python Tools/regression/verify-translation-work-queue.py --enkits /path/to/enkiTS --sanitize
+python Tools/regression/verify-rhi-software-queue.py --enkits /path/to/enkiTS
+python Tools/regression/verify-rhi-software-queue.py --enkits /path/to/enkiTS --sanitize
 python Tools/regression/verify-scene-input-reuse.py
 ASAN_OPTIONS=detect_leaks=0 python Tools/regression/verify-scene-input-reuse.py --sanitize
+python Tools/regression/verify-scene-selection.py
+ASAN_OPTIONS=detect_leaks=0 python Tools/regression/verify-scene-selection.py --sanitize
+python Tools/regression/verify-scene-selection.py --source-ref 4de854c4b7171619b942e7eba2541b6a9fdb88f9 --behavior-only
 git diff --check</code></pre>
+<p>마지막 scene-selection 명령에서 <code>--behavior-only</code>를 제거하면 수정 전 per-draw 조회를 검출하여 exit 1로 끝난다. 이는 의도한 RED이며 현재 수정본의 실패가 아니다.</p>
 <h3 id="통과로-세지-않은-항목">통과로 세지 않은 항목</h3>
 <ul>
-<li>recording runner의 기본 전체 gate는 helper 변경 전부터 planning/storage pointer 재사용 assertion에서 실패한다. 선택 실행은 이 gate를 통과 처리하지 않으며, 기존 기본 경로와 assertion을 유지한다.</li>
-<li><code>verify-translation-work-queue.py</code>는 최신 RHI profiling/backend scope/provenance를 반영하지 않은 fixture 때문에 컴파일되지 않았다. 해당 consumer의 통합 검증 통과로 계산하지 않는다.</li>
-<li>include-boundary gate는 sparse checkout에서 상향 include 7개·물리 경계 85건으로 실패했다. 지적한 source/project 경로 중 이번 PR에서 변경한 경로는 없고, project-parse 5건은 checkout에서 제외한 프로젝트다. 전체 master checkout의 결과나 나머지 실패 원인까지 이 관찰로 입증하지 않는다. allowlist는 변경하지 않았다.</li>
-<li>scene-input 기본 LeakSanitizer 실행은 컨테이너의 <code>/proc</code> task/ptrace 제약으로 실패했다. 이후 leak detection을 끈 ASan+UBSan 결과를 누수 검사 통과로 확대하지 않는다.</li>
+<li>초기 커밋의 recording 전체 gate 실패와 translation fixture 컴파일 실패는 위 후속 구현·복구로 해소했다. 이 사실을 원래 검사도 통과했다는 의미로 소급하지 않는다.</li>
+<li>초기 include-boundary gate는 sparse checkout에서 상향 include 7개·물리 경계 85건으로 실패했다. 지적한 source/project 경로 중 초기 수정 커밋에서 변경한 경로는 없고, project-parse 5건은 checkout에서 제외한 프로젝트다. 전체 master checkout의 결과나 나머지 실패 원인까지 이 관찰로 입증하지 않는다. allowlist는 변경하지 않았다.</li>
+<li>scene-input·scene-selection 기본 LeakSanitizer 실행은 컨테이너의 <code>/proc</code> task/ptrace 제약으로 실패했다. 이후 leak detection을 끈 ASan+UBSan 결과를 누수 검사 통과로 확대하지 않는다.</li>
 <li>GCC의 기존 reflection/noexcept 관련 경고가 출력된다. warning-free 빌드로 표시하지 않는다.</li>
 <li>Windows/MSVC Debug·Release 및 non-unity 빌드, DX12/Vulkan native 기록·RG9 GPU·재질 수명 회귀, 픽셀·validation, 일반 프레임 CPU/GPU p50/p95는 미실행이다. 단일 target의 owner 실행에 맞춘 native self-test, inline/worker 혼합 기록의 실패 복구·진단·종료 순서도 재실행이 필요하다.</li>
 </ul>
 </div>
 </section>
 <section class="doc-sec" id="sec-보고서-정정과-잔여-범위">
-<div class="sec-head"><p class="ve-label">§03</p><h2 id="보고서-정정과-잔여-범위">보고서 정정과 잔여 범위</h2></div>
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="보고서-정정과-잔여-범위">보고서 정정과 잔여 범위</h2></div>
 <div class="prose"><p><a href="RenderRg9Implementation20261023.html">RG9 구현 기록</a>의 mip program 검증 문구에 mip-only 사각지대를 명시하고, <a href="../plans/RenderGraphDependencySchedulingPlan.html">정본 계획</a>과 <a href="Phase4Progress20261022.html">진척 원장</a>에 현재 수정본의 native 재검증이 열려 있음을 덧붙였다. 과거 실행의 source/binary hash와 인일 원장은 보존하며, 그 기록을 이번 코드의 완료 근거로 재사용하지 않는다.</p>
 <p><a href="../TechnicalGuide.html">기술설명서</a>의 자동 측정 기반 큐 배치 설명도 현재의 authored async 정책과 graphics-only primary 경로에 맞췄다. CPU worker 절감과 GPU async compute는 서로 다른 작업이다.</p>
 <p>실제 제품 pass의 async opt-in과 전체 프레임 개선, RG7 조합, Declare 비용, 뷰 간 독립 실행, pending geometry/preview 정책, shadow cache 예산 재설계는 이 PR에서 완료한 것으로 주장하지 않는다. 이들 변경은 대표 장면의 trace와 native 수명·출력 검증을 함께 확보해야 한다.</p>
+<p>특히 <code>EnhancedSceneRenderer</code>의 DX11·DX12 경로는 view loop 전에 <code>prepareSceneGeometry()</code> 실패를 반환하므로 geometry 준비 지연이 독립적인 material preview까지 막을 수 있다. 이 gate는 이번 slot별 선택 최적화로 해결되지 않았다. geometry pin 게시·draw-pool 구축과 view별 실패 범위를 함께 변경해야 하는 후속 구현 항목으로 남긴다.</p>
 </div>
 </section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="RenderPipelineAuditFix20261031.md"><code>docs/analysis/RenderPipelineAuditFix20261031.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="RenderPipelineAuditFix20261031.md"><code>docs/analysis/RenderPipelineAuditFix20261031.md</code></a> · 마지막 커밋 2026-10-31 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>

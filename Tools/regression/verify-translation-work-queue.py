@@ -5,6 +5,9 @@ The fixture replaces RHI/native encoders and the pool with fixed CPU storage and
 joined std::threads. The production function is included unchanged after its
 includes. This checks target ownership/order, weighted work claims, allocation
 and failure draining; it does not measure native/GPU/frame performance.
+Queue/failure/provenance/lifetime/backend-scope types are production headers.
+Profile value conversions are included verbatim; CE_SHIPPING scopes do not test
+development profiling instrumentation.
 With --enkits, normal/replay-failure cases use the actual engine recording-jobs
 helper, JobScheduler and ThreadPool; controlled delay/admission-failure cases
 still use joined std::threads. Use a local enkiTS v1.12 checkout at the engine's
@@ -42,6 +45,19 @@ def main():
              root / "Engine/RenderEngine/RHI/RHITranslationWorkQueue.h",
              ROOT / "Tools/regression/translation_work_queue_probe.cpp", Path(__file__).resolve(),
              root / "Engine/Utility_Framework/Foundation/StandardLibrary.h"]
+    profiling = root / "Engine/RenderEngine/RHI/RHIProfilingContext.h"
+    paths += [profiling, root / "Engine/RenderEngine/RHI/RHICommandProvenance.h",
+              root / "Engine/RenderEngine/RHI/RHIBackendExecution.h",
+              root / "Engine/RenderEngine/RHI/RHIQueueContract.h",
+              root / "Engine/RenderEngine/RHI/RHICommandFailure.h",
+              root / "Engine/RenderEngine/RenderAllocator.h",
+              root / "Engine/Utility_Framework/Foundation/EngineFunc.h",
+              root / "Engine/Contracts/Core/Creator.Core.LifetimeToken.ixx",
+              root / "Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h",
+              root / "Engine/Contracts/Core/Creator.Core.HeapAllocator.ixx",
+              root / "Tools/build/ModuleAdapters/Creator.Core.HeapAllocator.h",
+              root / "Engine/EngineDiagnostics/ProfileScope.h",
+              root / "Engine/EngineDiagnostics/ProfileRhiContext.h"]
     dependency = args.enkits.resolve() if args.enkits else None
     if dependency:
         if (dependency / "src/TaskScheduler.cpp").is_file():
@@ -71,6 +87,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix="translation-work-queue-") as directory:
         target = Path(directory)
         (target / "RHICommandTranslatorProduction.inl").write_bytes(body.encode("utf-8"))
+        profile_source = snapshots[profiling].decode("utf-8")
+        profile_start = profile_source.index("inline ce::profile_rhi_context MakeRHIProfileContext(")
+        if any(line.strip() and line != "#pragma once" and not line.startswith("#include ")
+               for line in profile_source[:profile_start].splitlines()):
+            raise RuntimeError("production declarations before profile conversions require a fixture review")
+        (target / "RHIProfilingContextProduction.inl").write_text(
+            profile_source[profile_start:], encoding="utf-8")
         probe = target / "probe.cpp"
         probe.write_bytes(snapshots[paths[2]])
         executable = target / "translation-work-queue"
@@ -104,7 +127,7 @@ def main():
                 raise RuntimeError(f"source changed during verification: {path}")
         evidence = {"source_sha256": hashes, "sanitized": args.sanitize, "native_scheduler": bool(dependency),
                     "compiler": subprocess.check_output([compiler, "--version"], text=True).splitlines()[0],
-                    "boundary": "exact-production-function; fixed CPU RHI fixture; no native/GPU/frame timing",
+                    "boundary": "exact-production-function and profile value conversions; real shipping profile/backend/lifetime types; fixed CPU RHI fixture; no development profiling/native/GPU/frame timing",
                     "production_body_sha256": hashlib.sha256(body.encode()).hexdigest(),
                     "output": result.stdout.splitlines()}
         if args.output:
