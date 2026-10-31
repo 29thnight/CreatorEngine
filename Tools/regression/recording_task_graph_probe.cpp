@@ -49,14 +49,15 @@ namespace
     void VerifyPlanning()
     {
         auto graph = Build({0, 1, 0}, {0, 0, 1}, {0, 1, 2}, {1, 20, 1}, {{false, {}}, {false, {}}, {false, {0}}});
-        Require(graph.nodes.size() == 3 && graph.nodes[2].dependencies == std::vector<uint32_t>{0},
+        Require(graph.nodes.size() == 3 && std::ranges::equal(graph.nodes[2].dependencies, std::array{0u}),
                 "unrelated wave work became a dependency");
         Require(graph.CriticalWork() == 20 && graph.ReplacesWaveJoins(), "dependency critical path is incorrect");
         graph = Build({0, 1, 1}, {0, 0, 1}, {0, 1, 2}, {}, {{false, {}}, {true, {0}}, {false, {1}}});
-        Require(graph.nodes[1].dependencies.empty() && graph.nodes[2].dependencies == std::vector<uint32_t>({0, 1}),
+        Require(graph.nodes[1].dependencies.empty() &&
+                    std::ranges::equal(graph.nodes[2].dependencies, std::array{0u, 1u}),
                 "independent bridge lost its upstream CPU prerequisite");
         graph = Build({0, 1, 2}, {0, 0, 1}, {0, 0, 1}, {}, {{false, {}}, {false, {0}}});
-        Require(graph.nodes[2].dependencies == std::vector<uint32_t>({0, 1}),
+        Require(std::ranges::equal(graph.nodes[2].dependencies, std::array{0u, 1u}),
                 "split producer did not join every slice");
         graph = Build({0, 0, 0}, {0, 1, 2}, {0, 1, 2}, {}, {{false, {}}, {false, {0}}, {false, {1}}});
         Require(!graph.ReplacesWaveJoins(), "single-target coalescing would be expanded into more jobs");
@@ -79,7 +80,7 @@ namespace
                 Require(reusable.scratch.previous.data() == previous &&
                             reusable.scratch.frontiers[0].data() == frontier &&
                             reusable.nodes[2].dependencies.data() == dependency &&
-                            reusable.nodes[2].dependencies == std::vector<uint32_t>{0},
+                            std::ranges::equal(reusable.nodes[2].dependencies, std::array{0u}),
                         "recording scratch or nested dependencies were reallocated or accumulated");
             }
         }
@@ -195,6 +196,280 @@ namespace
         Require(failed && calls == 2, "invalid DAG submitted partial work");
     }
 
+    void VerifyIndexedRecording(job_scheduler& scheduler)
+    {
+        const auto owner = std::this_thread::get_id();
+        uint32_t emptyCalls = 0;
+        RHIRunCommandRecordingJobs(scheduler, [&](uint32_t) { ++emptyCalls; }, 0);
+        Require(emptyCalls == 0, "empty indexed recording ran a callback");
+        for (const uint32_t targets : {1u, 4u})
+        {
+            for (const bool fail : {false, true})
+            {
+                std::array<std::atomic<uint32_t>, 4> calls{};
+                auto capture = std::make_shared<uint32_t>(17);
+                const std::weak_ptr<uint32_t> lifetime = capture;
+                bool propagated = false;
+                try
+                {
+                    RHIRunCommandRecordingJobs(
+                        scheduler,
+                        [&, capture = std::move(capture)](uint32_t target)
+                        {
+                            Require(target < targets && *capture == 17, "indexed recording lost its target or capture");
+                            Require(targets == 1 ? std::this_thread::get_id() == owner && !thread_pool::is_worker_thread()
+                                                 : std::this_thread::get_id() != owner && thread_pool::is_worker_thread(),
+                                    "indexed recording did not use the single owner or multiple workers");
+                            ++calls[target];
+                            if (fail && target == 0)
+                            {
+                                throw std::runtime_error("indexed recording failure");
+                            }
+                        },
+                        targets);
+                }
+                catch (const std::runtime_error& error)
+                {
+                    propagated = std::string_view{error.what()} == "indexed recording failure";
+                    if (!propagated)
+                    {
+                        throw;
+                    }
+                }
+                Require(propagated == fail, "indexed recording did not preserve its callback exception");
+                Require(lifetime.expired(), "indexed recording retained a callback after returning or throwing");
+                for (uint32_t target = 0; target < calls.size(); ++target)
+                {
+                    Require(calls[target] == (target < targets ? 1u : 0u),
+                            "indexed recording returned before every accepted target finished exactly once");
+                }
+            }
+        }
+        for (const uint32_t targets : {0u, 1u, 4u})
+        {
+            scheduler.submit(
+                [&]
+                {
+                    uint32_t calls = 0;
+                    bool rejected = false;
+                    try
+                    {
+                        RHIRunCommandRecordingJobs(scheduler, [&](uint32_t) { ++calls; }, targets);
+                    }
+                    catch (const std::logic_error&)
+                    {
+                        rejected = true;
+                    }
+                    Require(rejected == (targets != 0) && calls == 0,
+                            "indexed recording changed empty or worker-entry rejection semantics");
+                }).wait();
+        }
+        struct BorrowedState
+        {
+            BorrowedState() = default;
+            BorrowedState(const BorrowedState&) = delete;
+            BorrowedState(BorrowedState&&) = delete;
+            uint32_t calls{};
+        } state;
+        const auto borrowed = [&](uint32_t target)
+        {
+            Require(target == 0 && std::this_thread::get_id() == owner,
+                    "single recording moved its borrowed callback to another thread");
+            ++state.calls;
+            throw static_cast<const BorrowedState*>(&state);
+        };
+        bool preserved = false;
+        try
+        {
+            RHIRunCommandRecordingJobs(scheduler, std::cref(borrowed), 1);
+        }
+        catch (const BorrowedState* failure)
+        {
+            preserved = failure == &state;
+        }
+        Require(preserved && state.calls == 1, "single recording moved borrowed state or replaced its exception");
+    }
+
+    void VerifySingleNodeRecording(job_scheduler& scheduler, const RHIRecordingExecutionOptions& policy)
+    {
+        auto graph = Build({3}, {0}, {0}, {}, {{false, {}}});
+        const auto owner = std::this_thread::get_id();
+        // 진단을 요청한 호출은 실제 제출·합류 시각을 보존하는 기존 경로를 검사한다.
+        for (uint32_t diagnosticsMask = 0; diagnosticsMask < 4; ++diagnosticsMask)
+        {
+            auto options = policy;
+            uint64_t waitBegin = 0;
+            if (diagnosticsMask & 1u)
+            {
+                options.diagnostics = own::make_shared<job_graph_diagnostics>();
+            }
+            if (diagnosticsMask & 2u)
+            {
+                options.waitBeginNanoseconds = &waitBegin;
+            }
+            auto capture = std::make_shared<uint32_t>(23);
+            const std::weak_ptr<uint32_t> lifetime = capture;
+            uint32_t calls = 0;
+            RHIRunCommandRecordingTaskGraph(
+                scheduler, graph,
+                [&, capture = std::move(capture)](uint32_t node)
+                {
+                    Require(node == 0 && *capture == 23, "single recording node lost its index or capture");
+                    Require(diagnosticsMask == 0
+                                ? std::this_thread::get_id() == owner && !thread_pool::is_worker_thread()
+                                : std::this_thread::get_id() != owner && thread_pool::is_worker_thread(),
+                            "single recording node changed owner or diagnostic execution semantics");
+                    ++calls;
+                },
+                options);
+            const uint64_t returned = job_timestamp_ns();
+            Require(calls == 1 && lifetime.expired(), "single recording node retained work or its callback");
+            Require(options.waitBeginNanoseconds ? waitBegin != 0 && waitBegin <= returned : waitBegin == 0,
+                    "single recording node lost or fabricated a wait timestamp");
+            if (options.diagnostics && options.batchSubmit)
+            {
+                const auto& diagnostics = *options.diagnostics;
+                Require(diagnostics.nodes.size() == 1 && diagnostics.dispatcher_handoffs == 1 &&
+                            diagnostics.native_task_count == 1 && diagnostics.submitted_ns != 0 &&
+                            diagnostics.completed_ns >= diagnostics.submitted_ns && diagnostics.completed_ns <= returned,
+                        "single recording node lost native submission diagnostics");
+                const auto& timing = diagnostics.nodes[0];
+                Require(!timing.skipped && timing.start_ns != 0 && timing.body_end_ns >= timing.start_ns &&
+                            timing.complete_ns >= timing.body_end_ns && diagnostics.completed_ns >= timing.complete_ns,
+                        "single recording node lost native execution timestamps");
+            }
+            else if (options.diagnostics)
+            {
+                Require(options.diagnostics->nodes.empty() && options.diagnostics->submitted_ns == 0,
+                        "legacy recording fabricated native graph diagnostics");
+            }
+        }
+        bool propagated = false;
+        auto capture = std::make_shared<uint32_t>(29);
+        const std::weak_ptr<uint32_t> lifetime = capture;
+        try
+        {
+            RHIRunCommandRecordingTaskGraph(
+                scheduler, graph,
+                [capture = std::move(capture)](uint32_t)
+                {
+                    Require(*capture == 29, "single recording failure lost its capture");
+                    throw std::runtime_error("single recording failure");
+                },
+                policy);
+        }
+        catch (const std::runtime_error& error)
+        {
+            propagated = std::string_view{error.what()} == "single recording failure";
+        }
+        Require(propagated && lifetime.expired(), "single recording failure was swallowed or retained its callback");
+        scheduler.submit(
+            [&]
+            {
+                bool rejected = false;
+                uint32_t calls = 0;
+                try
+                {
+                    RHIRunCommandRecordingTaskGraph(scheduler, graph, [&](uint32_t) { ++calls; }, policy);
+                }
+                catch (const std::logic_error&)
+                {
+                    rejected = true;
+                }
+                Require(rejected && calls == 0, "single recording node bypassed worker-entry rejection");
+            }).wait();
+        graph.nodes[0].dependencies.push_back(0);
+        uint32_t invalidCalls = 0;
+        bool rejected = false;
+        try
+        {
+            RHIRunCommandRecordingTaskGraph(scheduler, graph, [&](uint32_t) { ++invalidCalls; }, policy);
+        }
+        catch (const std::invalid_argument&)
+        {
+            rejected = true;
+        }
+        Require(rejected && invalidCalls == 0, "single recording node bypassed dependency validation");
+    }
+
+    void VerifyInlineRecordingReentry(job_scheduler& scheduler)
+    {
+        const std::array graphs{
+            Build({3}, {0}, {0}, {}, {{false, {}}}),
+            Build({0, 1, 0}, {0, 0, 1}, {0, 1, 2}, {}, {{false, {}}, {false, {}}, {false, {0}}})};
+        uint32_t nestedCalls = 0;
+        Require(!RHIInlineCommandRecordingScope::IsActive(), "inline recording scope leaked into its caller");
+        RHIRunCommandRecordingJobs(
+            scheduler,
+            [&](uint32_t)
+            {
+                Require(RHIInlineCommandRecordingScope::IsActive(), "owner callback has no reentry guard");
+                RHIRunCommandRecordingJobs(scheduler, [&](uint32_t) { ++nestedCalls; }, 0);
+                RHIRunCommandRecordingTaskGraph(scheduler, {}, [&](uint32_t) { ++nestedCalls; });
+                for (const uint32_t targets : {1u, 4u})
+                {
+                    bool rejected = false;
+                    try
+                    {
+                        RHIRunCommandRecordingJobs(scheduler, [&](uint32_t) { ++nestedCalls; }, targets);
+                    }
+                    catch (const std::logic_error&)
+                    {
+                        rejected = true;
+                    }
+                    Require(rejected && nestedCalls == 0 && RHIInlineCommandRecordingScope::IsActive(),
+                            "nested indexed recording ran work or cleared its outer guard");
+                }
+                for (const bool batchSubmit : {false, true})
+                {
+                    for (const auto& graph : graphs)
+                    {
+                        RHIRecordingExecutionOptions options;
+                        options.batchSubmit = batchSubmit;
+                        options.diagnostics = own::make_shared<job_graph_diagnostics>();
+                        uint64_t waitBegin = 0;
+                        options.waitBeginNanoseconds = &waitBegin;
+                        bool rejected = false;
+                        try
+                        {
+                            RHIRunCommandRecordingTaskGraph(
+                                scheduler, graph, [&](uint32_t) { ++nestedCalls; }, options);
+                        }
+                        catch (const std::logic_error&)
+                        {
+                            rejected = true;
+                        }
+                        Require(rejected && nestedCalls == 0 && RHIInlineCommandRecordingScope::IsActive() &&
+                                    options.diagnostics->submitted_ns == 0 && waitBegin == 0,
+                                "nested recording graph admitted work or changed diagnostics before rejection");
+                    }
+                }
+            },
+            1);
+        Require(!RHIInlineCommandRecordingScope::IsActive(), "successful inline recording did not restore its guard");
+        bool propagated = false;
+        try
+        {
+            RHIRunCommandRecordingTaskGraph(
+                scheduler, graphs[0],
+                [&](uint32_t)
+                {
+                    Require(RHIInlineCommandRecordingScope::IsActive(), "inline graph callback has no reentry guard");
+                    throw std::runtime_error("inline recording scope failure");
+                });
+        }
+        catch (const std::runtime_error& error)
+        {
+            propagated = std::string_view{error.what()} == "inline recording scope failure";
+        }
+        Require(propagated && !RHIInlineCommandRecordingScope::IsActive(),
+                "failed inline recording replaced its exception or leaked its guard");
+        uint32_t recoveryCalls = 0;
+        RHIRunCommandRecordingJobs(scheduler, [&](uint32_t) { ++recoveryCalls; }, 1);
+        Require(recoveryCalls == 1 && !RHIInlineCommandRecordingScope::IsActive(),
+                "inline recording did not recover after callback failure");
+    }
+
 #if !defined(RECORDING_WAVE_JOIN_MUTANT)
     void RequireSameExecutionGraph(const RHIRecordingTaskGraph& actual, const RHIRecordingTaskGraph& expected)
     {
@@ -223,7 +498,7 @@ namespace
                 Require(dependency.reasons >= 1 && dependency.reasons <= 3,
                         "topology published an absent or unknown dependency reason");
             }
-            Require(dependencies == graph.nodes[node].dependencies,
+            Require(std::ranges::equal(dependencies, graph.nodes[node].dependencies),
                     "topology did not describe every execution dependency exactly once");
             for (const auto unit : topology.nodes[node].units)
             {
@@ -271,10 +546,10 @@ namespace
         graph = Build({1, 0, 2, 2}, {0, 0, 1, 1}, {0, 0, 1, 1}, {5, 7, 11, 13}, {{false, {}}, {false, {0}}}, &topology);
         RequireCompleteTopology(graph, topology);
         Require(topology.nodes.size() == 3, "split producer topology changed its expected node count");
-        Require(topology.unitNodes == std::vector<uint32_t>({1, 0, 2, 2}) &&
-                    topology.nodes[0].units == std::vector<uint32_t>{1} &&
-                    topology.nodes[1].units == std::vector<uint32_t>{0} &&
-                    topology.nodes[2].units == std::vector<uint32_t>({2, 3}),
+        Require(std::ranges::equal(topology.unitNodes, std::array{1u, 0u, 2u, 2u}) &&
+                    std::ranges::equal(topology.nodes[0].units, std::array{1u}) &&
+                    std::ranges::equal(topology.nodes[1].units, std::array{0u}) &&
+                    std::ranges::equal(topology.nodes[2].units, std::array{2u, 3u}),
                 "topology confused original recording units with sorted graph nodes");
         Require(graph.nodes[0].work == 7 && graph.nodes[1].work == 5 && graph.nodes[2].work == 24,
                 "topology capture changed coalesced work estimates");
@@ -286,7 +561,7 @@ namespace
         graph = Build({0, 0}, {0, 0}, {0, 1}, {}, {{false, {}}, {false, {0}}}, &topology);
         RequireCompleteTopology(graph, topology);
         Require(graph.nodes.size() == 1 && topology.nodes[0].dependencies.empty() &&
-                    topology.nodes[0].units == std::vector<uint32_t>({0, 1}),
+                    std::ranges::equal(topology.nodes[0].units, std::array{0u, 1u}),
                 "coalesced passes created a self dependency or lost a recording unit");
         const auto previous = graph;
         Require(!RHIBuildRecordingTaskGraph(
@@ -316,7 +591,7 @@ namespace
         Require(RHIBuildRecordingTaskGraph(targets, waves, unitPasses, {}, passes, kMaximumEntries, graph, &topology),
                 "recording topology rejected its exact entry limit");
         Require(topology.available && !topology.truncated && topology.nodes.size() == kMaximumEntries &&
-                    topology.unitNodes == targets && graph.nodes.size() == kMaximumEntries,
+                    std::ranges::equal(topology.unitNodes, targets) && graph.nodes.size() == kMaximumEntries,
                 "recording topology truncated at rather than above its entry limit");
         targets.push_back(kMaximumEntries);
         waves.push_back(0);
@@ -513,7 +788,7 @@ namespace
         nodes[4].dependencies = {0};
         std::array<std::atomic<uint32_t>, 5> calls{};
         const auto submitter = std::this_thread::get_id();
-        auto diagnostics = std::make_shared<job_graph_diagnostics>();
+        auto diagnostics = own::make_shared<job_graph_diagnostics>();
         auto handle = scheduler.submit_graph(
             nodes,
             [&](size_t node)
@@ -607,7 +882,7 @@ namespace
         ManualGate release;
         std::promise<void> independentEntered;
         auto entered = independentEntered.get_future();
-        auto diagnostics = std::make_shared<job_graph_diagnostics>();
+        auto diagnostics = own::make_shared<job_graph_diagnostics>();
         auto handle = scheduler.submit_graph(
             nodes,
             [&, capture = std::move(capture)](size_t node)
@@ -660,7 +935,7 @@ namespace
         std::array<job_graph_node, 4> nodes;
         nodes[1].dependencies = {0};
         nodes[2].dependencies = {1};
-        auto diagnostics = std::make_shared<job_graph_diagnostics>();
+        auto diagnostics = own::make_shared<job_graph_diagnostics>();
         for (size_t iteration = 0; iteration < 128; ++iteration)
         {
             std::array<std::atomic<uint32_t>, 4> calls{};
@@ -832,18 +1107,39 @@ namespace
 #endif
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
     try
     {
+        const bool recordingHelperOnly = argc == 2 && std::string_view{argv[1]} == "--recording-helper-only";
+        Require(argc == 1 || recordingHelperOnly, "unknown recording task graph probe argument");
 #if !defined(RECORDING_WAVE_JOIN_MUTANT)
-        VerifyPlanning();
-        VerifyTopologyReasonsAndMapping();
-        VerifyTopologyEntryLimit();
-        VerifyTopologyDependencyLimit();
+        if (!recordingHelperOnly)
+        {
+            VerifyPlanning();
+            VerifyTopologyReasonsAndMapping();
+            VerifyTopologyEntryLimit();
+            VerifyTopologyDependencyLimit();
+        }
 #endif
         thread_pool pool;
         job_scheduler scheduler{pool};
+        uint32_t stoppedCalls = 0;
+        RHIRunCommandRecordingJobs(scheduler, [&](uint32_t) { ++stoppedCalls; }, 0);
+        RHIRunCommandRecordingTaskGraph(scheduler, {}, [&](uint32_t) { ++stoppedCalls; });
+        for (const uint32_t targets : {1u, 4u})
+        {
+            bool rejected = false;
+            try
+            {
+                RHIRunCommandRecordingJobs(scheduler, [&](uint32_t) { ++stoppedCalls; }, targets);
+            }
+            catch (const std::runtime_error&)
+            {
+                rejected = true;
+            }
+            Require(rejected && stoppedCalls == 0, "stopped scheduler accepted indexed recording work");
+        }
         bool stopped = false;
         try
         {
@@ -858,10 +1154,13 @@ int main()
         for (const auto workers : {1u, 4u, 8u})
         {
             scheduler.start(workers);
+            VerifyIndexedRecording(scheduler);
+            VerifyInlineRecordingReentry(scheduler);
             for (const bool batchSubmit : {false, true})
             {
                 RHIRecordingExecutionOptions options;
                 options.batchSubmit = batchSubmit;
+                VerifySingleNodeRecording(scheduler, options);
                 VerifyExecution(scheduler, options);
 #if !defined(RECORDING_WAVE_JOIN_MUTANT)
                 VerifyTargetSerialization(scheduler, options);
@@ -873,19 +1172,33 @@ int main()
                 }
             }
 #if !defined(RECORDING_WAVE_JOIN_MUTANT)
-            VerifyNativeSubmission(scheduler);
-            VerifyNativeValidation(scheduler);
-            VerifyNativeFailureAndLifetime(scheduler);
-            VerifyNativeStorageReuse(scheduler);
-            VerifyCompletionWait(scheduler);
-            VerifyNativeShutdown(pool, scheduler);
+            if (!recordingHelperOnly)
+            {
+                VerifyNativeSubmission(scheduler);
+                VerifyNativeValidation(scheduler);
+                VerifyNativeFailureAndLifetime(scheduler);
+                VerifyNativeStorageReuse(scheduler);
+                VerifyCompletionWait(scheduler);
+                VerifyNativeShutdown(pool, scheduler);
+            }
+            else
+            {
+                scheduler.shutdown();
+            }
 #else
             scheduler.shutdown();
 #endif
         }
         std::cout << "RECORDING_TASK_GRAPH_OK checks=" << g_checks.load()
-                  << " workers=1,4,8 targets=8 policies=legacy,native wait=cv lifetime=callback,observer"
-                  << " shutdown=drain topology=bounded\n";
+                  << " workers=1,4,8 targets=8 policies=legacy,native";
+        if (recordingHelperOnly)
+        {
+            std::cout << " scope=recording-helpers single=owner diagnostics=scheduled\n";
+        }
+        else
+        {
+            std::cout << " wait=cv lifetime=callback,observer shutdown=drain topology=bounded\n";
+        }
         return 0;
     }
     catch (const std::exception& error)

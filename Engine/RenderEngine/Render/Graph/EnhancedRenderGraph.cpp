@@ -19,6 +19,7 @@ import Creator.Core.Ownership;
 import Creator.Concurrency.JobGraph;
 #endif
 #include "../../RHI/RHISoftwareRecorder.h"
+#include "../../RHI/RHICommandRecordingJobs.h"
 #include "../../RHI/RHIProfilingContext.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.DynamicBitset.h"
@@ -970,7 +971,8 @@ RGHandle EnhancedRenderGraph::FindImportedTexture(RHITextureHandle texture) cons
 bool EnhancedRenderGraph::PrepareParallel(IRHIParallelCommandPool& pool, std::string& outError)
 {
     if (m_preparedPool || !m_resources.empty() || !m_passes.empty() || m_compiled || !pool.IsInitialized() ||
-        m_deviceServices->GetCurrentUploadRecordingId() == 0 || thread_pool::is_worker_thread())
+        m_deviceServices->GetCurrentUploadRecordingId() == 0 || thread_pool::is_worker_thread() ||
+        RHIInlineCommandRecordingScope::IsActive())
     {
         outError = "Parallel preparation needs an empty graph, initialized pool and an active owner recording.";
         return false;
@@ -3959,7 +3961,8 @@ bool EnhancedRenderGraph::MatchesStructuralSchedule(const StructuralSchedule& sc
             const auto& left = current.desc;
             const auto& right = cached.texture;
             if (left.width != right.width || left.height != right.height || left.arraySize != right.arraySize ||
-                left.format != right.format || left.allowRenderTarget != right.allowRenderTarget ||
+                left.mipLevels != right.mipLevels || left.format != right.format ||
+                left.allowRenderTarget != right.allowRenderTarget ||
                 left.allowDepthStencil != right.allowDepthStencil || left.allowUnorderedAccess != right.allowUnorderedAccess)
             {
                 return false;
@@ -5413,6 +5416,11 @@ bool EnhancedRenderGraph::RecordSoftware(IRHIParallelCommandPool& pool, uint32_t
     RHISoftwareRecorder& recorder, const RHISoftwareBatchDesc& batchDesc, RHISoftwareBatch& outBatch,
     std::string& outError)
 {
+    if (thread_pool::is_worker_thread() || RHIInlineCommandRecordingScope::IsActive())
+    {
+        outError = "Software graph recording cannot recurse from a worker or recording callback.";
+        return false;
+    }
     if (outBatch.IsValid())
     {
         outError = "Software graph recording output is not empty.";
@@ -5440,7 +5448,11 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
     const RHIRecordedBatchDesc& batchDesc, RHIRecordedBatch& outBatch, std::string& outError,
     RHISoftwareRecorder* software, RHISoftwareBatchDesc* softwareDesc, RHISoftwareBatch* softwareBatch)
 {
-
+    if (thread_pool::is_worker_thread() || RHIInlineCommandRecordingScope::IsActive())
+    {
+        outError = "공용 워커 또는 기록 콜백에서 동기 명령 기록을 중첩할 수 없다";
+        return false;
+    }
     const auto finalize = [&](std::span<const uint32_t> order)
     {
         if (software)
@@ -5473,12 +5485,6 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
     if (!pool.IsInitialized())
     {
         outError = "병렬 커맨드 풀이 초기화되지 않았다";
-        return false;
-    }
-
-    if (thread_pool::is_worker_thread())
-    {
-        outError = "공용 워커에서 동기 명령 기록을 중첩할 수 없다";
         return false;
     }
 
@@ -5647,8 +5653,8 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
     };
     // CPU metadata only: no callbacks, encoders, native handles or frame owners.
     // A bounded owner-thread cache also serves graph storage in other frame slots.
-    // Workers cannot recursively record, so an active entry cannot be evicted by
-    // its callbacks. Exact immutable schedule identity and unit shapes gate reuse.
+    // Workers and inline callbacks cannot recursively record, so an active entry
+    // cannot be evicted by its callbacks. Exact schedule identity and shapes gate reuse.
     static thread_local ce::fixed_array<std::optional<CachedRecordingPlan>, MaxStructuralSchedules * 2> cachedPlans;
     static thread_local size_t nextCachedPlan = 0;
     const bool cacheEligible = bindingAware && !recordingSideEffects && workers > 1 &&
@@ -6203,7 +6209,7 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
         }
     };
 
-    // 기록 구간당 Job 하나를 엔진 공용 워커에 제출한다. 단일 구간도 같은 경로다.
+    // 독립 기록 구간은 엔진 공용 워커에 제출하고 단일 구간은 소유자가 직접 기록한다.
     // RunParallel은 모든 콜백이 끝난 뒤 반환/throw하므로 아래에서 안전하게 닫는다.
     try
     {
@@ -6248,11 +6254,8 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
         }
         else
         {
-            // 의존이 줄줄이 이어진 그래프는 차례가 거의 패스 수만큼 생긴다(37 패스에
-            // 33 차례). 차례마다 워커를 깨워 합류시키면 그 비용만 프레임당 2 ms 였다
-            // (기록 0.33 → 2.45 ms, 초당 994 → 315장). 워커 하나만 일하는 차례가
-            // 연달아 오면 그 묶음을 Job 하나가 차례 순서대로 기록한다 — 합류 조건과
-            // 리스트 순서 제약이 그대로이고, 기록은 여전히 공용 워커에서만 일어난다.
+            // 연속된 단일 target 차례는 소유자가 순서대로 기록한다. 다중 target
+            // 차례만 워커에 제출하고 합류하므로 기존 의존·리스트 순서는 유지한다.
             constexpr uint32_t kMaskedWorkers = 32;
             ce::render_arena_vector<uint32_t> waveWorkerMask(waveCount, 0, arena);
             for (size_t i = 0; i < unitCount && workers <= kMaskedWorkers; ++i)
@@ -6277,14 +6280,19 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
                         const auto cursor = workerCursors[worker];
                         if (cursor < workerUnits[worker].size() &&
                             unitWave[workerUnits[worker][cursor]] == activeWave)
+                        {
                             active.push_back(worker);
+                        }
                     }
-                    m_stats.recordingJobDispatchCount += 1;
-                    m_stats.recordingDispatcherHandoffCount += 1;
-                    m_stats.recordingOwnerJoinCount += 1;
-                    m_stats.recordingWorkerJobCount += static_cast<uint32_t>(active.size());
-                    pool.RunParallel([&](uint32_t job) { recordRange(active[job], activeWave); },
-                                     static_cast<uint32_t>(active.size()));
+                    const uint32_t jobs = static_cast<uint32_t>(active.size());
+                    if (jobs > 1)
+                    {
+                        ++m_stats.recordingJobDispatchCount;
+                        ++m_stats.recordingDispatcherHandoffCount;
+                        ++m_stats.recordingOwnerJoinCount;
+                        m_stats.recordingWorkerJobCount += jobs;
+                    }
+                    pool.RunParallel([&](uint32_t job) { recordRange(active[job], activeWave); }, jobs);
                     continue;
                 }
                 const uint32_t runBegin = wave;
@@ -6293,10 +6301,6 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
                     ++wave;
                 }
                 const uint32_t runEnd = wave;
-                ++m_stats.recordingJobDispatchCount;
-                ++m_stats.recordingDispatcherHandoffCount;
-                ++m_stats.recordingOwnerJoinCount;
-                ++m_stats.recordingWorkerJobCount;
                 pool.RunParallel([&](uint32_t)
                 {
                     for (uint32_t run = runBegin; run < runEnd && !failed.load(std::memory_order_relaxed); ++run)

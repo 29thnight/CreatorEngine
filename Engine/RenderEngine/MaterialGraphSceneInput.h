@@ -110,9 +110,14 @@ class SceneViewInput
     {
         return materialPins_->Owner(draw.materialPinIndex);
     }
-    // Immediate preparation borrows the immutable instance; this input pins the table.
+    // Seal/selection validated this borrow and the append-only table keeps it alive.
+    // Only this input's own immutable draw records may bypass the table lookup.
     own::local_view<const Instance> MaterialBorrow(const SceneDrawInput& draw) const
     {
+        if (draw.sourceIndex < draws_.size() && &draw == &draws_[draw.sourceIndex])
+        {
+            return draw.material;
+        }
         return materialPins_->Borrow(draw.materialPinIndex);
     }
     const own::shared_owner<InstanceFramePins>& MaterialPins() const { return materialPins_; }

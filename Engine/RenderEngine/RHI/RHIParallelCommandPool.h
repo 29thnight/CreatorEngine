@@ -74,9 +74,9 @@ class IRHIParallelCommandPool
     virtual uint32_t DrainEncoderDrops(std::string& outLast) = 0;
     virtual bool HasRecorded(uint32_t worker) const = 0;
 
-    /// worker는 물리 스레드가 아닌 독립 command target 번호다. 각 target을
-    /// 공용 Job 하나가 맡으며 한 target 안의 패스 순서는 호출자가 보존한다.
-    /// 단일 target도 공용 워커에서 실행한다. 모든 콜백/캡처가 끝난 뒤 반환하거나
+    /// worker는 물리 스레드가 아닌 독립 command target 번호다.
+    /// 여러 target은 각각 공용 Job 하나가 맡으며 내부 패스 순서는 호출자가 보존한다.
+    /// 단일 target은 소유자가 바로 실행한다. 모든 콜백/캡처가 끝난 뒤 반환하거나
     /// 첫 예외를 전파한다. 중지 중 제출과 공용 워커의 중첩 동기 호출은 거절한다.
     /// Initialize/BeginFrame/Open/RunParallel/Close/Shutdown은 owner가 직렬화한다.
     /// 따라서 반환 뒤에는 기록 Job이 자원을 참조하지 않는다. GPU 완료 대기는 별도다.

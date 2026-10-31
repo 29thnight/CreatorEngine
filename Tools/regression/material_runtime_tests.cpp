@@ -90,6 +90,34 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
         check(firstId != secondRepresentation->representationId &&
             firstIndex != pins->Retain(secondRepresentation) && pins->Size() == 2,
             "Value copies have distinct representation identities within one graph generation");
+        auto hintedIndex = firstIndex;
+        check(material_graph_test::SamePinnedObject(pins->BorrowExact(*firstRepresentation, hintedIndex),
+                                                    firstRepresentation) && hintedIndex == firstIndex,
+              "An exact producer pin hint borrows its immutable instance");
+        hintedIndex = pins->Find(*secondRepresentation);
+        check(material_graph_test::SamePinnedObject(pins->BorrowExact(*firstRepresentation, hintedIndex),
+                                                    firstRepresentation) && hintedIndex == firstIndex,
+              "A foreign in-range hint falls back to the exact instance lookup");
+        hintedIndex = InstanceFramePins::InvalidIndex;
+        check(material_graph_test::SamePinnedObject(pins->BorrowExact(*firstRepresentation, hintedIndex),
+                                                    firstRepresentation) && hintedIndex == firstIndex,
+              "A producer without a pin hint retains the exact instance lookup");
+        auto impostor = own::make_shared<Instance>(*firstRepresentation);
+        impostor->representationId = firstId;
+        hintedIndex = firstIndex;
+        check(!pins->BorrowExact(*impostor, hintedIndex) && hintedIndex == InstanceFramePins::InvalidIndex,
+              "Equal material identity values never substitute a different instance owner");
+        auto replacementGeneration = own::make_shared<Generation>(*firstRepresentation->generation);
+        ++replacementGeneration->generation;
+        impostor->generation = std::move(replacementGeneration);
+        hintedIndex = firstIndex;
+        check(!pins->BorrowExact(*impostor, hintedIndex) && hintedIndex == InstanceFramePins::InvalidIndex,
+              "A new graph generation cannot borrow the old generation's pin");
+        const auto replacementIndex = pins->Retain(impostor);
+        hintedIndex = firstIndex;
+        check(material_graph_test::SamePinnedObject(pins->BorrowExact(*impostor, hintedIndex), impostor) &&
+                  hintedIndex == replacementIndex,
+              "A retained new generation resolves independently of the stale producer hint");
         const own::weak_owner<const Instance> weak = firstRepresentation;
         const auto borrowed = pins->Borrow(firstIndex);
         firstRepresentation.reset();

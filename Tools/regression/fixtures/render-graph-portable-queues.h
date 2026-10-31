@@ -97,7 +97,7 @@ namespace ce::regression
         size_t preparations{}, rejectPreparationAt{SIZE_MAX};
         explicit PortableQueueRecorder(PortableRenderServices& services) : services(services) {}
         IRenderDeviceServices& DeviceServices() const override { return services; }
-        bool Record(const own::shared_owner<IRHICommandQueue>& queue, const std::function<void(RHIEncoder&)>& commands,
+        bool Record(const own::shared_owner<IRHICommandQueue>& queue, const ce::owned_func<void(RHIEncoder&)>& commands,
                     ce::lifetime_token owner, ce::pooled_owner<IRHIQueueCommandBatch>& batch,
                     std::string& error) override
         {
