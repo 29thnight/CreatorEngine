@@ -28,11 +28,7 @@ class ModelDepthOracleTests(unittest.TestCase):
                                 {'buffer':0,'byteOffset':36,'byteLength':12}],
                    accessors=[{'bufferView':0,'componentType':5126,'count':3,'type':'VEC3'},
                               {'bufferView':1,'componentType':5125,'count':3,'type':'SCALAR'}])
-        payload = json.dumps(doc).encode()
-        payload += b' '*(-len(payload)%4)
-        self.model.write_bytes(struct.pack('<III',0x46546c67,2,28+len(payload)+len(binary))+
-                               struct.pack('<II',len(payload),0x4e4f534a)+payload+
-                               struct.pack('<II',len(binary),0x004e4942)+binary)
+        self.write_glb(doc,binary)
         self.model.with_suffix('.glb.meta').write_text('  - kind: mesh\n    assetId: test\n    binding: mesh/0\n')
         identity = np.eye(4).reshape(-1).tolist()
         self.manifest = dict(source='product-live',validationCount=0,width=64,height=64,
@@ -43,6 +39,14 @@ class ModelDepthOracleTests(unittest.TestCase):
         nx,ny = (x+.5)/32-1,1-(y+.5)/32
         self.pixels = np.where((ny>=-.8)&(np.abs(nx)<=(.8-ny)/2),.5,1).astype('<f4')
         self.pixels.tofile(self.root/'depth.f32')
+
+    def write_glb(self,doc,binary):
+        self.doc = doc
+        payload = json.dumps(doc).encode()
+        payload += b' '*(-len(payload)%4)
+        self.model.write_bytes(struct.pack('<III',0x46546c67,2,28+len(payload)+len(binary))+
+                               struct.pack('<II',len(payload),0x4e4f534a)+payload+
+                               struct.pack('<II',len(binary),0x004e4942)+binary)
 
     def tearDown(self):
         self.temp.cleanup()
@@ -79,6 +83,25 @@ class ModelDepthOracleTests(unittest.TestCase):
         self.manifest['camera']['view'][14] = .1
         self.write_manifest()
         self.assertFalse(self.run_oracle())
+
+    def test_foreground_subpixel_edge_is_not_a_background_interior_probe(self):
+        # Its left edge lies 0.0005 pixels to the right of pixel center (32,32).
+        # Rounding to 1/256 pixels covers that pixel with the foreground triangle.
+        x = .015625 + .0005/32
+        y = -.015625
+        binary = struct.pack('<18f6I', -.8,-.8,-.5, .8,-.8,-.5, 0,.8,-.5,
+                             x,y-.01,-.25, x+.01,y,-.25, x,y+.01,-.25, 0,1,2,3,4,5)
+        self.doc['buffers'][0]['byteLength'] = len(binary)
+        self.doc['bufferViews'][0]['byteLength'] = 72
+        self.doc['bufferViews'][1].update(byteOffset=72,byteLength=24)
+        for accessor in self.doc['accessors']:
+            accessor['count'] = 6
+        self.write_glb(self.doc,binary)
+        self.pixels[32,32] = .25
+        self.pixels.tofile(self.root/'depth.f32')
+        self.assertTrue(self.run_oracle())
+        result = json.loads((self.root/'result.json').read_text())
+        self.assertEqual(result['foregroundBoundaryExcludedPixels'],1)
 
 
 if __name__ == '__main__':

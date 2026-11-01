@@ -61,6 +61,8 @@ def verify(model, capture, output):
     width, height = manifest['width'], manifest['height']
     vp = np.array(manifest['camera']['view']).reshape(4,4) @ np.array(manifest['camera']['projection']).reshape(4,4)
     expected = np.ones((height,width),dtype=np.float64)
+    boundary_depth = np.full_like(expected,np.inf)
+    edge_margin = 1.0/16.0
     margin = np.zeros_like(expected)
     owner = np.full((height,width),-1,dtype=np.int32)
     alpha = []
@@ -122,24 +124,30 @@ def verify(model, capture, output):
             edge_distance = np.minimum(np.minimum(u*abs(den)/np.linalg.norm(b[:2]-c[:2]),
                                                  v*abs(den)/np.linalg.norm(c[:2]-a[:2])),
                                        w*abs(den)/np.linalg.norm(a[:2]-b[:2]))
+            # A foreground edge can cover a pixel after subpixel rounding even
+            # when the unrounded ray hits a different, interior triangle behind it.
+            boundary = np.abs(edge_distance)<edge_margin
+            boundary_depth[region][boundary] = np.minimum(boundary_depth[region][boundary],depth[boundary])
             margin[region][nearer] = edge_distance[nearer]
             owner[region][nearer] = draw_index
     actual = np.fromfile(capture/'depth.f32',dtype='<f4').reshape(height,width)
     assert np.isfinite(actual).all() and np.all((actual>=0)&(actual<=1))
     # D3D raster coordinates have 8 fractional bits. Sixteen subpixel steps
     # exclude coverage ties without discarding almost every dense-model triangle.
-    edge_margin = 1.0/16.0
     probes = (owner>=0)&(margin>=edge_margin)
     for i,is_alpha in enumerate(alpha):
         if is_alpha:
             probes &= owner!=i
     error = np.abs(actual.astype(np.float64)-expected)
     tolerance = 2e-6  # fixed before reading GPU values; includes float/geometry quantization
+    boundary_excluded = int(np.sum(probes&(boundary_depth<=expected+tolerance)))
+    probes &= boundary_depth>expected+tolerance
     count = int(probes.sum())
     report = dict(passed=count>=20 and not np.any(error[probes]>tolerance),
                   sourceSha256=hashlib.sha256(raw).hexdigest(),capture=str(capture.resolve()),
                   width=width,height=height,triangles=triangle_count,interiorOpaqueProbes=count,
                   tolerance=tolerance,minimumEdgeDistancePixels=edge_margin,
+                  foregroundBoundaryExcludedPixels=boundary_excluded,
                   maxAbsoluteError=float(error[probes].max()) if count else None,
                   failingPixels=int(np.sum(error[probes]>tolerance)),
                   failures=[dict(x=int(x),y=int(y),expected=float(expected[y,x]),actual=float(actual[y,x]),
