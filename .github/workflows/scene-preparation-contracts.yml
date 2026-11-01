@@ -7,6 +7,8 @@ on:
       - 'Engine/Containers/**'
       - 'Engine/RenderEngine/GpuGeometryVisibility.cpp'
       - 'Engine/RenderEngine/MaterialGraphSceneHost.cpp'
+      - 'Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h'
+      - 'Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp'
       - 'Tools/regression/**'
       - '.github/workflows/scene-preparation-contracts.yml'
   pull_request:
@@ -14,6 +16,8 @@ on:
       - 'Engine/Containers/**'
       - 'Engine/RenderEngine/GpuGeometryVisibility.cpp'
       - 'Engine/RenderEngine/MaterialGraphSceneHost.cpp'
+      - 'Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h'
+      - 'Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp'
       - 'Tools/regression/**'
       - '.github/workflows/scene-preparation-contracts.yml'
   workflow_dispatch:
@@ -39,6 +43,10 @@ jobs:
         run: python Tools/regression/MaterialCaptureIdentityTests.py
       - name: GPU meshlet list evidence
         run: python Tools/regression/GpuMeshletListTests.py
+      - name: Material packet structure and density
+        run: python Tools/regression/MaterialPacketTests.py
+      - name: Material packet stable input comparison
+        run: python Tools/regression/MaterialPacketComparisonTests.py
       - name: Bounds recook geometry identity
         run: python Tools/regression/GeometryRecookIdentityTests.py
 

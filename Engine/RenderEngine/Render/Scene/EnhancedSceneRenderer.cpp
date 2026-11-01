@@ -7716,7 +7716,8 @@ namespace
 
                 if (capture && capture->controlled)
                 {
-                    if (!capture->DeclareGeometryLists(dx12.Resources(), graph, p.Execution().graphMaterials, outError))
+                    if (!capture->DeclareGeometryLists(dx12.Resources(), graph, p.Execution().graphMaterials, outError) ||
+                        !capture->DeclareMaterialPackets(dx12.Resources(), graph, p.Execution().graphMaterials, outError))
                     {
                         return false;
                     }
