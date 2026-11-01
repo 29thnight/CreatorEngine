@@ -33,6 +33,18 @@ constexpr std::uint32_t kMeshletBinCapacity = 4096;
 constexpr std::uint32_t kMeshletWorldRegister = 8211;
 constexpr std::uint32_t kOrderedScanDispatch = 0x40000000u;
 
+bool AllVisibleDiagnosticsEnabled()
+{
+    static const bool enabled = []
+    {
+        char value[4]{};
+        std::size_t bytes{};
+        getenv_s(&bytes, value, sizeof(value), "CREATOR_METEOR_ALL_VISIBLE");
+        return std::strcmp(value, "1") == 0;
+    }();
+    return enabled;
+}
+
 std::uint32_t GroupMaskWords(std::uint32_t groups) { return (groups + 15u) / 16u; }
 std::uint32_t FeedbackWords(std::uint32_t groups) { return (groups + 31u) / 32u; }
 
@@ -793,7 +805,9 @@ bool GpuGeometryVisibility::PrepareMeshlets(
                               bin,
                               static_cast<uint32_t>(groups),
                               static_cast<uint32_t>(offset),
-                              8u | kGroupSelection | kInstanceBounds | (ordered ? kOrderedMeshlets : 0u) |
+                              8u | kGroupSelection | kInstanceBounds |
+                                  (AllVisibleDiagnosticsEnabled() ? kDiagnosticAllVisible : 0u) |
+                                  (ordered ? kOrderedMeshlets : 0u) |
                                   (groupOwner != bin ? kReuseBinGroups : 0u) |
                                   (geometry->UsesDirectClusters() ? 32u : 0u)});
         bins.push_back({count, static_cast<uint32_t>(offset), static_cast<std::int32_t>(groupCount),
@@ -878,6 +892,7 @@ bool GpuGeometryVisibility::PrepareMeshlets(
         }
         frame->m_firstStage = std::move(firstStage);
         frame->m_occlusionCull = m_meshletRecoveryCull.GetGeneration();
+        frame->m_reset = m_meshletRecoveryReset.GetGeneration();
     }
     if (!reuseGroups)
     {
@@ -898,11 +913,13 @@ bool GpuGeometryVisibility::PrepareMeshlets(
 bool GpuGeometryVisibility::InitializeMeshletOcclusion(const EnhancedFrameContext& context, std::string& error)
 {
     if (m_meshletOcclusionCull.GetGeneration() && m_meshletHistoryCull.GetGeneration() &&
-        m_meshletRecoveryCull.GetGeneration() && m_meshletCameraPredictionCull.GetGeneration())
+        m_meshletRecoveryCull.GetGeneration() && m_meshletRecoveryReset.GetGeneration() &&
+        m_meshletCameraPredictionCull.GetGeneration())
     {
         return true;
     }
-    const auto compile = [&](LX::Runtime::ComputePipeline& pipeline, const char* stage) {
+    const auto compile = [&](LX::Runtime::ComputePipeline& pipeline, const char* stage,
+                             const char* entry = "ShadowMeshletCullCS") {
         ce::dynamic_array<RHIPipelineLayoutParam> parameters{
             RHILayout::Cbv(0),
             RHILayout::Srv(0),
@@ -928,7 +945,7 @@ bool GpuGeometryVisibility::InitializeMeshletOcclusion(const EnhancedFrameContex
         LX::Runtime::CompiledCompute shader;
         if (!permutation.Enable("GEOMETRY_VISIBILITY_OCCLUSION", error) ||
             !LX::Runtime::CompileCompute(RHIShaderSource::Resolve("GeometryVisibility.slang").string(),
-                                         "ShadowMeshletCullCS", permutation, options, shader, error))
+                                         entry, permutation, options, shader, error))
             return false;
         RHIComputePipelineDesc desc;
         desc.layout = layout;
@@ -938,6 +955,7 @@ bool GpuGeometryVisibility::InitializeMeshletOcclusion(const EnhancedFrameContex
     };
     return compile(m_meshletOcclusionCull, nullptr) && compile(m_meshletHistoryCull, "GEOMETRY_VISIBILITY_HISTORY") &&
            compile(m_meshletRecoveryCull, "GEOMETRY_VISIBILITY_RECOVERY") &&
+           compile(m_meshletRecoveryReset, "GEOMETRY_VISIBILITY_RECOVERY", "ShadowMeshletResetCS") &&
            compile(m_meshletCameraPredictionCull, "GEOMETRY_VISIBILITY_CAMERA_PREDICTION");
 }
 
@@ -1423,8 +1441,10 @@ void GpuGeometryVisibility::Frame::DispatchMeshletStage(RHIEncoder& encoder, Mes
             encoder.SetBindings(RHIBindPoint::Compute, 7, depth);
         if (m_historyProjection.IsValid())
             encoder.SetConstantBuffer(RHIBindPoint::Compute, 8, m_historyProjection);
-        if (m_firstStage)
-            encoder.SetRootBuffer(RHIBindPoint::Compute, 8, m_firstStage->VisibleIds(0, m_firstStage->m_outputCount));
+    }
+    if (m_firstStage && (stage == MeshletStage::Reset || stage == MeshletStage::Cull))
+    {
+        encoder.SetRootBuffer(RHIBindPoint::Compute, 8, m_firstStage->VisibleIds(0, m_firstStage->m_outputCount));
     }
     DispatchGroups(encoder, stage == MeshletStage::Cull
                                 ? (std::min)(m_binCount * kInitialSubdivisions, kPersistentConsumerGroups)
@@ -1714,6 +1734,10 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
         if (frame->m_firstStage)
         {
             frame->m_firstStage->CheckCurrent(&graph);
+            // Recovery copies the sealed instance bounds before its culling pass.
+            // Declare the producer dependency here, not only at the later consumer.
+            resetUses.push_back(
+                {frame->m_firstStage->m_graphVisibleIds, RHIResourceState::ShaderResource, RGAccessMode::Read});
             cullUses.push_back(
                 {frame->m_firstStage->m_graphVisibleIds, RHIResourceState::ShaderResource, RGAccessMode::Read});
         }
@@ -1987,6 +2011,12 @@ RGHandle GpuGeometryVisibility::Frame::GraphVisibleIds(const EnhancedRenderGraph
     return m_graphVisibleIds;
 }
 
+bool GpuGeometryVisibility::Frame::BypassesMeshletCulling() const
+{
+    return m_meshletInputs && !m_meshletInputs->candidates.empty() &&
+           (m_meshletInputs->candidates.front().flags & kDiagnosticAllVisible) != 0u;
+}
+
 RHIBufferSlice GpuGeometryVisibility::Frame::VisibleIds(std::uint32_t outputOffset, std::uint32_t count) const
 {
     if (!count || outputOffset % kOutputAlignment != 0 || std::uint64_t(outputOffset) + count > m_outputCount)
@@ -2036,6 +2066,7 @@ void GpuGeometryVisibility::ShutdownAfterIdle()
     m_meshletOcclusionCull = {};
     m_meshletHistoryCull = {};
     m_meshletRecoveryCull = {};
+    m_meshletRecoveryReset = {};
     m_meshletCameraPredictionCull = {};
     m_reset = {};
     m_cull = {};

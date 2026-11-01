@@ -75,6 +75,134 @@ struct EnhancedPbrCapture
     ce::dynamic_array<StageReadback> stageReadbacks;
     ce::dynamic_array<StageDiagnostic> stages;
 
+    struct GeometryReadback
+    {
+        std::string name;
+        own::shared_owner<const GpuGeometryVisibility::Frame> owner;
+        RHIReadback readback;
+        uint64_t bytes{};
+    };
+    ce::dynamic_array<GeometryReadback> geometryReadbacks;
+
+    bool DeclareGeometryLists(IRenderDeviceServices& resources, EnhancedRenderGraph& graph,
+        const material_graph::SceneHost& host, std::string& error)
+    {
+        const std::pair<const char*, own::shared_owner<const GpuGeometryVisibility::Frame>> sources[]{
+            {"camera-first", host.CameraDepthMeshletWork()}, {"camera-final", host.CameraMeshletWork()}};
+        for (const auto& [name, owner] : sources)
+        {
+            if (!owner || owner->MeshletBinCount() == 0)
+            {
+                continue;
+            }
+            const auto last = owner->MeshletBinCount() - 1u;
+            const uint64_t bytes = (uint64_t(owner->MeshletOutputOffset(last)) +
+                owner->MeshletGeometry(last)->MeshletCount() + 1u) * sizeof(uint32_t);
+            RHIReadback readback{};
+            if (!resources.CreateBufferReadback(bytes, readback, error))
+            {
+                return false;
+            }
+            geometryReadbacks.push_back({name, owner, readback, bytes});
+            graph.AddPass(std::string("Capture.Geometry.") + name,
+                {{owner->GraphVisibleIds(graph), RHIResourceState::CopySource, RGAccessMode::Read}},
+                [owner, readback, bytes](const EnhancedRenderGraph::ExecuteContext& context)
+                {
+                    context.encoder->CopyBufferToReadback(readback, owner->VisibleIdBuffer(), 0, bytes);
+                }, true);
+        }
+        return true;
+    }
+
+    bool SaveGeometryLists(IRenderDeviceServices& resources, const std::filesystem::path& root, std::string& error)
+    {
+        auto lists = manifest.Root()["gpuMeshletLists"];
+        lists.SetSequence();
+        for (const auto& source : geometryReadbacks)
+        {
+            RHIReadbackImage image;
+            if (!resources.MapReadback(source.readback, image, error))
+            {
+                return false;
+            }
+            if (image.data.size() < source.bytes)
+            {
+                error = "GPU meshlet list readback is truncated.";
+                return false;
+            }
+            const auto word = [&](uint64_t offset)
+            {
+                uint32_t value{};
+                std::memcpy(&value, image.data.data() + offset * sizeof(value), sizeof(value));
+                return value;
+            };
+            const auto file = source.name + "-meshlets.u32";
+            std::ofstream output(root / file, std::ios::binary | std::ios::trunc);
+            auto list = lists.Append();
+            list["stage"] << source.name;
+            list["spatialCulling"] << (source.owner->BypassesMeshletCulling() ? "bypassed-diagnostic" : "enabled");
+            list["file"] << file;
+            list["encoding"] << "uint32-le-local-meshlet-id";
+            list["scope"] << "GPU accepted meshlets; not rasterized pixel coverage or visible draw count";
+            list["sourceFrameId"] << result.frameId;
+            list["bins"].SetSequence();
+            uint64_t writtenWords = 0;
+            for (uint32_t bin = 0; bin < source.owner->MeshletBinCount(); ++bin)
+            {
+                const auto& geometry = source.owner->MeshletGeometry(bin);
+                const auto offset = source.owner->MeshletOutputOffset(bin);
+                const auto capacity = geometry->MeshletCount();
+                const auto count = word(offset);
+                if (count > capacity || (uint64_t(offset) + count + 1u) * sizeof(uint32_t) > source.bytes)
+                {
+                    error = "GPU meshlet list exceeds its sealed capacity.";
+                    return false;
+                }
+                ce::dynamic_array<uint32_t> sorted;
+                sorted.reserve(count);
+                for (uint32_t index = 0; index < count; ++index)
+                {
+                    const auto id = word(uint64_t(offset) + index + 1u);
+                    if (id >= capacity)
+                    {
+                        error = "GPU meshlet ID exceeds its sealed geometry.";
+                        return false;
+                    }
+                    sorted.push_back(id);
+                    output.write(reinterpret_cast<const char*>(&id), sizeof(id));
+                }
+                std::sort(sorted.begin(), sorted.end());
+                if (std::adjacent_find(sorted.begin(), sorted.end()) != sorted.end())
+                {
+                    error = "GPU meshlet list contains duplicate IDs.";
+                    return false;
+                }
+                auto item = list["bins"].Append();
+                item["bin"] << bin;
+                item["offsetWords"] << writtenWords;
+                item["count"] << count;
+                item["capacity"] << capacity;
+                WriteMeshIdentity(item, geometry->Input()->Geometry().handle);
+                item["world"].SetSequence();
+                ce::fixed_array<float, 16> world;
+                std::memcpy(world.data(), &geometry->ObjectToWorld(), sizeof(world));
+                for (float value : world)
+                {
+                    item["world"].Append() << value;
+                }
+                writtenWords += count;
+            }
+            output.close();
+            if (!output)
+            {
+                error = "GPU meshlet list write failed.";
+                return false;
+            }
+            list["acceptedMeshlets"] << writtenWords;
+        }
+        return true;
+    }
+
     bool DeclareHistory(IRenderDeviceServices& resources, EnhancedRenderGraph& graph,
         RGHandle handle, uint32_t width, uint32_t height, std::string& error)
     {
@@ -1172,6 +1300,10 @@ struct EnhancedPbrCapture
                 item["channels"] << 4;
                 item["nonfinite"] << image.nonfinite;
             }
+            if (!SaveGeometryLists(resources, root, error))
+            {
+                return false;
+            }
             auto graphNode = rootNode["graph"];
             graphNode.SetMap();
             graphNode["declared"] << stats.passesDeclared;
@@ -1230,7 +1362,7 @@ struct EnhancedPbrCapture
                 return true;
             }
         }
-        return !stageReadbacks.empty();
+        return !stageReadbacks.empty() || !geometryReadbacks.empty();
     }
 
     void Release(IRenderDeviceServices& resources)
@@ -1245,6 +1377,11 @@ struct EnhancedPbrCapture
         }
         stageReadbacks.clear();
         stages.clear();
+        for (auto& geometry : geometryReadbacks)
+        {
+            resources.ReleaseReadback(geometry.readback);
+        }
+        geometryReadbacks.clear();
     }
     void Fail(const std::string& error)
     {

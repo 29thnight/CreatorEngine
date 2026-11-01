@@ -20,6 +20,23 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
         desc.csBytecode = shader.stage.bytecode.Data(); desc.csSize = shader.stage.bytecode.Size();
         Check(kernels[i].Create(pipelines, desc, std::move(shader.description), error), "Batch meshlet PSO " + error);
     }
+    LX::Runtime::ComputePipeline recoveryReset;
+    {
+        std::vector<RHIPipelineLayoutParam> recoveryParams(std::begin(params), std::end(params));
+        recoveryParams.push_back(RHILayout::Srv(8210));
+        RHIShaderPermutation permutation;
+        Check(permutation.Enable("GEOMETRY_VISIBILITY_RECOVERY", error), "Recovery reset permutation");
+        LX::Runtime::CompiledCompute shader;
+        RHIShaderCompileOptions options;
+        options.strictMath = true;
+        Check(LX::Runtime::CompileCompute(RHIShaderSource::Resolve("GeometryVisibility.slang").string(),
+            "ShadowMeshletResetCS", permutation, options, shader, error), "Recovery reset shader " + error);
+        RHIComputePipelineDesc desc;
+        desc.layout = roots.GetOrCreate({recoveryParams, {}}, error);
+        desc.csBytecode = shader.stage.bytecode.Data();
+        desc.csSize = shader.stage.bytecode.Size();
+        Check(recoveryReset.Create(pipelines, desc, std::move(shader.description), error), "Recovery reset PSO " + error);
+    }
     LX::Runtime::ComputePipeline partialCull;
     {
         RHIShaderPermutation permutation;
@@ -224,6 +241,57 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
                 encoder.Dispatch((std::min)(groups, 65535u), (groups + 65534) / 65535, 1);
                 const RHIBufferHandle barriers[]{ids, args}; encoder.ResourceBarriers({{}, {}, {}, barriers});
             }
+            RHIBufferHandle recoveredIds, recoveredArgs;
+            RHIReadback recoveredReadback;
+            if (instanceAdmission)
+            {
+                RHIBufferDesc recoveredDesc;
+                recoveredDesc.allowUnorderedAccess = true;
+                recoveredDesc.bytes = uint64_t(storageWords) * 4;
+                Check(device.CreateBuffer(recoveredDesc, recoveredIds, error), "Recovery ID buffer");
+                recoveredDesc.bytes = uint64_t(binCount) * sizeof(RHIDrawIndexedIndirectArguments);
+                Check(device.CreateBuffer(recoveredDesc, recoveredArgs, error), "Recovery argument buffer");
+                const RHIBindingDesc recoveredOutputs[]{RHIBindingDesc::UavBuffer(recoveredIds, storageWords, 4),
+                    RHIBindingDesc::UavBuffer(recoveredArgs, binCount, sizeof(RHIDrawIndexedIndirectArguments))};
+                const auto recoveredTable = device.CreateBindings(recoveredOutputs);
+                Check(recoveredTable.IsValid(), "Recovery output bindings");
+
+                auto recoveryRanges = ranges;
+                for (auto& candidate : recoveryRanges)
+                {
+                    candidate.flags |= GpuGeometryVisibility::kReuseFirstGroups;
+                }
+                const auto recoveryUpload = upload(recoveryRanges.data(), recoveryRanges.size() * sizeof(recoveryRanges[0]));
+                // Deliberately perturb the recomputation input at the kernel boundary.
+                // A reset that ignores the reuse flag must fail the readback comparison.
+                auto recoveryWorlds = worlds;
+                for (uint32_t bin = 0; bin < binCount; ++bin)
+                {
+                    recoveryWorlds[bin * GpuGeometryVisibility::kMeshletInstanceRows].w += .25f;
+                }
+                const auto recoveryWorldUpload = upload(recoveryWorlds.data(), recoveryWorlds.size() * sizeof(math::vector4));
+                const RHIBufferTransition recoveryBefore[]{
+                    {ids, RHIResourceState::UnorderedAccess, RHIResourceState::ShaderResource},
+                    {recoveredIds, RHIResourceState::Common, RHIResourceState::UnorderedAccess},
+                    {recoveredArgs, RHIResourceState::Common, RHIResourceState::UnorderedAccess}};
+                encoder.ResourceBarriers({{}, recoveryBefore});
+                encoder.SetPipeline(RHIBindPoint::Compute, recoveryReset.GetGeneration()->GetHandle());
+                encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, uniform);
+                encoder.SetRootBuffer(RHIBindPoint::Compute, 1, recoveryUpload);
+                encoder.SetRootBuffer(RHIBindPoint::Compute, 2, binUpload);
+                encoder.SetBindings(RHIBindPoint::Compute, 3, recoveredTable);
+                encoder.SetBindings(RHIBindPoint::Compute, 4, vertexTable);
+                encoder.SetBindings(RHIBindPoint::Compute, 5, topologyTable);
+                encoder.SetRootBuffer(RHIBindPoint::Compute, 6, recoveryWorldUpload);
+                encoder.SetRootBuffer(RHIBindPoint::Compute, 7, {ids, 0, uint64_t(storageWords) * 4});
+                encoder.Dispatch(binCount, 1, 1);
+                const RHIBufferTransition recoveryAfter[]{
+                    {ids, RHIResourceState::ShaderResource, RHIResourceState::UnorderedAccess},
+                    {recoveredIds, RHIResourceState::UnorderedAccess, RHIResourceState::CopySource}};
+                encoder.ResourceBarriers({{}, recoveryAfter});
+                Check(device.CreateBufferReadback(uint64_t(storageWords) * 4, recoveredReadback, error), "Recovery readback");
+                encoder.CopyBufferToReadback(recoveredReadback, recoveredIds);
+            }
             RHIReadback idReadback, argReadback;
             Check(device.CreateBufferReadback(uint64_t(storageWords) * 4, idReadback, error) &&
                 device.CreateBufferReadback(desc.bytes, argReadback, error), "Batch result readbacks");
@@ -235,6 +303,25 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
             RHIReadbackImage idImage, argImage;
             Check(device.MapReadback(idReadback, idImage, error) && device.MapReadback(argReadback, argImage, error),
                 "Batch map");
+            if (instanceAdmission)
+            {
+                RHIReadbackImage recoveredImage;
+                Check(device.MapReadback(recoveredReadback, recoveredImage, error), "Recovery map");
+                const auto* original = reinterpret_cast<const uint32_t*>(idImage.data.data());
+                const auto* recovered = reinterpret_cast<const uint32_t*>(recoveredImage.data.data());
+                for (const auto& bin : bins)
+                {
+                    const auto address = bin.firstIndex + 1u + bin.indexCount * 2u + 2u;
+                    for (uint32_t word = 0; word < GpuGeometryVisibility::kInstanceBoundsWords; ++word)
+                    {
+                        const auto expected = word < 6u && original[address + 6u] == 0u ? 0u : original[address + word];
+                        Check(recovered[address + word] == expected, "Recovery preserves first-stage bounds and admission");
+                    }
+                }
+                device.ReleaseReadback(recoveredReadback);
+                device.ReleaseBuffer(recoveredIds);
+                device.ReleaseBuffer(recoveredArgs);
+            }
             if (dynamic)
             {
                 const auto* queue = reinterpret_cast<const uint32_t*>(idImage.data.data()) + outputCount;
@@ -324,6 +411,8 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
     Check(instanceCases == 16, "Instance admission covers empty, tail, skewed, partial-wave and maximum-bin queues");
     std::cout << "METEOR_INSTANCE_ADMISSION_OK cases=" << instanceCases
               << " partialWaveCases=8 boundsWords=8 legacyParity=1 validation=0\n";
+    std::cout << "METEOR_INSTANCE_RECOVERY_BOUNDS_OK cases=" << instanceCases
+              << " boundsWords=8 recomputationMutation=1 validation=0\n";
     Check(queueCases == 48, "Six ring routes cover empty, tail, skewed and maximum-bin queues");
     std::cout << "METEOR_QUEUE_COUNT_OK cases=" << queueCases
         << " referenceCases=8 orderedCases=32 partialWaveCases=16 oneSlotCases=16 subdivisions=16 ignoredTotalHintCases=8 budgetBoundaries=3 validation=0\n";

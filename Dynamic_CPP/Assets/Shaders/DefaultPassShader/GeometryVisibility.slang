@@ -565,6 +565,30 @@ void GeometryResetInstanceBounds(uint bin, uint lane)
         return;
     }
     const uint address = MeshletInstanceOffset(bin);
+#if defined(GEOMETRY_VISIBILITY_SHARED_VIEWS) || defined(GEOMETRY_VISIBILITY_RECOVERY)
+    // The CPU reuse proof requires the same sealed geometry, view and LOD inputs.
+    // Invalid bounds deliberately leave coordinates unspecified in the first pass.
+    if ((geometryVisibilityCandidates[bin].flags & 128u) != 0u)
+    {
+#if defined(GEOMETRY_VISIBILITY_SHARED_VIEWS)
+        const uint viewIndex = NonUniformResourceIndex(geometryVisibilityCandidates[bin].bin);
+        const uint valid = meshletViewFirst[viewIndex][address + 6u];
+        if (lane < 8u)
+        {
+            MESHLET_IDS(bin)[address + lane] = lane < 6u && valid == 0u
+                ? 0u : meshletViewFirst[viewIndex][address + lane];
+        }
+#else
+        const uint valid = meshletFirstStage[address + 6u];
+        if (lane < 8u)
+        {
+            MESHLET_IDS(bin)[address + lane] = lane < 6u && valid == 0u
+                ? 0u : meshletFirstStage[address + lane];
+        }
+#endif
+        return;
+    }
+#endif
     const uint worldBase = MeshletWorldBase(bin);
     const float4 minimum = meshletWorldColumns[worldBase + 3u];
     const float4 maximum = meshletWorldColumns[worldBase + 4u];
@@ -733,6 +757,10 @@ bool GeometryPrepareMeshlet(uint bin, uint meshlet)
 
 bool GeometryMeshletBoxOccluded(uint bin, float3 minimumWorld, float3 maximumWorld, uint firstAddress)
 {
+    if ((geometryVisibilityCandidates[bin].flags & 1024u) != 0u)
+    {
+        return false;
+    }
 #if defined(GEOMETRY_VISIBILITY_OCCLUSION)
     const MeshletViewData view = MeshletView(bin);
 #if defined(GEOMETRY_VISIBILITY_SHARED_VIEWS)
@@ -781,6 +809,10 @@ bool GeometryMeshletBoxOccluded(uint bin, float3 minimumWorld, float3 maximumWor
 
 bool GeometryInstanceAdmitted(uint bin)
 {
+    if ((geometryVisibilityCandidates[bin].flags & 1024u) != 0u)
+    {
+        return true;
+    }
     if (!MeshletHasInstanceBounds(bin))
     {
         return true;
@@ -822,7 +854,8 @@ void GeometryCullMeshlet(uint bin, uint meshlet)
             !GeometryClusterSelected(bin, descriptor.groupId, false)) return;
     }
     const uint count = descriptor.vertexCount;
-    uint outside = view.valid != 0u ? 63u : 0u;
+    const bool allVisible = (geometryVisibilityCandidates[bin].flags & 1024u) != 0u;
+    uint outside = view.valid != 0u && !allVisible ? 63u : 0u;
 #if defined(GEOMETRY_VISIBILITY_OCCLUSION)
     float3 minimumWorld = float3(3.402823466e+38f);
     float3 maximumWorld = -minimumWorld;

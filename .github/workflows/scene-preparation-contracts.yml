@@ -37,6 +37,8 @@ jobs:
         run: python Tools/regression/ProfileCaptureBudgetTests.py
       - name: Material capture input identity
         run: python Tools/regression/MaterialCaptureIdentityTests.py
+      - name: GPU meshlet list evidence
+        run: python Tools/regression/GpuMeshletListTests.py
 
   native-preparation:
     runs-on: windows-latest

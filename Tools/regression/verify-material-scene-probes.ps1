@@ -87,7 +87,7 @@ try
         '--scene-only'=@('LX_MATERIAL_SCENE_INTEGRATION_OK')
         '--meshlet-hzb-only'=@('METEOR_MESHLET_HZB_OK cases=8','METEOR_MESHLET_TEMPORAL_OK cases=8','METEOR_HISTORY_POOL_OK')
         '--lx-meshlet-only'=@('METEOR_MESHLET_HZB_OK cases=8','METEOR_MESHLET_TEMPORAL_OK cases=8','LX_MESHLET_CULL_LOD_HZB_OK','METEOR_CAMERA_MESHLET_DISPATCH_BOUNDARIES_OK cases=5 maxSurvivors=131071 ordered=1','METEOR_MESHLET_BATCH_DISPATCH_OK bins=4096')
-        '--meshlet-dispatch-only'=@('METEOR_CAMERA_MESHLET_DISPATCH_BOUNDARIES_OK cases=5 maxSurvivors=131071 ordered=1','METEOR_MESHLET_BATCH_DISPATCH_OK bins=4096','METEOR_QUEUE_COUNT_OK cases=48 referenceCases=8 orderedCases=32 partialWaveCases=16 oneSlotCases=16 subdivisions=16 ignoredTotalHintCases=8 budgetBoundaries=3 validation=0','METEOR_INSTANCE_ADMISSION_OK cases=16 partialWaveCases=8 boundsWords=8 legacyParity=1 validation=0')
+        '--meshlet-dispatch-only'=@('METEOR_CAMERA_MESHLET_DISPATCH_BOUNDARIES_OK cases=5 maxSurvivors=131071 ordered=1','METEOR_MESHLET_BATCH_DISPATCH_OK bins=4096','METEOR_QUEUE_COUNT_OK cases=48 referenceCases=8 orderedCases=32 partialWaveCases=16 oneSlotCases=16 subdivisions=16 ignoredTotalHintCases=8 budgetBoundaries=3 validation=0','METEOR_INSTANCE_ADMISSION_OK cases=16 partialWaveCases=8 boundsWords=8 legacyParity=1 validation=0','METEOR_INSTANCE_RECOVERY_BOUNDS_OK cases=16 boundsWords=8 recomputationMutation=1 validation=0')
         '--decal-only'=@('LX_MATERIAL_SCENE_DECAL_OK')
         '--forward-transport'=@('LX_MATERIAL_FORWARD_TRANSPORT_OK')
     }
