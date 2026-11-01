@@ -13,6 +13,29 @@ import struct
 import numpy as np
 
 
+def meshlet_positions(positions):
+    """Independent QMC1 v2 default position-grid model, before skinning.
+
+    The contract uses a mesh-wide 16-bit grid, separate float32 multiply/add,
+    and retains raw channels if any decoded value violates the 1e-4 budget or
+    source bounds. See MeshletCompression.h and MeshletGeometryAccess.slang.
+    """
+    result = positions.astype(np.float32).copy()
+    for axis in range(3):
+        values = result[:,axis].copy()
+        lo, hi = values.min(), values.max()
+        step = np.float32((float(hi)-float(lo))/65535)
+        if not np.isfinite(step) or step < np.finfo(np.float32).tiny:
+            continue
+        # Codes are nonnegative; floor(x+.5) implements C++ round ties away.
+        codes = np.clip(np.floor((values.astype(np.float64)-float(lo))/float(step)+.5),0,65535)
+        decoded = lo + codes.astype(np.float32)*step
+        if (np.isfinite(decoded).all() and (decoded>=lo).all() and
+                (decoded<=hi).all() and np.abs(decoded-values).max()<=np.float32(.0001)):
+            result[:,axis] = decoded
+    return result.astype(np.float64)
+
+
 def verify(model, capture, output):
     raw = model.read_bytes()
     assert raw[:4] == b'glTF'
@@ -61,6 +84,8 @@ def verify(model, capture, output):
     width, height = manifest['width'], manifest['height']
     vp = np.array(manifest['camera']['view']).reshape(4,4) @ np.array(manifest['camera']['projection']).reshape(4,4)
     expected = np.ones((height,width),dtype=np.float64)
+    boundary_depth = np.full_like(expected,np.inf)
+    edge_margin = 1.0/16.0
     margin = np.zeros_like(expected)
     owner = np.full((height,width),-1,dtype=np.int32)
     alpha = []
@@ -79,6 +104,15 @@ def verify(model, capture, output):
         attrs = primitive['attributes']
         pos = accessor(attrs['POSITION']).astype(np.float64)
         pos[:,2] *= -1  # importer right-handed -> left-handed convention
+        if draw.get('route') == 'lattice':
+            routes = manifest['geometryRoutes']
+            assert routes['source'] == 'joined-command-recording-after-native-submission'
+            assert len(routes['selected']) == len(manifest['draws'])
+            assert all(r['meshShader'] for r in routes['selected']), 'Mixed geometry routes need a separate oracle'
+            decoded = meshlet_positions(pos)
+            material_policies[-1].update(positionCodec='QMC1-v2-default-mesh-wide-16-bit',
+                                        maxSourcePositionError=float(np.abs(decoded-pos).max()))
+            pos = decoded
         pos = np.column_stack((pos,np.ones(len(pos))))
         if draw['pose']:
             packed = np.frombuffer(bytes(draw['pose']),dtype='<f4').reshape(-1,3,4).astype(np.float64)
@@ -122,24 +156,30 @@ def verify(model, capture, output):
             edge_distance = np.minimum(np.minimum(u*abs(den)/np.linalg.norm(b[:2]-c[:2]),
                                                  v*abs(den)/np.linalg.norm(c[:2]-a[:2])),
                                        w*abs(den)/np.linalg.norm(a[:2]-b[:2]))
+            # A foreground edge can cover a pixel after subpixel rounding even
+            # when the unrounded ray hits a different, interior triangle behind it.
+            boundary = np.abs(edge_distance)<edge_margin
+            boundary_depth[region][boundary] = np.minimum(boundary_depth[region][boundary],depth[boundary])
             margin[region][nearer] = edge_distance[nearer]
             owner[region][nearer] = draw_index
     actual = np.fromfile(capture/'depth.f32',dtype='<f4').reshape(height,width)
     assert np.isfinite(actual).all() and np.all((actual>=0)&(actual<=1))
     # D3D raster coordinates have 8 fractional bits. Sixteen subpixel steps
     # exclude coverage ties without discarding almost every dense-model triangle.
-    edge_margin = 1.0/16.0
     probes = (owner>=0)&(margin>=edge_margin)
     for i,is_alpha in enumerate(alpha):
         if is_alpha:
             probes &= owner!=i
     error = np.abs(actual.astype(np.float64)-expected)
     tolerance = 2e-6  # fixed before reading GPU values; includes float/geometry quantization
+    boundary_excluded = int(np.sum(probes&(boundary_depth<=expected+tolerance)))
+    probes &= boundary_depth>expected+tolerance
     count = int(probes.sum())
     report = dict(passed=count>=20 and not np.any(error[probes]>tolerance),
                   sourceSha256=hashlib.sha256(raw).hexdigest(),capture=str(capture.resolve()),
                   width=width,height=height,triangles=triangle_count,interiorOpaqueProbes=count,
                   tolerance=tolerance,minimumEdgeDistancePixels=edge_margin,
+                  foregroundBoundaryExcludedPixels=boundary_excluded,
                   maxAbsoluteError=float(error[probes].max()) if count else None,
                   failingPixels=int(np.sum(error[probes]>tolerance)),
                   failures=[dict(x=int(x),y=int(y),expected=float(expected[y,x]),actual=float(actual[y,x]),
@@ -147,7 +187,7 @@ def verify(model, capture, output):
                             for y,x in np.argwhere(probes&(error>tolerance))[:50]],
                   exactFloatMatches=int(np.sum(actual[probes]==expected[probes].astype(np.float32))),
                   geometryCoveredPixels=int(np.sum(owner>=0)),gpuCoveredPixels=int(np.sum(actual<1)),
-                  scope='source GLB geometry + captured world/skin/camera/coverage; opaque triangle interiors only',
+                  scope='source GLB geometry with default meshlet position codec + captured world/skin/camera/coverage; opaque triangle interiors only',
                   exclusions='alpha coverage, triangle boundaries, clipping, LOD simplification not certified',
                   perDraw=[dict(mesh=d['meshId'],alpha=alpha[i],probes=int(np.sum(probes&(owner==i))),
                                 materialPolicy=material_policies[i]) for i,d in enumerate(manifest['draws'])])
