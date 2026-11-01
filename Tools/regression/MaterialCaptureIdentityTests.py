@@ -45,6 +45,29 @@ class MaterialCaptureIdentityTests(unittest.TestCase):
                 changed['lattice'][field] = value
                 self.assertNotEqual(self.identity([self.draw]), self.identity([changed]))
 
+    def test_proven_recook_preserves_other_input_checks(self):
+        original = copy.deepcopy(self.draw)
+        original.update(contentSha256=[1] * 32, artifactBytes=100, resolverRevision=7)
+        recooked = copy.deepcopy(original)
+        recooked.update(contentSha256=[2] * 32, artifactSchema=10, artifactBytes=136, resolverRevision=8)
+        replacement = {bytes(recooked['contentSha256']).hex(): (original['contentSha256'], 100)}
+
+        def canonical(draws):
+            return compare.material_draws(dict(draws=draws), replacement)
+
+        self.assertNotEqual(self.identity([original]), self.identity([recooked]))
+        self.assertEqual(canonical([original]), canonical([recooked]))
+        self.assertNotEqual(canonical([original]), canonical([recooked, recooked]))
+        for field, value in [('world', [1, 0, 4, 1]), ('pose', [0, 1]),
+                             ('coverageFlags', 0), ('alphaCutoff', .1), ('assetId', 'other')]:
+            with self.subTest(field=field):
+                changed = copy.deepcopy(recooked)
+                changed[field] = value
+                self.assertNotEqual(canonical([original]), canonical([changed]))
+        changed = copy.deepcopy(recooked)
+        changed['lattice']['textures'][0]['assetId'] = 'other'
+        self.assertNotEqual(canonical([original]), canonical([changed]))
+
 
 if __name__ == '__main__':
     unittest.main()

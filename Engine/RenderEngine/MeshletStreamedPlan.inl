@@ -10,6 +10,8 @@ bool MeshSurfacePlan::BuildStreamed(const EnhancedDrawItem& draw, const SurfaceV
         metadata->vertexCount > budget.maxSourceVertices || !view.sceneEpoch || !view.viewRevision ||
         !view.geometryRevision || !Finite(view.eye) || !Affine(draw.worldMatrix) || draw.boneCount > 256 ||
         (draw.boneCount && !draw.bonePalette) ||
+        (draw.boneCount && (draw.boneCount != metadata->requiredBoneCount ||
+                            metadata->boneBounds.size() != draw.boneCount + 1u)) ||
         (!assets::Has(geometry.vertexAttributeMask, assets::VertexAttribute::BoneIndices) && draw.boneCount))
     {
         return Fail(error, "Thin geometry requires bounded descriptors, affine pose and a supported scene hierarchy.");
@@ -61,6 +63,20 @@ bool MeshSurfacePlan::BuildStreamed(const EnhancedDrawItem& draw, const SurfaceV
         source->bones_.push_back(PackedBoneMatrix::From(draw.bonePalette[bone]));
     }
     source->SealInstanceBounds();
+    if (draw.boneCount)
+    {
+        source->m_boneBounds.resize(metadata->boneBounds.size());
+        for (std::size_t bone = 0; bone < metadata->boneBounds.size(); ++bone)
+        {
+            const auto& packed = metadata->boneBounds[bone];
+            auto& bounds = source->m_boneBounds[bone];
+            for (unsigned axis = 0; axis < 4; ++axis)
+            {
+                bounds.minimum[axis] = packed[axis];
+                bounds.maximum[axis] = packed[axis + 4];
+            }
+        }
+    }
     candidate->source_ = source;
     candidate->chunkLimit_ = budget.maxChunkPoints;
     auto& cost = candidate->cost_;
@@ -71,7 +87,8 @@ bool MeshSurfacePlan::BuildStreamed(const EnhancedDrawItem& draw, const SurfaceV
     cost.cpuPayloadBytes = sizeof(MeshSurfacePlan) + sizeof(MeshSurfaceInput) +
                            source->meshlets_.descriptors.capacity() * sizeof(experiment::MeshletDescriptor) +
                            source->hierarchy_.groups.capacity() * sizeof(experiment::MeshClusterGroup) +
-                           source->bones_.capacity() * sizeof(PackedBoneMatrix);
+                           source->bones_.capacity() * sizeof(PackedBoneMatrix) +
+                           source->m_boneBounds.capacity() * sizeof(MeshSurfaceInput::InstanceBoneBounds);
     own::shared_owner<MeshSurfaceInput> chunk;
     uint32_t firstTriangle{}, triangleCursor{}, logicalCursor{};
     const auto start = [&]
@@ -83,6 +100,7 @@ bool MeshSurfacePlan::BuildStreamed(const EnhancedDrawItem& draw, const SurfaceV
         chunk->world_ = source->world_;
         chunk->view_ = source->view_;
         chunk->bones_ = source->bones_;
+        chunk->m_boneBounds = source->m_boneBounds;
         chunk->streamedTopology_ = true;
         chunk->sourceVertexCount_ = source->sourceVertexCount_;
         chunk->sourcePrimitiveCount_ = source->sourcePrimitiveCount_;
@@ -105,11 +123,13 @@ bool MeshSurfacePlan::BuildStreamed(const EnhancedDrawItem& draw, const SurfaceV
         cost.cpuPayloadBytes += sizeof(MeshSurfaceInput) + sizeof(MeshSurfaceChunk) +
                                 chunk->meshlets_.descriptors.capacity() * sizeof(experiment::MeshletDescriptor) +
                                 chunk->hierarchy_.groups.capacity() * sizeof(experiment::MeshClusterGroup) +
-                                chunk->bones_.capacity() * sizeof(PackedBoneMatrix);
+                                chunk->bones_.capacity() * sizeof(PackedBoneMatrix) +
+                                chunk->m_boneBounds.capacity() * sizeof(MeshSurfaceInput::InstanceBoneBounds);
         cost.gpuPayloadBytes += sizeof(RHIMeshletBufferHeader) +
                                 chunk->meshlets_.descriptors.size() * (sizeof(experiment::MeshletDescriptor) + 8ull) +
                                 chunk->hierarchy_.GpuBytes() + chunk->hierarchy_.groupCount * 4ull +
-                                chunk->Count() * 8ull + 256 + chunk->bones_.size() * sizeof(PackedBoneMatrix);
+                                chunk->Count() * 8ull + 256 + chunk->bones_.size() * sizeof(PackedBoneMatrix) +
+                                chunk->BoneBounds().size_bytes();
         chunk->SealInstanceBounds();
         MeshSurfaceChunk item;
         item.input = chunk;

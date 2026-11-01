@@ -16,7 +16,8 @@ namespace experiment::cooked
 // Independent CEMF3 payloads. Spatial DAG geometry requires artifact v4 / CEMC v15.
 inline constexpr std::uint32_t kModelDescriptorRepresentation = 2u;
 inline constexpr std::uint32_t kModelGeometryRepresentation = 1u;
-inline constexpr std::uint32_t kModelGeometryArtifactVersion = 9u;
+// Version 10 adds authenticated bone bounds; earlier geometry must be recooked.
+inline constexpr std::uint32_t kModelGeometryArtifactVersion = 10u;
 inline constexpr std::uint32_t kSkeletonRepresentation = 1u;
 inline constexpr std::uint32_t kAnimationClipRepresentation = 1u;
 // Version 5 requires the canonical LX profile-2 geometry contract.
@@ -75,6 +76,8 @@ struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Mod
     MeshletPayload meshlets{}; // Descriptors only; connectivity lives in pages.
     MeshLodChain lods{};       // Descriptors/DAG only; level.indices are empty.
     ce::dynamic_array<ModelStreamLodCounts> counts;
+    // min.xyz, valid, max.xyz, valid; final box covers zero-weight vertices.
+    ce::dynamic_array<ce::fixed_array<float, 8>> boneBounds;
     own::shared_owner<const assets::cluster::Archive> archive;
     ce::dynamic_array<Sha256Digest> pageHashes;
     own::shared_owner<const ce::dynamic_array<MeshletDescriptor>> flatDescriptors;

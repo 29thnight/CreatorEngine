@@ -191,9 +191,40 @@ namespace
             Require(ck::ModelGeometryStreamPrefixSize(std::span(bytes).first(12),bytes.size(),prefix,failure) &&
                 ck::ReadModelGeometryStreamMetadata(std::span(bytes).first(prefix),bytes.size(),table,failure),"Current page metadata");
             Require(table.archive->fileOffsets.front() == prefix,"Full geometry body was not retired");
+            Require(table.boneBounds.size() == (value.requiredBoneCount ? value.requiredBoneCount + 1u : 0u),
+                    "Streamed bone bounds palette size");
+            for (std::size_t vertexIndex = 0; value.requiredBoneCount && vertexIndex < value.mesh.vertices.size();
+                 ++vertexIndex)
+            {
+                const auto vertex = value.mesh.vertices[vertexIndex];
+                const auto contained = [&](uint32_t bone)
+                {
+                    const auto& box = table.boneBounds.at(bone);
+                    Require(box[3] == 1.0f && box[7] == 1.0f, "Referenced bone bounds are inactive");
+                    for (unsigned axis = 0; axis < 3; ++axis)
+                    {
+                        Require(double(box[axis]) <= double(vertex.position[axis]) - table.archive->grid.positionError &&
+                                    double(box[axis + 4]) >= double(vertex.position[axis]) + table.archive->grid.positionError,
+                                "Streamed bone bounds exclude a source/quantized position");
+                    }
+                };
+                bool influenced = false;
+                for (unsigned slot = 0; slot < 4; ++slot)
+                {
+                    if (vertex.boneWeights[slot] > 0.0f)
+                    {
+                        contained(vertex.boneIndices[slot]);
+                        influenced = true;
+                    }
+                }
+                if (!influenced)
+                {
+                    contained(value.requiredBoneCount);
+                }
+            }
             corrupt = bytes; corrupt[table.archive->fileOffsets.front() + 40] ^= std::byte{1};
             Require(!ck::ExpandModelGeometryPages(corrupt,decoded,failure),"Corrupt page accepted");
-            for (uint32_t version : {6u,7u,8u}) {
+            for (uint32_t version : {6u,7u,8u,9u}) {
                 corrupt = bytes; std::memcpy(corrupt.data()+4,&version,4);
                 Require(!ck::ExpandModelGeometryPages(corrupt,decoded,failure),"Retired geometry schema accepted");
             }

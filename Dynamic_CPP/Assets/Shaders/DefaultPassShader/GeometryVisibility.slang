@@ -601,14 +601,41 @@ void GeometryResetInstanceBounds(uint bin, uint lane)
         }
         return;
     }
-    // 가중치가 모두 0인 정점은 bind pose를 쓴다. 본의 변환 경계와 함께
-    // 보존하여 현재 포즈가 원래 메시 경계를 벗어나도 조기 컬링에서 빠지지 않는다.
+    // Legacy packets retain the whole bind-pose box. New packets store only
+    // the vertices influenced by each bone and a separate zero-weight box.
     float3 posedMinimum = minimum.xyz;
     float3 posedMaximum = maximum.xyz;
     bool valid = true;
     const uint boneCount = MeteorPoseWord(shadowMeshletVertices[NonUniformResourceIndex(bin)], 0u);
+    const bool tightBounds = boneCount != 0u &&
+        MeteorPoseWord(shadowMeshletVertices[NonUniformResourceIndex(bin)], 4u) == 0x31424249u &&
+        MeteorPoseWord(shadowMeshletVertices[NonUniformResourceIndex(bin)], 12u) == boneCount + 1u;
+    const uint boundsBase = tightBounds
+        ? MeteorPoseWord(shadowMeshletVertices[NonUniformResourceIndex(bin)], 8u) : 0u;
+    if (tightBounds)
+    {
+        const uint fallback = boundsBase + boneCount * 32u;
+        const float4 lower = MeteorPose4(shadowMeshletVertices[NonUniformResourceIndex(bin)], fallback);
+        const float4 upper = MeteorPose4(shadowMeshletVertices[NonUniformResourceIndex(bin)], fallback + 16u);
+        posedMinimum = lower.w != 0.0f ? lower.xyz : float3(3.402823466e+38f);
+        posedMaximum = upper.w != 0.0f ? upper.xyz : float3(-3.402823466e+38f);
+    }
     for (uint bone = lane; bone < boneCount; bone += 64u)
     {
+        float3 boneMinimum = minimum.xyz;
+        float3 boneMaximum = maximum.xyz;
+        if (tightBounds)
+        {
+            const uint address = boundsBase + bone * 32u;
+            const float4 lower = MeteorPose4(shadowMeshletVertices[NonUniformResourceIndex(bin)], address);
+            const float4 upper = MeteorPose4(shadowMeshletVertices[NonUniformResourceIndex(bin)], address + 16u);
+            if (lower.w == 0.0f && upper.w == 0.0f)
+            {
+                continue;
+            }
+            boneMinimum = lower.xyz;
+            boneMaximum = upper.xyz;
+        }
         const float4x4 matrix = MeteorBone(shadowMeshletVertices[NonUniformResourceIndex(bin)], bone);
         float4 columns[3];
         [unroll] for (uint column = 0u; column < 3u; ++column)
@@ -616,7 +643,7 @@ void GeometryResetInstanceBounds(uint bin, uint lane)
             columns[column] = float4(matrix[0][column], matrix[1][column], matrix[2][column], matrix[3][column]);
         }
         float3 lower, upper;
-        valid = GeometryTransformInstanceBounds(minimum.xyz, maximum.xyz, columns, lower, upper) && valid;
+        valid = GeometryTransformInstanceBounds(boneMinimum, boneMaximum, columns, lower, upper) && valid;
         posedMinimum = min(posedMinimum, lower);
         posedMaximum = max(posedMaximum, upper);
     }

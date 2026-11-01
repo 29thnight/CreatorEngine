@@ -6,6 +6,8 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                    bool skinnedTest = false, unsigned visibilityAuditMode = 0)
 {
     device.captureSkinViewConstants = skinnedTest || std::getenv("CREATOR_CLUSTER_VIEW_AUDIT") != nullptr;
+    const bool skinBoundsEdges = skinnedTest && visibilityAuditMode == 2;
+    const uint32_t fixtureBones = skinBoundsEdges ? 3u : 2u;
     const auto material = SceneCooked(sourceMaterial);
     std::string error;
     auto geometry = MakeGeometry(false, false);
@@ -54,6 +56,12 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
         {
             const auto vertex = y * side + x;
             std::memcpy(geometry.vertices.data() + vertex * stride, prototype.data(), stride);
+            if (skinBoundsEdges && vertex == 0)
+            {
+                std::memset(geometry.vertices.data() + vertex * stride +
+                                assets::OffsetOf(mesh.vertexAttributeMask, assets::VertexAttribute::BoneWeights),
+                            0, sizeof(float) * 4);
+            }
             const math::vector3 p{-.6f + x * .075f, -.6f + y * .075f, .04f * std::sin(float(x)) * std::cos(float(y))};
             positions.push_back(p);
             std::memcpy(geometry.vertices.data() + vertex * stride +
@@ -166,13 +174,18 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     artifact.mesh = authored;
     if (skinnedTest)
     {
-        artifact.requiredBoneCount = 2;
+        artifact.requiredBoneCount = fixtureBones;
         experiment::Skeleton skeleton;
         skeleton.rootBone = experiment::BoneIndex{0};
-        skeleton.bones.resize(2);
+        skeleton.bones.resize(fixtureBones);
         skeleton.bones[0].name = "Root";
         skeleton.bones[1].name = "Child";
         skeleton.bones[1].parent = experiment::BoneIndex{0};
+        if (skinBoundsEdges)
+        {
+            skeleton.bones[2].name = "Unused";
+            skeleton.bones[2].parent = experiment::BoneIndex{0};
+        }
         Check(experiment::cooked::ComputeSkinBindingDigest(skeleton, artifact.requiredSkinBindingSha256, error),
               "Skinned LOD binding digest " + error);
     }
@@ -226,6 +239,12 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             auto descriptor = own::make_shared<assets::ModelMeshDescriptor>(*sourceDescriptor);
             auto storage = own::make_shared<assets::ModelSkeletonStorage>();
             storage->skeleton = descriptor->skeleton->skeleton;
+            if (skinBoundsEdges)
+            {
+                storage->skeleton.bones.resize(fixtureBones);
+                storage->skeleton.bones[2].name = "Unused";
+                storage->skeleton.bones[2].parent = 0;
+            }
             storage->skinBindingSha256 = artifact.requiredSkinBindingSha256;
             descriptor->requiredSkinBindingSha256 = artifact.requiredSkinBindingSha256;
             descriptor->skeleton =
@@ -281,7 +300,8 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     double maximumDepthError{};
     for (uint32_t chunkSize : {64u, 1u << 20})
     {
-        std::array<math::matrix4x4, 2> skinPose{math::matrix4x4::identity(), math::matrix4x4::identity()};
+        std::array<math::matrix4x4, 3> skinPose{math::matrix4x4::identity(), math::matrix4x4::identity(),
+                                              math::matrix4x4::identity()};
         if (skinnedTest)
         {
             skinPose[0].m[0][0] = 1.02f;
@@ -289,10 +309,15 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             skinPose[1].m[0][0] = .98f;
             skinPose[1].m[1][1] = 1.02f;
             skinPose[0].m[3][2] = chunkSize == 64 ? .1f : -.1f;
+            skinPose[2].m[3][0] = 100000.0f;
             for (size_t vertex = 0; vertex < positions.size(); ++vertex)
             {
                 positions[vertex] = {bindPositions[vertex].x * .99f, bindPositions[vertex].y * 1.01f,
                                      bindPositions[vertex].z + .25f * skinPose[0].m[3][2]};
+                if (skinBoundsEdges && vertex == 0)
+                {
+                    positions[vertex] = bindPositions[vertex];
+                }
             }
         }
         own::shared_owner<const SceneViewInput> previous;
@@ -319,7 +344,7 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             if (skinnedTest)
             {
                 draw.bonePalette = skinPose.data();
-                draw.boneCount = 2;
+                draw.boneCount = fixtureBones;
             }
             draw.modelMeshView = cooked;
             draw.materialGraphInstance = material;
@@ -383,6 +408,37 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             }
             const bool sealed = SealScene(view, {&draw, 1}, budget, input, error, previous ? &*previous : nullptr);
             Check(sealed, "Cluster scene seal " + error);
+            if (skinnedTest)
+            {
+                const auto& plan = input->Draws()[0].geometry;
+                Check(plan->Source()->BoneBounds().size() == draw.boneCount + 1u,
+                      "Skinned scene source publishes every palette bound and zero-weight bound");
+                if (skinBoundsEdges)
+                {
+                    Check(plan->Source()->BoneBounds()[2].minimum.w == 0.0f &&
+                              plan->Source()->BoneBounds()[fixtureBones].minimum.w == 1.0f,
+                          "Unused bone stays inactive while zero-weight bind-pose vertices have their own bound");
+                }
+                for (const auto& chunk : plan->Chunks())
+                {
+                    Check(chunk.input->BoneBounds().size() == draw.boneCount + 1u,
+                          "Skinned partition preserves the immutable bounds across pose refresh");
+                    if (streamingTest)
+                    {
+                        const auto& expected = coldGeometry->descriptor->streamMetadata->boneBounds;
+                        const auto actual = chunk.input->BoneBounds();
+                        for (std::size_t bone = 0; bone < expected.size(); ++bone)
+                        {
+                            for (unsigned axis = 0; axis < 4; ++axis)
+                            {
+                                Check(actual[bone].minimum[axis] == expected[bone][axis] &&
+                                          actual[bone].maximum[axis] == expected[bone][axis + 4],
+                                      "Streamed partition carries authenticated bounds without vertex expansion");
+                            }
+                        }
+                    }
+                }
+            }
             if (streamingTest)
             {
                 const auto& plan = input->Draws()[0].geometry;
@@ -456,6 +512,7 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             Check(table->geometry[1]->UsesDirectClusters() && resident,
                   "Scene consumes resident cluster packets directly");
             Check(resident->residencyAlignment == 16, "Production residency charges packed packet bytes");
+            uint64_t posePacketBytes{}, expandedPointBytes{};
             for (std::size_t i = 1; i < table->geometry.size(); ++i)
             {
                 Check(device.IsSparseBuffer(table->geometry[i]->Meshlets().buffer),
@@ -491,11 +548,18 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                     Check(table->geometry[i]->Input()->ClusterStream()->GpuFeedbackGroups() > 0,
                           "Completed camera/shadow GPU page feedback reaches the streaming controller");
                 }
-                Check(table->geometry[i]->BufferBytes() < table->geometry[i]->Count() * sizeof(SurfacePoint),
-                      "Scene retains a small pose packet rather than expanded SurfacePoint vertices");
+                const auto poseBytes = 32u + sealed.Bones().size_bytes() + sealed.BoneBounds().size_bytes();
+                const auto expectedBytes = ((poseBytes + sizeof(SurfacePoint) - 1u) / sizeof(SurfacePoint)) *
+                                           sizeof(SurfacePoint);
+                Check(table->geometry[i]->BufferBytes() == expectedBytes,
+                      "Direct geometry stores only its palette and bounds with structured-view alignment");
+                posePacketBytes += table->geometry[i]->BufferBytes();
+                expandedPointBytes += table->geometry[i]->Count() * sizeof(SurfacePoint);
                 Check(table->geometry[i]->ClusterResidency()->groups == resident->groups,
                       "All partitions share one residency cut");
             }
+            Check(posePacketBytes < expandedPointBytes,
+                  "Scene-wide pose and bounds storage stays below expanded SurfacePoint storage");
             const bool sameResident = previousResident == resident->groups;
             if (std::ranges::any_of(resident->groups, [](auto value) { return value == 0; }))
             {
@@ -681,10 +745,30 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             }
             const auto work = host.CameraMeshletWork();
             const auto last = uint32_t(table->geometry.size() - 2);
+            const auto instanceBoundsOffset = [&](uint32_t bin)
+            {
+                const auto& geometry = table->geometry[bin + 1];
+                const auto groups = (std::max)(1u, geometry->Input()->Hierarchy().groupCount);
+                if (bin != 0)
+                {
+                    Check(geometry->Input()->ClusterStream().operator->() ==
+                                  table->geometry[1]->Input()->ClusterStream().operator->() &&
+                              geometry->ClusterResidency().operator->() ==
+                                  table->geometry[1]->ClusterResidency().operator->(),
+                          "Single-draw fixture partitions share one group owner");
+                }
+                // This fixture has one draw/pose: only its first partition owns
+                // group masks and residency feedback. Each has its own bounds.
+                const auto groupWords = bin == 0 ? 2u * ((groups + 15u) / 16u) + (groups + 31u) / 32u : 0u;
+                return work->MeshletOutputOffset(bin) + geometry->MeshletCount() * 2u + 1u + groupWords;
+            };
             RHIReadback ids;
             Check(
                 device.CreateBufferReadback(
-                    (work->MeshletOutputOffset(last) + table->geometry.back()->MeshletCount() * 2 + 1) * 4, ids, error),
+                    (skinnedTest && streamingTest
+                         ? instanceBoundsOffset(last) + GpuGeometryVisibility::kInstanceBoundsWords
+                         : work->MeshletOutputOffset(last) + table->geometry.back()->MeshletCount() * 2 + 1) * 4,
+                    ids, error),
                 "Cluster list readback");
             graph->AddPass(
                 "Probe.Cluster.List", {{final.list, RHIResourceState::CopySource, RGAccessMode::Read}},
@@ -816,6 +900,42 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             device.ReleaseReadback(shadowPixels);
             RHIReadbackImage lists;
             Check(device.MapReadback(ids, lists, error), "Cluster list map");
+            if (skinnedTest && streamingTest)
+            {
+                const auto* words = reinterpret_cast<const uint32_t*>(lists.data.data());
+                for (uint32_t bin = 0; bin <= last; ++bin)
+                {
+                    const auto address = instanceBoundsOffset(bin);
+                    Check((address + GpuGeometryVisibility::kInstanceBoundsWords) * sizeof(uint32_t) <= lists.data.size(),
+                          "GPU instance bounds fit the captured list");
+                    Check(words[address + 6u] == 1u, "Streamed skinned GPU bounds are valid");
+                    // positions is the independently posed fixture, not a GPU
+                    // culling result. Whole-source metadata must contain every
+                    // vertex even when its page is currently not resident.
+                    for (const auto& position : positions)
+                    {
+                        const double point[4]{position.x, position.y, position.z, 1.0};
+                        for (unsigned axis = 0; axis < 3; ++axis)
+                        {
+                            double worldPosition{};
+                            for (unsigned row = 0; row < 4; ++row)
+                            {
+                                worldPosition += point[row] * draw.worldMatrix.m[row][axis];
+                            }
+                            const auto lower = std::bit_cast<float>(words[address + axis]);
+                            const auto upper = std::bit_cast<float>(words[address + 3u + axis]);
+                            if (skinBoundsEdges)
+                            {
+                                Check(upper - lower < 10.0f,
+                                      "Unused distant bone does not inflate the GPU instance bounds");
+                            }
+                            Check(std::isfinite(lower) && std::isfinite(upper) &&
+                                      lower <= worldPosition && worldPosition <= upper,
+                                  "GPU bone bounds contain independently posed vertices across residency and world transforms");
+                        }
+                    }
+                }
+            }
             const double scale = std::sqrt(double(draw.worldMatrix.m[0][0]) * draw.worldMatrix.m[0][0] +
                                            double(draw.worldMatrix.m[1][1]) * draw.worldMatrix.m[1][1] +
                                            double(draw.worldMatrix.m[2][2]) * draw.worldMatrix.m[2][2]);

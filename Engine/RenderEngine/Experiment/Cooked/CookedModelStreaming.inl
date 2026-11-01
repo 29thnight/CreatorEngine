@@ -78,6 +78,60 @@ namespace
             counts(level.meshlets, static_cast<uint32_t>(level.indices.size()));
         }
         wire.Float(attributes.grid.positionError);
+        const auto boxCount = value.requiredBoneCount ? value.requiredBoneCount + 1u : 0u;
+        ce::dynamic_array<ce::fixed_array<double, 6>> boxes(boxCount);
+        const auto infinity = std::numeric_limits<double>::infinity();
+        for (auto& box : boxes)
+        {
+            box = {infinity, infinity, infinity, -infinity, -infinity, -infinity};
+        }
+        const auto include = [&](uint32_t bone, const math::vector3& position)
+        {
+            auto& box = boxes.at(bone);
+            for (unsigned axis = 0; axis < 3; ++axis)
+            {
+                const double margin = double(attributes.grid.positionError) + 1e-5;
+                box[axis] = (std::min)(box[axis], double(position[axis]) - margin);
+                box[axis + 3] = (std::max)(box[axis + 3], double(position[axis]) + margin);
+            }
+        };
+        for (std::size_t index = 0; boxCount && index < value.mesh.vertices.size(); ++index)
+        {
+            const auto vertex = value.mesh.vertices[index];
+            bool influenced = false;
+            for (unsigned slot = 0; slot < 4; ++slot)
+            {
+                if (vertex.boneWeights[slot] > 0.0f)
+                {
+                    include(vertex.boneIndices[slot], vertex.position);
+                    influenced = true;
+                }
+            }
+            if (!influenced)
+            {
+                include(value.requiredBoneCount, vertex.position);
+            }
+        }
+        wire.Integer(boxCount);
+        for (const auto& box : boxes)
+        {
+            ce::fixed_array<float, 8> packed{};
+            if (box[0] != infinity)
+            {
+                for (unsigned axis = 0; axis < 3; ++axis)
+                {
+                    packed[axis] = std::nextafter(static_cast<float>(box[axis]),
+                                                  -std::numeric_limits<float>::infinity());
+                    packed[axis + 4] = std::nextafter(static_cast<float>(box[axis + 3]),
+                                                      std::numeric_limits<float>::infinity());
+                }
+                packed[3] = packed[7] = 1.0f;
+            }
+            for (const auto scalar : packed)
+            {
+                wire.Float(scalar);
+            }
+        }
         wire.Integer(static_cast<uint32_t>(pages.size()));
         uint64_t offset{};
         for (const auto& page : pages)
@@ -265,6 +319,28 @@ bool ReadModelGeometryStreamMetadata(std::span<const std::byte> prefix, uint64_t
             archive->pagedTopology = true;
             archive->grid.positionError = reader.Float();
             Require(archive->grid.positionError >= 0, "Streaming quantization error");
+            const auto boxCount = reader.Count(kModelSubAssetMaxBones + 1u, 32);
+            Require(boxCount == (skin ? value.requiredBoneCount + 1u : 0u), "Streaming bone bounds count");
+            value.boneBounds.resize(boxCount);
+            bool anyBound = false;
+            for (auto& box : value.boneBounds)
+            {
+                for (auto& scalar : box)
+                {
+                    scalar = reader.Float();
+                    Require(std::isfinite(scalar), "Streaming nonfinite bone bounds");
+                }
+                Require((box[3] == 0.0f || box[3] == 1.0f) && box[3] == box[7],
+                        "Streaming bone bounds validity");
+                for (unsigned axis = 0; axis < 3; ++axis)
+                {
+                    Require(box[3] != 0.0f ? box[axis] <= box[axis + 4]
+                                          : box[axis] == 0.0f && box[axis + 4] == 0.0f,
+                            "Streaming bone bounds extent");
+                }
+                anyBound = anyBound || box[3] != 0.0f;
+            }
+            Require(!skin || anyBound, "Streaming skin has no active bounds");
             const auto pages = reader.Count(kModelSubAssetMaxBytes / 44, 44);
             archive->packets.resize(pages);
             uint64_t cursor = prefixBytes;

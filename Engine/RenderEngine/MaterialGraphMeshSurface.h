@@ -102,6 +102,17 @@ namespace material_graph
         {
             return staticOwner_ ? staticOwner_->InstanceMaximum() : m_instanceMaximum;
         }
+        struct InstanceBoneBounds
+        {
+            math::vector4 minimum{}, maximum{};
+        };
+        static_assert(sizeof(InstanceBoneBounds) == 32);
+        // One box per palette entry, followed by the zero-weight bind-pose box.
+        // W=0 marks an unused box. Immutable data is shared across pose updates.
+        std::span<const InstanceBoneBounds> BoneBounds() const
+        {
+            return staticOwner_ ? staticOwner_->BoneBounds() : std::span<const InstanceBoneBounds>(m_boneBounds);
+        }
         uint32_t OriginalIndexCount() const
         {
             return staticOwner_ ? staticOwner_->OriginalIndexCount() : originalIndexCount_;
@@ -139,6 +150,7 @@ namespace material_graph
         experiment::MeshClusterHierarchy hierarchy_{};
         // 불변 압축 토폴로지의 경계다. W=0이면 현재 포즈의 조기 컬링을 생략한다.
         math::vector4 m_instanceMinimum{}, m_instanceMaximum{};
+        ce::dynamic_array<InstanceBoneBounds> m_boneBounds;
         uint32_t originalIndexCount_{};
         ce::dynamic_array<std::uint32_t> sourceVertexIds_;
         uint32_t sourcePrimitiveCount_{}, sourceVertexCount_{};

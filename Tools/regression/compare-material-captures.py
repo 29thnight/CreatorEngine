@@ -8,7 +8,7 @@ from pathlib import Path
 from base0_artifacts import audit_pixel_measurement
 
 
-def material_draws(manifest):
+def material_draws(manifest, recook=None):
     identity_fields = (
         "route", "modelId", "meshId", "modelGeneration", "world", "pose",
         "coverageFlags", "alphaCutoff", "meshDomain", "assetId", "subassetId",
@@ -19,6 +19,15 @@ def material_draws(manifest):
              {"material": {key: draw.get("lattice", {}).get(key)
                            for key in ("features", "coverage", "uniformBytes", "textures")}}
              for draw in manifest["draws"]]
+    if recook is not None:
+        for draw in draws:
+            digest = bytes(draw["contentSha256"]).hex()
+            if digest in recook:
+                draw["contentSha256"], draw["artifactBytes"] = recook[digest]
+                draw["artifactSchema"] = 9
+            # The resolver publication changes on recook; authenticated blob
+            # equivalence above replaces only this publication identity.
+            draw.pop("resolverRevision")
     # Publication order and runtime material slots may differ. Preserve every
     # input record, including repeated instances, while matching by value.
     return sorted(draws, key=lambda draw: json.dumps(draw, sort_keys=True))
@@ -31,6 +40,8 @@ def main():
     parser.add_argument("output", type=Path)
     parser.add_argument("--exact", action="store_true", help="Require identical finite float32 values")
     parser.add_argument("--diagnostic-stages", action="store_true", help="Also compare every named intermediate stage")
+    parser.add_argument("--bounds-recook-root", type=Path,
+                        help="Prove CEGE 9 -> 10 bounds-only recook using original cached blobs")
     args = parser.parse_args()
     left = json.loads((args.left / "manifest.json").read_text(encoding="utf-8-sig"))
     right = json.loads((args.right / "manifest.json").read_text(encoding="utf-8-sig"))
@@ -43,7 +54,11 @@ def main():
         raise ValueError("Requires controlled captures")
     if Path(left["skyBoxPath"]).name != Path(right["skyBoxPath"]).name:
         raise ValueError("Environment asset names differ")
-    if material_draws(left) != material_draws(right):
+    recook, recook_proofs = None, []
+    if args.bounds_recook_root:
+        from geometry_recook_identity import prove_bounds_recook
+        recook, recook_proofs = prove_bounds_recook(left, right, args.bounds_recook_root)
+    if material_draws(left, recook) != material_draws(right, recook):
         raise ValueError("Material inputs or mesh identities differ")
     rows = []
     groups = [("attachment", "attachments")]
@@ -95,6 +110,7 @@ def main():
                          rms=math.sqrt(squares / len(a)), nonfinite=nonfinite,
                          changedComponents=changed, exact=changed == 0 and nonfinite == 0, passed=passed))
     report = dict(left=str(args.left), right=str(args.right), width=left["width"], height=left["height"],
+                  boundsRecookProofs=recook_proofs,
                   comparison="exact" if args.exact else "tolerance",
                   passed=all(row["passed"] for row in rows),
                   attachments=[row for row in rows if row["kind"] == "attachment"],

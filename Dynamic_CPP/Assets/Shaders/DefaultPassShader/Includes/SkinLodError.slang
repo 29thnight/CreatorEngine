@@ -13,7 +13,23 @@ bool MeteorSkinGroupMetric(StructuredBuffer<float4> pose, ByteAddressBuffer topo
     {
         return false;
     }
-    const float4x4 reference = MeteorBone(pose, 0u);
+    const bool hasBoneBounds = MeteorPoseWord(pose, 4u) == 0x31424249u &&
+        MeteorPoseWord(pose, 12u) == count + 1u;
+    const uint boundsOffset = hasBoneBounds ? MeteorPoseWord(pose, 8u) : 0u;
+    uint referenceBone = 0u;
+    if (hasBoneBounds)
+    {
+        // The table covers every source vertex, including nonresident pages.
+        // An unused palette entry cannot affect either the patch or its error.
+        while (referenceBone < count &&
+               MeteorPoseWord(pose, boundsOffset + referenceBone * 32u + 12u) == 0u &&
+               MeteorPoseWord(pose, boundsOffset + referenceBone * 32u + 28u) == 0u)
+        {
+            ++referenceBone;
+        }
+    }
+    const float4x4 identity = float4x4(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1);
+    const float4x4 reference = referenceBone < count ? MeteorBone(pose, referenceBone) : identity;
     float referenceNorm = 0.0f, deviation = 0.0f, translation = 0.0f;
     [unroll] for (uint row = 0u; row < 3u; ++row)
     {
@@ -24,8 +40,13 @@ bool MeteorSkinGroupMetric(StructuredBuffer<float4> pose, ByteAddressBuffer topo
     const uint boundCount = count + ((flags & 2u) != 0u ? 1u : 0u);
     [loop] for (uint bone = 0u; bone < boundCount; ++bone)
     {
-        const float4x4 matrix = bone < count ? MeteorBone(pose, bone) :
-            float4x4(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1);
+        if (hasBoneBounds && bone < count &&
+            MeteorPoseWord(pose, boundsOffset + bone * 32u + 12u) == 0u &&
+            MeteorPoseWord(pose, boundsOffset + bone * 32u + 28u) == 0u)
+        {
+            continue;
+        }
+        const float4x4 matrix = bone < count ? MeteorBone(pose, bone) : identity;
         float difference = 0.0f, norm = 0.0f;
         [unroll] for (uint row = 0u; row < 3u; ++row)
         {
