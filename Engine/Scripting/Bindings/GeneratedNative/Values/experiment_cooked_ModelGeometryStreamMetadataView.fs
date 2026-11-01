@@ -77,6 +77,9 @@ module experiment_cooked_ModelGeometryStreamMetadataViewMembers =
         /// Native field experiment::cooked::ModelGeometryStreamMetadata::counts.
         member this.``counts`` : NativeArray<experiment_cooked_ModelStreamLodCountsView> = this.Field("counts", "counts").Read(NativeCodecs.Array(NativeCodecs.View((fun value -> experiment_cooked_ModelStreamLodCountsView(value)))))
 
+        /// Native field experiment::cooked::ModelGeometryStreamMetadata::boneBounds.
+        member this.``boneBounds`` : NativeArray<NativeArray<single>> = this.Field("boneBounds", "boneBounds").Read(NativeCodecs.Array(NativeCodecs.Array(NativeCodecs.Single)))
+
         /// Native field experiment::cooked::ModelGeometryStreamMetadata::archive.
         member this.``archive`` : NativeReference<assets_cluster_ArchiveView> = this.Field("archive", "archive").Read(NativeCodecs.Reference(NativeCodecs.View((fun value -> assets_cluster_ArchiveView(value)))))
 

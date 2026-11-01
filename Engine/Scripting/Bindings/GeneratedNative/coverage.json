@@ -2,16 +2,16 @@
   "format": "creator-native-fsharp-facades",
   "version": 1,
   "namespace": "CreatorEngine.NativeTypes",
-  "sourceSha256": "ddcf45724cff90c5b51854d9d3cc783e5806344284727c6ad7000347f559d324",
+  "sourceSha256": "679255ecc50bff19a2fd3ea33d06b9b242a733922eac5ad4587dcb7adef0d734",
   "counts": {
     "components": 27,
     "nativeDeclarations": 328,
     "manualRuntimeSchemas": 35,
     "recordViews": 363,
     "enumTypes": 88,
-    "fields": 1797,
+    "fields": 1798,
     "methods": 1202,
-    "typedMembers": 2842,
+    "typedMembers": 2843,
     "unavailableMembers": 157
   },
   "policy": {
@@ -58197,7 +58197,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 39,
+        "line": 40,
         "column": 5
       },
       "nativeType": "experiment::AssetId",
@@ -58216,7 +58216,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 40,
+        "line": 41,
         "column": 5
       },
       "nativeType": "ce::fixed_array<unsigned char, 32>",
@@ -58235,7 +58235,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 41,
+        "line": 42,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -58254,7 +58254,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 42,
+        "line": 43,
         "column": 5
       },
       "nativeType": "experiment::AnimationClip",
@@ -59339,7 +59339,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 47,
+        "line": 48,
         "column": 5
       },
       "nativeType": "experiment::AssetId",
@@ -59358,7 +59358,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 48,
+        "line": 49,
         "column": 5
       },
       "nativeType": "std::basic_string<char>",
@@ -59377,7 +59377,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 49,
+        "line": 50,
         "column": 5
       },
       "nativeType": "double",
@@ -59396,7 +59396,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 50,
+        "line": 51,
         "column": 5
       },
       "nativeType": "double",
@@ -59415,7 +59415,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 51,
+        "line": 52,
         "column": 5
       },
       "nativeType": "bool",
@@ -59434,7 +59434,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 130,
+        "line": 133,
         "column": 5
       },
       "nativeType": "experiment::AssetId",
@@ -59453,7 +59453,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 131,
+        "line": 134,
         "column": 5
       },
       "nativeType": "experiment::AssetId",
@@ -59472,7 +59472,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 132,
+        "line": 135,
         "column": 5
       },
       "nativeType": "std::basic_string<char>",
@@ -59491,7 +59491,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 133,
+        "line": 136,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<experiment::cooked::ModelClipSummary>",
@@ -59510,7 +59510,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 134,
+        "line": 137,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<experiment::cooked::ModelMeshSummary>",
@@ -59529,7 +59529,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 135,
+        "line": 138,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<experiment::cooked::ModelNodeSummary>",
@@ -59548,7 +59548,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 136,
+        "line": 139,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<experiment::cooked::ModelMaterialSummary>",
@@ -59567,7 +59567,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 137,
+        "line": 140,
         "column": 5
       },
       "nativeType": "bool",
@@ -59586,7 +59586,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 58,
+        "line": 59,
         "column": 5
       },
       "nativeType": "experiment::Mesh",
@@ -59605,7 +59605,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 59,
+        "line": 60,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -59624,7 +59624,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 60,
+        "line": 61,
         "column": 5
       },
       "nativeType": "ce::fixed_array<unsigned char, 32>",
@@ -59643,7 +59643,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 71,
+        "line": 72,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -59662,7 +59662,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 72,
+        "line": 73,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -59681,7 +59681,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 72,
+        "line": 73,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -59700,7 +59700,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 72,
+        "line": 73,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -59719,7 +59719,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 73,
+        "line": 74,
         "column": 5
       },
       "nativeType": "math::aabb",
@@ -59738,7 +59738,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 74,
+        "line": 75,
         "column": 5
       },
       "nativeType": "ce::fixed_array<unsigned char, 32>",
@@ -59757,7 +59757,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 75,
+        "line": 76,
         "column": 5
       },
       "nativeType": "experiment::MeshletPayload",
@@ -59776,7 +59776,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 76,
+        "line": 77,
         "column": 5
       },
       "nativeType": "experiment::MeshLodChain",
@@ -59795,11 +59795,30 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 77,
+        "line": 78,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<experiment::cooked::ModelStreamLodCounts>",
       "serializedName": "counts",
+      "scalarSetter": false,
+      "navigation": true
+    },
+    {
+      "declaringType": "experiment::cooked::ModelGeometryStreamMetadata",
+      "schemaName": "experiment::cooked::ModelGeometryStreamMetadata",
+      "kind": "field",
+      "nativeName": "boneBounds",
+      "fsharpName": "boneBounds",
+      "fsharpType": "NativeArray<NativeArray<single>>",
+      "status": "typed",
+      "reason": "",
+      "source": {
+        "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
+        "line": 80,
+        "column": 5
+      },
+      "nativeType": "ce::dynamic_array<ce::fixed_array<float, 8>>",
+      "serializedName": "boneBounds",
       "scalarSetter": false,
       "navigation": true
     },
@@ -59814,7 +59833,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 78,
+        "line": 81,
         "column": 5
       },
       "nativeType": "own::shared_owner<const assets::cluster::Archive>",
@@ -59833,7 +59852,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 79,
+        "line": 82,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<ce::fixed_array<unsigned char, 32>>",
@@ -59852,7 +59871,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 80,
+        "line": 83,
         "column": 5
       },
       "nativeType": "own::shared_owner<const ce::dynamic_array<experiment::MeshletDescriptor>>",
@@ -59871,7 +59890,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 81,
+        "line": 84,
         "column": 5
       },
       "nativeType": "unsigned long long",
@@ -59890,7 +59909,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 81,
+        "line": 84,
         "column": 5
       },
       "nativeType": "unsigned long long",
@@ -59909,7 +59928,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 82,
+        "line": 85,
         "column": 5
       },
       "nativeType": "ce::fixed_array<unsigned char, 32>",
@@ -59928,7 +59947,7 @@
       "reason": "native callbacks require an explicit rooted callback ABI",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 83,
+        "line": 86,
         "column": 5
       },
       "nativeType": "ce::func_detail::owning_func<ce::dynamic_array<std::byte>, false, true, false, 48, 8, ce::heap_allocator>",
@@ -59945,7 +59964,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 123,
+        "line": 126,
         "column": 5
       },
       "nativeType": "experiment::AssetId",
@@ -59964,7 +59983,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 124,
+        "line": 127,
         "column": 5
       },
       "nativeType": "std::basic_string<char>",
@@ -59983,7 +60002,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 125,
+        "line": 128,
         "column": 5
       },
       "nativeType": "experiment::MaterialBlendMode",
@@ -60002,7 +60021,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 100,
+        "line": 103,
         "column": 5
       },
       "nativeType": "experiment::AssetId",
@@ -60021,7 +60040,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 101,
+        "line": 104,
         "column": 5
       },
       "nativeType": "experiment::AssetId",
@@ -60040,7 +60059,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 102,
+        "line": 105,
         "column": 5
       },
       "nativeType": "std::basic_string<char>",
@@ -60059,7 +60078,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 103,
+        "line": 106,
         "column": 5
       },
       "nativeType": "math::aabb",
@@ -60078,7 +60097,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 104,
+        "line": 107,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -60097,7 +60116,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 105,
+        "line": 108,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -60116,7 +60135,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 106,
+        "line": 109,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -60135,7 +60154,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 107,
+        "line": 110,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -60154,7 +60173,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 108,
+        "line": 111,
         "column": 5
       },
       "nativeType": "bool",
@@ -60173,7 +60192,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 113,
+        "line": 116,
         "column": 5
       },
       "nativeType": "std::basic_string<char>",
@@ -60192,7 +60211,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 114,
+        "line": 117,
         "column": 5
       },
       "nativeType": "experiment::Index<experiment::NodeIndexTag>",
@@ -60211,7 +60230,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 115,
+        "line": 118,
         "column": 5
       },
       "nativeType": "math::matrix4x4",
@@ -60230,7 +60249,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 116,
+        "line": 119,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<experiment::AssetId>",
@@ -60249,7 +60268,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 67,
+        "line": 68,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -60268,7 +60287,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 67,
+        "line": 68,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -60287,7 +60306,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 67,
+        "line": 68,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -60306,7 +60325,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 67,
+        "line": 68,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -60458,7 +60477,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 33,
+        "line": 34,
         "column": 5
       },
       "nativeType": "experiment::Skeleton",
@@ -60477,7 +60496,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
-        "line": 34,
+        "line": 35,
         "column": 5
       },
       "nativeType": "ce::fixed_array<unsigned char, 32>",
