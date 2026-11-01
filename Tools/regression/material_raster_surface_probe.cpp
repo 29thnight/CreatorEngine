@@ -1160,6 +1160,48 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
             own::make_shared<const experiment::cooked::AssetBlobRecord>(equivalent.modelMeshView.handle.Blob());
         Check(SceneViewInput::Seal(view, {&equivalent, 1}, {}, pinned, error, pins, {}, &payloadPins),
               "Equal blob values with distinct owners seal");
+        const auto proved = pinned;
+        auto nextView = view;
+        ++nextView.frameId;
+        auto materialPins = own::make_shared<InstanceFramePins>();
+        const auto foreignMaterialIndex = materialPins->Retain(instances[1]);
+        const auto exactMaterialIndex = materialPins->Retain(pinnedDraw.materialGraphInstance);
+        for (const auto hint : {std::size_t{0}, pins->meshes.size(), SIZE_MAX})
+        {
+            auto hinted = pinnedDraw;
+            hinted.modelPinIndex = hint;
+            hinted.materialGraphPinIndex = hint == 0 ? exactMaterialIndex : foreignMaterialIndex;
+            Check(SceneViewInput::Seal(nextView, {&hinted, 1}, {}, pinned, error, pins, materialPins,
+                                       &payloadPins, &*proved) && pinned->Draws()[0].modelPinIndex == 0 &&
+                      pinned->Draws()[0].materialPinIndex == exactMaterialIndex,
+                  "Exact and out-of-range pin hints retain the exact lookup fallback");
+        }
+        auto foreignDescriptor = own::make_shared<assets::ModelMeshDescriptor>(*pins->meshes[0]);
+        ++foreignDescriptor->origin.resolverRevision;
+        auto alternatePins = own::make_shared<assets::ModelAssetGenerationPins>(*pins);
+        alternatePins->meshes.insert(alternatePins->meshes.begin(), foreignDescriptor);
+        auto hinted = pinnedDraw;
+        hinted.modelPinIndex = 0;
+        hinted.materialGraphPinIndex = foreignMaterialIndex;
+        Check(SceneViewInput::Seal(nextView, {&hinted, 1}, {}, pinned, error, alternatePins, materialPins,
+                                   &payloadPins, &*proved) && pinned->Draws()[0].modelPinIndex == 1 &&
+                  pinned->Draws()[0].materialPinIndex == exactMaterialIndex,
+              "An in-range model hint for another resolver identity falls back to the exact owner");
+        const auto& sealedDraw = pinned->Draws()[0];
+        Check(material_graph_test::SamePinnedObject(pinned->MaterialBorrow(sealedDraw), instances[0]),
+              "An immutable sealed draw reuses its validated material borrow");
+        auto copiedDraw = sealedDraw;
+        copiedDraw.material = instances[1].borrow();
+        Check(material_graph_test::SamePinnedObject(pinned->MaterialBorrow(copiedDraw), instances[0]),
+              "A copied or foreign draw cannot substitute a material through the sealed-borrow fast path");
+        auto unpinnedDescriptor = own::make_shared<assets::ModelMeshDescriptor>(*pins->meshes[0]);
+        auto forgedOwner = pinnedDraw;
+        forgedOwner.modelPinIndex = 0;
+        forgedOwner.modelMeshView.sourceDescriptor = &*unpinnedDescriptor;
+        const auto acceptedPinned = pinned;
+        Check(!SceneViewInput::Seal(nextView, {&forgedOwner, 1}, {}, pinned, error, pins, {}, &payloadPins,
+                                    &*proved) && material_graph_test::SamePinnedObject(pinned, acceptedPinned),
+              "An exact previous identity cannot replace current descriptor owner provenance");
         for (unsigned field = 0; field < 10; ++field)
         {
             auto invalid = pinnedDraw;
@@ -1208,14 +1250,39 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
             }
             }
             pinned.reset();
-            Check(!SceneViewInput::Seal(view, {&invalid, 1}, {}, pinned, error, pins, {}, &payloadPins) && !pinned,
+            invalid.modelPinIndex = 0;
+            Check(!SceneViewInput::Seal(nextView, {&invalid, 1}, {}, pinned, error, pins, {}, &payloadPins,
+                                       &*proved) && !pinned,
                   "Changed full descriptor identity is rejected " + std::to_string(field));
         }
-        auto nextView = view;
-        ++nextView.frameId;
         Check(SceneViewInput::Seal(nextView, {&pinnedDraw, 1}, {}, pinned, error, pins, {}, &payloadPins),
               "Seal scratch is reusable after rejection");
         std::cout << "METEOR_SEAL_PIN_VALUES_OK mismatches=10 equalBlobOwner=1 scratchReuse=1\n";
+    }
+
+    {
+        auto otherGeometry = MakeGeometry(true, false);
+        auto secondDraw = draw;
+        secondDraw.geometryKey = draw.geometryKey + 1;
+        secondDraw.modelMeshView = otherGeometry.draw.modelMeshView;
+        secondDraw.modelMeshView.indexData = otherGeometry.indices.data();
+        std::array identityDraws{draw, secondDraw};
+        own::shared_owner<const SceneViewInput> previous;
+        Check(SealScene(view, identityDraws, {}, previous, error), "Distinct geometry identities seal");
+        auto nextView = view;
+        ++nextView.frameId;
+        own::shared_owner<const SceneViewInput> current;
+        Check(SealScene(nextView, identityDraws, {}, current, error, &*previous),
+              "Exact ordered identities reuse prior collision validation");
+        std::swap(identityDraws[0], identityDraws[1]);
+        Check(SealScene(nextView, identityDraws, {}, current, error, &*previous),
+              "Reordered identities retain the full validation fallback");
+        identityDraws[1].geometryKey = identityDraws[0].geometryKey;
+        const auto acceptedCurrent = current;
+        Check(!SealScene(nextView, identityDraws, {}, current, error, &*previous) &&
+                  error == "Geometry batching hash collides with a different complete mesh identity." &&
+                  material_graph_test::SamePinnedObject(current, acceptedCurrent),
+              "A new hash collision cannot reuse a prior collision-free seal or replace accepted input");
     }
 
     {

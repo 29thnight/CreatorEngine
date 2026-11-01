@@ -152,6 +152,8 @@ namespace
 
     struct ProbeReplayState
     {
+        std::thread::id inlineOwner;
+        bool expectInline{}, expectWorkers{};
         std::atomic<uint32_t> active{};
         std::atomic<uint32_t> completed{};
         std::atomic<uint32_t> failures{};
@@ -208,6 +210,10 @@ namespace
         void ClearRenderTargetRect(const RHIRenderTargetBinding&, const float*, const RHIRect&) override {}
         void Append(uint32_t value)
         {
+            require(!m_replay->expectInline || std::this_thread::get_id() == m_replay->inlineOwner,
+                    "single/serial owned translation left its caller thread");
+            require(!m_replay->expectWorkers || thread_pool::is_worker_thread(),
+                    "parallel owned translation did not use engine workers");
             require(!m_busy.test_and_set(), "two replay jobs owned one target");
             m_replay->active.fetch_add(1);
             struct Release
@@ -459,7 +465,7 @@ namespace
             result = std::move(recording);
             return true;
         }
-        bool Record(const own::shared_owner<IRHICommandQueue>& queue, const std::function<void(RHIEncoder&)>& commands,
+        bool Record(const own::shared_owner<IRHICommandQueue>& queue, const ce::owned_func<void(RHIEncoder&)>& commands,
                     ce::lifetime_token token, ce::pooled_owner<IRHIQueueCommandBatch>& batch,
                     std::string& error) override
         {
@@ -471,7 +477,7 @@ namespace
             commands(recording->AcquireEncoder(0));
             return recording->Finish(batch, error);
         }
-        bool ExecuteSubmission(const std::function<bool(std::string&)>& submit, std::string& error) override
+        bool ExecuteSubmission(const ce::owned_func<bool(std::string&)>& submit, std::string& error) override
         {
             if (m_rejectAdmission.load())
             {
@@ -611,6 +617,9 @@ namespace
             {
                 ProbeContext context(scheduler, workerCount, parallel);
                 const auto targets = (std::max)(1u, workerCount);
+                context.native->m_replay.inlineOwner = std::this_thread::get_id();
+                context.native->m_replay.expectWorkers = parallel && targets > 1;
+                context.native->m_replay.expectInline = !context.native->m_replay.expectWorkers;
                 auto owner = own::make_shared<int>(17);
                 const own::weak_owner<int> lifetime = owner;
                 auto batch = context.Record(targets, owner);
@@ -670,6 +679,61 @@ namespace
                 "translation reentered graph callback");
         batch.reset();
         context.Drain();
+    }
+
+    void verify_recording_execution(job_scheduler& scheduler)
+    {
+        // Exercise the real IRHIQueueRecorder entry point against real software
+        // recording storage. The helper-only probe covers stopped/nested calls.
+        for (const uint32_t targets : {1u, 4u})
+        {
+            for (const bool fail : {false, true})
+            {
+                ProbeContext context(scheduler);
+                auto owner = own::make_shared<int>(17);
+                const own::weak_owner<int> lifetime = owner;
+                ce::pooled_owner<IRHIQueueRecording> recording;
+                std::string error;
+                require(context.recorder->BeginRecording(context.queue, targets, owner, recording, error),
+                        "consumer recording begin failed");
+                const auto caller = std::this_thread::get_id();
+                std::atomic<uint32_t> callbacks{};
+                bool threw{};
+                try
+                {
+                    context.recorder->RunParallel(
+                        [&, pin = std::move(owner)](uint32_t target)
+                        {
+                            require(pin && !lifetime.expired(), "consumer callback lost its resource pin");
+                            require(targets == 1 ? std::this_thread::get_id() == caller &&
+                                                       RHIInlineCommandRecordingScope::IsActive()
+                                                 : thread_pool::is_worker_thread(),
+                                    "consumer recording chose the wrong execution thread");
+                            recording->AcquireEncoder(target).Dispatch(100 + target, 1, 1);
+                            callbacks.fetch_add(1);
+                            if (fail && target == 0)
+                            {
+                                throw std::runtime_error("injected consumer recording failure");
+                            }
+                        },
+                        targets);
+                }
+                catch (const std::runtime_error& exception)
+                {
+                    require(std::string(exception.what()) == "injected consumer recording failure",
+                            "consumer recording changed its exception");
+                    threw = true;
+                }
+                require(threw == fail && callbacks.load() == targets && !RHIInlineCommandRecordingScope::IsActive(),
+                        "consumer recording did not drain or restore inline scope");
+                require(!lifetime.expired(), "consumer recording released its storage pin before cancellation");
+                recording.reset();
+                require(lifetime.expired(), "consumer recording retained callback/storage resources after return");
+            }
+        }
+        std::cout << "{\"test\":\"recording_execution\",\"target_counts\":[1,4],"
+                     "\"owner_inline\":true,\"workers\":true,\"exception_drain\":true,"
+                     "\"resource_release\":true,\"native_or_gpu\":false}\n";
     }
 
     void verify_submission_preparation(job_scheduler& scheduler)
@@ -1404,18 +1468,20 @@ namespace
     }
 } // namespace
 
-void* queue_probe_allocate(size_t bytes, size_t alignment)
+void* queue_probe_allocate(size_t bytes, size_t alignment) noexcept
 {
     if (rejectNextAllocation.exchange(false))
     {
-        throw std::bad_alloc();
+        // The native mimalloc callback is nullable and noexcept. Let the real
+        // owning allocator turn failure into bad_alloc and return pooled storage.
+        return nullptr;
     }
     renderAllocations.fetch_add(1, std::memory_order_relaxed);
     renderBytes.fetch_add(bytes, std::memory_order_relaxed);
     void* pointer{};
     if (posix_memalign(&pointer, (std::max)(alignment, sizeof(void*)), (std::max)(bytes, size_t{1})) != 0)
     {
-        throw std::bad_alloc();
+        return nullptr;
     }
     return pointer;
 }
@@ -1427,6 +1493,11 @@ void queue_probe_free(void* pointer) noexcept
 
 int main()
 {
+    std::set_terminate([]
+                       {
+                           std::cerr << activeTest << ": terminated during CPU queue verification\n";
+                           std::abort();
+                       });
     try
     {
         thread_pool pool;
@@ -1434,6 +1505,8 @@ int main()
         scheduler.start(8);
         activeTest = "basic";
         verify_basic(scheduler);
+        activeTest = "recording_execution";
+        verify_recording_execution(scheduler);
         activeTest = "submission_preparation";
         verify_submission_preparation(scheduler);
         activeTest = "failures";

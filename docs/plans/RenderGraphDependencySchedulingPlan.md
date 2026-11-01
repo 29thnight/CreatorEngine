@@ -6,6 +6,12 @@
 
 [전체 문서 대조·충돌 판정](MasterPlanAudit20261020.html) · [정리 전 원문](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/RenderGraphDependencySchedulingPlan.md)
 
+## 2026-10-31 RG9 후속 정정·재검증
+
+transient mip 수만 바뀌는 retained program 경로에 구조 비교 누락이 확인됐다. 1 mip의 부분 write/전체 read program을 2 mip에 재사용하면 신규 compile이 거부하는 미초기화 mip 읽기를 허용했다. 기존 CPU 검사는 mip 수와 접근 범위를 동시에 바꿔 이 경우를 덮지 못했다.
+
+구조 비교 보완과 고정 범위 회귀를 [감사 수정 기록](../analysis/RenderPipelineAuditFix20261031.md)에 추적한다. 아래 10월 23일 RG9 done·100/100인일은 당시 수용 이력이며, 이 결함이 발견된 현재 소스나 수정본의 native 재검증 완료를 뜻하지 않는다. 수정본의 Windows Debug/Release·RG9 GPU·병렬 기록·재질 수명 검증은 열려 있다. RG8-F의 실제 제품 overlap/전체 프레임 개선도 계속 별도 미완료다.
+
 ## 2026-10-23 RG8 제품 수용 — 현재 판정
 
 현행 master `0509753a3`와 보존 로컬 변경을 제품 수용한다. DeclareAsyncCompute 명시적 요청, graphics-only 공통 primary 경로, 실제 compute의 owned 큐·GPU wait·retirement가 수용 범위다. 기본 mode 0과 제품 async 태그 0을 유지한다. 자동 비용 모델·배치 탐색은 제거된 상태다.
@@ -71,7 +77,7 @@ D/R native 441·계획 82·전체 RG 회귀 통과, 제품 8캡처·128출력 �
 |---|---|---|
 | `RG8` · PHASE 4.3 | 명시적 async·primary fallback 제품 수용 | done · 16인일 |
 | `RG8-F` · 미래 계획 | 제품 pass opt-in·RG7 조합·전체 프레임 개선 | 보류 · 현재 공수 제외 |
-| `RG9` · PHASE 4.3 | 범위·transient mip·동일 반복 pass split·Inspector | done · 10인일 |
+| `RG9` · PHASE 4.3 | 범위·transient mip·동일 반복 pass split·Inspector; mip-only 수정본 native 재검증 필요 | 10월 23일 done · 10인일 보존; 10월 31일 후속 검증 열림 |
 
 대시보드 상태는 인계용 식별 정보다. 위 구현 기반에서 이미 충족한 하위 요구는 재작성하지 않고, 남은 제품/실패/비용 수용을 수행한다.
 

@@ -5,6 +5,9 @@ Requires a local enkiTS checkout matching v1.12 / 0289cf6ffce86697e1f46cb4eeca1c
 This runner does not download dependencies. Native GPU command lists and frame
 performance are outside its scope; CE_CONTRACT_STANDALONE and CE_SHIPPING are set.
 The deliberate wave-join mutation must fail the existing early-progress check.
+--recording-helper-only selects the production recording helper execution checks,
+including single-target ownership, diagnostics, exceptions and callback lifetimes.
+It does not claim the separate topology planning or scheduler storage-reuse gates.
 """
 
 import runpy
@@ -26,6 +29,7 @@ def main():
     parser.add_argument("--enkits", required=True, type=Path)
     parser.add_argument("--compiler", default="g++")
     parser.add_argument("--sanitize", action="store_true")
+    parser.add_argument("--recording-helper-only", action="store_true")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     compiler = shutil.which(args.compiler)
@@ -35,7 +39,7 @@ def main():
     if not compiler or not all((dependency / name).is_file() for name in ("TaskScheduler.h", "TaskScheduler.cpp")):
         parser.error("a C++23 GCC/Clang compiler and a local enkiTS source checkout are required")
     probe = ROOT / "Tools/regression/recording_task_graph_probe.cpp"
-    inputs = [probe, ROOT / "Engine/RenderEngine/RHI/RHICommandRecordingJobs.h",
+    inputs = [probe, Path(__file__).resolve(), ROOT / "Engine/RenderEngine/RHI/RHICommandRecordingJobs.h",
               ROOT / "Engine/RenderEngine/RHI/RHIRecordingTaskGraph.h",
               ROOT / "Engine/Utility_Framework/Concurrency/JobScheduler.cpp",
               ROOT / "Engine/Utility_Framework/Concurrency/ThreadPool.cpp",
@@ -67,7 +71,10 @@ def main():
             if args.sanitize:
                 command.extend(["-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-fno-sanitize-recover=all"])
             subprocess.run(command, check=True, timeout=120)
-            result = subprocess.run([str(executable)], text=True, capture_output=True, timeout=30)
+            arguments = [str(executable)]
+            if args.recording_helper_only:
+                arguments.append("--recording-helper-only")
+            result = subprocess.run(arguments, text=True, capture_output=True, timeout=30)
             if mutant:
                 valid = result.returncode == 1 and any(message in result.stderr for message in (
                     "unrelated wave work became a dependency", "consumer waited for unrelated"))
@@ -81,6 +88,7 @@ def main():
     if before != source_hashes():
         raise RuntimeError("production, probe or dependency source changed during verification")
     evidence = {"scope": "CPU recording DAG correctness only; no GPU/frame benchmark", "sanitized": args.sanitize,
+                "recording_helper_only": args.recording_helper_only,
                 "asan_options": os.environ.get("ASAN_OPTIONS", ""), "source_sha256": before, "rows": rows}
     if args.output:
         args.output.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")

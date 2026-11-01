@@ -410,26 +410,40 @@ namespace
         uint64_t mixedNewest{};
     };
 
-    ModelGenerationMix CountModelGenerations(const material_graph::SceneViewInput* input)
+    ModelGenerationMix CountModelGenerations(const material_graph::SceneViewInput* input,
+                                             ce::dynamic_array<ce::pair<uuid::uuid16, std::uint64_t>>& drawn)
     {
         ModelGenerationMix result;
-        if (!input) return result;
-        ce::dynamic_array<ce::pair<uuid::uuid16, std::uint64_t>> drawn;
+        drawn.clear();
+        if (!input)
+        {
+            return result;
+        }
         drawn.reserve(input->Draws().size());
         for (const auto& draw : input->Draws())
         {
             if (draw.mesh.domain == assets::ModelMeshDomain::Granular)
+            {
                 drawn.emplace_back(draw.mesh.assetSetId.value, draw.mesh.manifestRevision);
+            }
             else
+            {
                 drawn.emplace_back(draw.model.modelId, draw.model.generation);
+            }
         }
         std::sort(drawn.begin(), drawn.end());
         drawn.erase(std::unique(drawn.begin(), drawn.end()), drawn.end());
         for (std::size_t i = 1; i < drawn.size(); ++i)
         {
-            if (drawn[i].first != drawn[i - 1].first) continue;
+            if (drawn[i].first != drawn[i - 1].first)
+            {
+                continue;
+            }
             // Sorted: count a model once, at its second generation.
-            if (i < 2 || drawn[i - 2].first != drawn[i].first) ++result.mixedModels;
+            if (i < 2 || drawn[i - 2].first != drawn[i].first)
+            {
+                ++result.mixedModels;
+            }
             result.mixedNewest = (std::max)(result.mixedNewest, drawn[i].second);
         }
         result.pairs = static_cast<uint32_t>(drawn.size());
@@ -3038,9 +3052,6 @@ namespace
             // drawPool이 view 선별과 graph 기록까지 Mesh raw 주소를 운반하므로
             // 프록시 snapshot을 놓은 뒤에도 같은 generation을 명시적으로 붙든다.
             own::shared_owner<Mesh> meshSource{};
-            // Borrowed mesh bytes are covered by the frame's single model pin
-            // table. Copies of this draw carry only the stable table index.
-            std::size_t modelPinIndex{ (std::numeric_limits<std::size_t>::max)() };
             // Source identity/coverage is copied once. The immutable instance
             // itself is retained by the frame pin table, never per draw.
             bool hasGraphMaterialSource{};
@@ -3235,6 +3246,8 @@ namespace
         // mixed 모델 중 가장 새 generation. 모든 모델의 최댓값을 쓰면 다른 모델의
         // 큰 번호가 재임포트의 전진을 가린다.
         uint64_t lastMixedNewestGeneration{ 0 };
+        // Value-only diagnostic scratch; reuse capacity across views without retaining assets.
+        ce::dynamic_array<ce::pair<uuid::uuid16, std::uint64_t>> modelGenerationScratch;
         ce::fixed_array<uint32_t, kEnhancedLiveDisplayTargetCount> viewSpriteCounts{};
         ce::fixed_array<uint32_t, kEnhancedLiveDisplayTargetCount> viewUICounts{};
         ce::fixed_array<EnhancedLiveShadowStats, kEnhancedLiveDisplayTargetCount> viewShadowStats{};
@@ -5825,7 +5838,7 @@ namespace
                     {
                         return;
                     }
-                    pooled.modelPinIndex = pinIndex;
+                    pooled.item.modelPinIndex = pinIndex;
                     bounds = descriptor->bounds;
                 }
                 else
@@ -5845,7 +5858,7 @@ namespace
                         return;
                     }
                     const auto& mesh = generation->Meshes()[proxy->m_modelMeshIndex];
-                    pooled.modelPinIndex = mesh.streamDescriptor ? pinMesh(mesh.streamDescriptor) : pinIndex;
+                    pooled.item.modelPinIndex = mesh.streamDescriptor ? pinMesh(mesh.streamDescriptor) : pinIndex;
                     bounds = mesh.bounds;
                 }
                 pooled.item.worldMatrix = proxy->m_worldMatrix;
@@ -5909,7 +5922,7 @@ namespace
                         {
                             continue;
                         }
-                        pooled.modelPinIndex = pinIndex;
+                        pooled.item.modelPinIndex = pinIndex;
                         bounds = descriptor->bounds;
                     }
                     else
@@ -5929,7 +5942,7 @@ namespace
                             continue;
                         }
                         const auto& mesh = generation->Meshes()[type.m_modelMeshIndex];
-                        pooled.modelPinIndex = mesh.streamDescriptor ? pinMesh(mesh.streamDescriptor) : pinIndex;
+                        pooled.item.modelPinIndex = mesh.streamDescriptor ? pinMesh(mesh.streamDescriptor) : pinIndex;
                         bounds = mesh.bounds;
                     }
                     pooled.item.worldMatrix = source.worldMatrix;
@@ -7518,7 +7531,8 @@ namespace
                 static_cast<uint32_t>(p.Execution().graphInput ? p.Execution().graphInput->Draws().size() : 0);
             lastBatchCount = p.Execution().graphMaterials.PreparedMeshletDrawCount();
             const auto generations =
-                CountModelGenerations(p.Execution().graphInput ? &*p.Execution().graphInput : nullptr);
+                CountModelGenerations(p.Execution().graphInput ? &*p.Execution().graphInput : nullptr,
+                                      modelGenerationScratch);
             lastModelGenerationPairs = generations.pairs;
             lastMixedGenerationModels = generations.mixedModels;
             lastMixedNewestGeneration = generations.mixedNewest;
@@ -10650,7 +10664,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 static_cast<uint32_t>(p.Execution().graphInput ? p.Execution().graphInput->Draws().size() : 0);
             state.lastBatchCount = p.Execution().graphMaterials.PreparedMeshletDrawCount();
             const auto generations =
-                CountModelGenerations(p.Execution().graphInput ? &*p.Execution().graphInput : nullptr);
+                CountModelGenerations(p.Execution().graphInput ? &*p.Execution().graphInput : nullptr,
+                                      state.modelGenerationScratch);
             state.lastModelGenerationPairs = generations.pairs;
             state.lastMixedGenerationModels = generations.mixedModels;
             state.lastMixedNewestGeneration = generations.mixedNewest;

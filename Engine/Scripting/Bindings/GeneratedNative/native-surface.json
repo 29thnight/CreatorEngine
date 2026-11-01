@@ -34107,7 +34107,7 @@
       "schema_name": "\"LightComponent\"",
       "source": {
         "file": "Engine/SceneRuntime/LightComponent.h",
-        "line": 19,
+        "line": 18,
         "column": 53
       },
       "nested": false,
@@ -34124,7 +34124,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 109,
+            "line": 108,
             "column": 5
           },
           "type": {
@@ -34148,7 +34148,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 110,
+            "line": 109,
             "column": 5
           },
           "type": {
@@ -34172,7 +34172,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 111,
+            "line": 110,
             "column": 5
           },
           "type": {
@@ -34196,7 +34196,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 112,
+            "line": 111,
             "column": 5
           },
           "type": {
@@ -34220,7 +34220,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 113,
+            "line": 112,
             "column": 5
           },
           "type": {
@@ -34244,7 +34244,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 114,
+            "line": 113,
             "column": 5
           },
           "type": {
@@ -34268,7 +34268,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 115,
+            "line": 114,
             "column": 5
           },
           "type": {
@@ -34292,7 +34292,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 116,
+            "line": 115,
             "column": 2
           },
           "type": {
@@ -34316,7 +34316,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 117,
+            "line": 116,
             "column": 5
           },
           "type": {
@@ -34340,7 +34340,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 118,
+            "line": 117,
             "column": 5
           },
           "type": {
@@ -34366,7 +34366,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 30,
+            "line": 29,
             "column": 5
           },
           "signature": "void ()",
@@ -34402,7 +34402,7 @@
               "expression": "reflgen::script_internal{}",
               "source": {
                 "file": "Engine/SceneRuntime/LightComponent.h",
-                "line": 30,
+                "line": 29,
                 "column": 7
               }
             }
@@ -34414,7 +34414,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 43,
+            "line": 42,
             "column": 2
           },
           "signature": "void (LightType)",
@@ -34457,7 +34457,7 @@
               },
               "source": {
                 "file": "Engine/SceneRuntime/LightComponent.h",
-                "line": 43,
+                "line": 42,
                 "column": 30
               }
             }
@@ -34470,7 +34470,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 49,
+            "line": 48,
             "column": 2
           },
           "signature": "void (const math::color &)",
@@ -34524,7 +34524,7 @@
               },
               "source": {
                 "file": "Engine/SceneRuntime/LightComponent.h",
-                "line": 49,
+                "line": 48,
                 "column": 35
               }
             }
@@ -34537,7 +34537,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 56,
+            "line": 55,
             "column": 2
           },
           "signature": "void (float)",
@@ -34580,7 +34580,7 @@
               },
               "source": {
                 "file": "Engine/SceneRuntime/LightComponent.h",
-                "line": 56,
+                "line": 55,
                 "column": 26
               }
             }
@@ -34593,7 +34593,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 62,
+            "line": 61,
             "column": 2
           },
           "signature": "void (float)",
@@ -34636,7 +34636,7 @@
               },
               "source": {
                 "file": "Engine/SceneRuntime/LightComponent.h",
-                "line": 62,
+                "line": 61,
                 "column": 22
               }
             }
@@ -34649,7 +34649,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 69,
+            "line": 68,
             "column": 2
           },
           "signature": "void (float)",
@@ -34692,7 +34692,7 @@
               },
               "source": {
                 "file": "Engine/SceneRuntime/LightComponent.h",
-                "line": 69,
+                "line": 68,
                 "column": 26
               }
             }
@@ -34705,7 +34705,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 75,
+            "line": 74,
             "column": 2
           },
           "signature": "void (LightStatus)",
@@ -34748,7 +34748,7 @@
               },
               "source": {
                 "file": "Engine/SceneRuntime/LightComponent.h",
-                "line": 75,
+                "line": 74,
                 "column": 34
               }
             }
@@ -34761,7 +34761,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 81,
+            "line": 80,
             "column": 5
           },
           "signature": "void ()",
@@ -34797,7 +34797,7 @@
               "expression": "reflgen::script_internal{}",
               "source": {
                 "file": "Engine/SceneRuntime/LightComponent.h",
-                "line": 81,
+                "line": 80,
                 "column": 7
               }
             }
@@ -34809,7 +34809,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 88,
+            "line": 87,
             "column": 5
           },
           "signature": "void ()",
@@ -34845,7 +34845,7 @@
               "expression": "reflgen::script_internal{}",
               "source": {
                 "file": "Engine/SceneRuntime/LightComponent.h",
-                "line": 88,
+                "line": 87,
                 "column": 7
               }
             }
@@ -34857,7 +34857,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 90,
+            "line": 89,
             "column": 5
           },
           "signature": "void ()",
@@ -34893,7 +34893,7 @@
               "expression": "reflgen::script_internal{}",
               "source": {
                 "file": "Engine/SceneRuntime/LightComponent.h",
-                "line": 90,
+                "line": 89,
                 "column": 7
               }
             }
@@ -34905,7 +34905,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 92,
+            "line": 91,
             "column": 5
           },
           "signature": "void ()",
@@ -34941,7 +34941,7 @@
               "expression": "reflgen::script_internal{}",
               "source": {
                 "file": "Engine/SceneRuntime/LightComponent.h",
-                "line": 92,
+                "line": 91,
                 "column": 7
               }
             }
@@ -34953,7 +34953,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/LightComponent.h",
-            "line": 95,
+            "line": 94,
             "column": 2
           },
           "signature": "math::aabb () const",
@@ -46888,7 +46888,7 @@
       "schema_name": "\"Prefab\"",
       "source": {
         "file": "Engine/SceneRuntime/Prefab.h",
-        "line": 10,
+        "line": 11,
         "column": 53
       },
       "nested": false,
@@ -46905,7 +46905,7 @@
           "access": "private",
           "source": {
             "file": "Engine/SceneRuntime/Prefab.h",
-            "line": 78,
+            "line": 79,
             "column": 2
           },
           "type": {
@@ -46931,7 +46931,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/Prefab.h",
-            "line": 20,
+            "line": 21,
             "column": 5
           },
           "signature": "Entity *(std::string_view) const",
@@ -46985,7 +46985,7 @@
               },
               "source": {
                 "file": "Engine/SceneRuntime/Prefab.h",
-                "line": 20,
+                "line": 21,
                 "column": 42
               }
             }
@@ -46998,7 +46998,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/Prefab.h",
-            "line": 21,
+            "line": 22,
             "column": 5
           },
           "signature": "Entity *(Scene *, std::string_view) const",
@@ -47063,7 +47063,7 @@
               },
               "source": {
                 "file": "Engine/SceneRuntime/Prefab.h",
-                "line": 21,
+                "line": 22,
                 "column": 32
               }
             },
@@ -47083,7 +47083,7 @@
               },
               "source": {
                 "file": "Engine/SceneRuntime/Prefab.h",
-                "line": 21,
+                "line": 22,
                 "column": 62
               }
             }
@@ -47096,7 +47096,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/Prefab.h",
-            "line": 26,
+            "line": 27,
             "column": 5
           },
           "signature": "Authoring::ReadNode () const",
@@ -47131,7 +47131,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/Prefab.h",
-            "line": 27,
+            "line": 28,
             "column": 5
           },
           "signature": "void (const Authoring::NodeView &)",
@@ -47185,7 +47185,7 @@
               },
               "source": {
                 "file": "Engine/SceneRuntime/Prefab.h",
-                "line": 27,
+                "line": 28,
                 "column": 51
               }
             }
@@ -47198,7 +47198,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/Prefab.h",
-            "line": 28,
+            "line": 29,
             "column": 5
           },
           "signature": "FileGuid () const",
@@ -47233,7 +47233,7 @@
           "access": "public",
           "source": {
             "file": "Engine/SceneRuntime/Prefab.h",
-            "line": 29,
+            "line": 30,
             "column": 5
           },
           "signature": "void (const FileGuid &)",
@@ -47287,7 +47287,7 @@
               },
               "source": {
                 "file": "Engine/SceneRuntime/Prefab.h",
-                "line": 29,
+                "line": 30,
                 "column": 38
               }
             }
@@ -47422,7 +47422,7 @@
       "schema_name": "\"RHIBindingDesc\"",
       "source": {
         "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-        "line": 136,
+        "line": 131,
         "column": 78
       },
       "nested": false,
@@ -47437,7 +47437,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 141,
+            "line": 136,
             "column": 5
           },
           "type": {
@@ -47461,7 +47461,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 142,
+            "line": 137,
             "column": 5
           },
           "type": {
@@ -47485,7 +47485,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 150,
+            "line": 145,
             "column": 5
           },
           "type": {
@@ -47509,7 +47509,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 151,
+            "line": 146,
             "column": 5
           },
           "type": {
@@ -47533,7 +47533,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 154,
+            "line": 149,
             "column": 5
           },
           "type": {
@@ -47557,7 +47557,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 158,
+            "line": 153,
             "column": 5
           },
           "type": {
@@ -47581,7 +47581,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 161,
+            "line": 156,
             "column": 5
           },
           "type": {
@@ -47605,7 +47605,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 163,
+            "line": 158,
             "column": 5
           },
           "type": {
@@ -47629,7 +47629,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 164,
+            "line": 159,
             "column": 5
           },
           "type": {
@@ -47653,7 +47653,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 165,
+            "line": 160,
             "column": 5
           },
           "type": {
@@ -47677,7 +47677,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 166,
+            "line": 161,
             "column": 5
           },
           "type": {
@@ -47701,7 +47701,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 169,
+            "line": 164,
             "column": 5
           },
           "type": {
@@ -47725,7 +47725,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 170,
+            "line": 165,
             "column": 5
           },
           "type": {
@@ -47749,7 +47749,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 171,
+            "line": 166,
             "column": 5
           },
           "type": {
@@ -47775,7 +47775,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 257,
+            "line": 252,
             "column": 5
           },
           "signature": "RHIBindingDesc () const",
@@ -49954,7 +49954,7 @@
       "schema_name": "\"RHITextureEntry\"",
       "source": {
         "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-        "line": 82,
+        "line": 77,
         "column": 78
       },
       "nested": false,
@@ -49969,7 +49969,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 84,
+            "line": 79,
             "column": 5
           },
           "type": {
@@ -49993,7 +49993,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 85,
+            "line": 80,
             "column": 5
           },
           "type": {
@@ -50017,7 +50017,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 86,
+            "line": 81,
             "column": 5
           },
           "type": {
@@ -50041,7 +50041,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 87,
+            "line": 82,
             "column": 5
           },
           "type": {
@@ -50065,7 +50065,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 88,
+            "line": 83,
             "column": 5
           },
           "type": {
@@ -50089,7 +50089,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 89,
+            "line": 84,
             "column": 5
           },
           "type": {
@@ -50113,7 +50113,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 90,
+            "line": 85,
             "column": 5
           },
           "type": {
@@ -50137,7 +50137,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 91,
+            "line": 86,
             "column": 5
           },
           "type": {
@@ -50163,7 +50163,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
-            "line": 93,
+            "line": 88,
             "column": 5
           },
           "signature": "bool () const",

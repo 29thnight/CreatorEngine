@@ -196,7 +196,7 @@ std::size_t job_scheduler::worker_count() const
 {
     return 0;
 }
-job_handle job_scheduler::submit_indexed(std::size_t, std::function<void(std::size_t)>)
+job_handle job_scheduler::submit_indexed(std::size_t, ce::unique_func<void(std::size_t)>)
 {
     throw std::logic_error("Portable graph fixture does not submit worker jobs");
 }

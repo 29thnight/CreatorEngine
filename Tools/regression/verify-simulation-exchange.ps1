@@ -18,7 +18,7 @@ try {
 @echo off
 call "$vs\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
 if errorlevel 1 exit /b 1
-cl /nologo /std:c++20 /EHsc Tools\regression\SimulationExchangeProbe.cpp /Fo"$out\clock.obj" /Fe"$out\clock.exe"
+cl /nologo /std:c++latest /DCE_CONTRACT_STANDALONE=1 /EHsc Tools\regression\SimulationExchangeProbe.cpp /Fo"$out\clock.obj" /Fe"$out\clock.exe"
 if errorlevel 1 exit /b 1
 "$out\clock.exe"
 "@ | Set-Content $batch -Encoding ascii

@@ -300,6 +300,9 @@ struct EnhancedDrawItem
     const math::matrix4x4* bonePalette{ nullptr };
     uint64_t              animatorKey{ 0 };
     uint32_t              boneCount{ 0 };
+    // Optional frame pin hint. Consumers still validate the full handle and owner;
+    // standalone producers may leave it unset and use the identity lookup path.
+    std::size_t modelPinIndex{ (std::numeric_limits<std::size_t>::max)() };
 };
 
 static_assert(std::is_same_v<decltype(EnhancedDrawItem::worldMatrix),

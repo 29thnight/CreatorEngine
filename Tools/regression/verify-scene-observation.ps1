@@ -16,7 +16,7 @@ $batch=Join-Path $out "$config.cmd"
 @echo off
 call "$vs\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
 if errorlevel 1 exit /b 1
-cl /nologo /std:c++20 /EHsc /W4 $flags Tools\regression\SceneObservationProbe.cpp /Fo"$out\$config.obj" /Fe"$out\$config.exe" /Fd"$out\$config.pdb"
+cl /nologo /std:c++latest /DCE_CONTRACT_STANDALONE=1 /EHsc /W4 $flags Tools\regression\SceneObservationProbe.cpp /Fo"$out\$config.obj" /Fe"$out\$config.exe" /Fd"$out\$config.pdb"
 if errorlevel 1 exit /b 1
 "$out\$config.exe"
 "@ | Set-Content $batch -Encoding ascii

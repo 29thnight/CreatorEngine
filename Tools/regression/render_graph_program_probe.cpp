@@ -123,6 +123,102 @@ namespace
                 "A rejected plan clears old values and preserves only caller-owned capacity");
     }
 
+    void CheckInlineRecordingEntryGuards()
+    {
+        using namespace ce::regression;
+        class PreparationPool final : public IRHIParallelCommandPool
+        {
+          public:
+            uint32_t preparations{};
+            bool IsInitialized() const override { return true; }
+            uint32_t GetWorkerCount() const override { return 1; }
+            bool Prepare(std::string& error) override
+            {
+                ++preparations;
+                error.clear();
+                return true;
+            }
+            void BeginFrame(uint32_t) override { Unexpected(); }
+            bool OpenWorker(uint32_t, std::string&) override { Unexpected(); }
+            RHIEncoder& AcquireEncoder(uint32_t) override { Unexpected(); }
+            bool CloseAll(std::string&) override { Unexpected(); }
+            uint32_t DrainEncoderDrops(std::string&) override { Unexpected(); }
+            bool HasRecorded(uint32_t) const override { return false; }
+
+          protected:
+            uint32_t GetCurrentFrameSlot() const override { return 0; }
+            bool PrepareRecordedCommands(uint32_t, RHICompletionPoint&, std::string&) override { Unexpected(); }
+            bool SubmitRecordedCommands(uint32_t, std::span<const uint32_t>, RHICompletionPoint,
+                                        std::string&) override
+            {
+                Unexpected();
+            }
+
+          private:
+            [[noreturn]] static void Unexpected()
+            {
+                throw std::logic_error("Entry guard fixture must not touch native command targets");
+            }
+        } pool;
+        PortableRenderServices services;
+        Graph preparation{services, RGSchedulingMode::ExplicitVersioned};
+        std::string error;
+        Require(!RHIInlineCommandRecordingScope::IsActive(), "The fixture starts outside inline recording");
+        // This CPU fixture enters the production scope directly. Actual helper
+        // callbacks and scheduler admission are covered by the jobs regression.
+        {
+            const RHIInlineCommandRecordingScope scope;
+            Require(!preparation.PrepareParallel(pool, error) && !error.empty() && pool.preparations == 0,
+                    "Inline recording rejects preparation before opening a native resource boundary");
+        }
+        Require(!RHIInlineCommandRecordingScope::IsActive() && preparation.PrepareParallel(pool, error) &&
+                    pool.preparations == 1,
+                "Rejected nested preparation leaves the graph ready for its owner after scope exit");
+        preparation.Reset();
+
+        auto graph = own::make_shared<Graph>(services, RGSchedulingMode::ExplicitVersioned);
+        uint32_t calls{};
+        graph->AddPass("Entry guard", {}, [&](const auto&) { ++calls; }, true);
+        Require(graph->Compile(error), error);
+        graph->SetQueueExecutionMode(2);
+        Require(graph->SelectExecutionQueues({true, true, false, true}, error), error);
+        const auto compileGeneration = graph->GetQueueDiagnostics().schedule.compileGeneration;
+        Require(compileGeneration != 0 && graph->GetQueueDiagnostics().schedule.entries.size() == 1,
+                "Nested submission starts with an existing compiled queue plan");
+        auto queue = own::make_shared<PortableQueue>(RHIQueueIdentity{59, 1, RHIQueueKind::Graphics});
+        Graph::QueueEndpoint endpoint{queue, 8};
+        PortableQueueRecorder recorder{services};
+        Graph::QueueExecution output;
+        Require(queue->Signal(7, output.completion, error) && output.retirement.Add(output.completion), error);
+        output.plannedBatches = 17;
+        output.submittedBatches = 11;
+        output.totalMilliseconds = 123.0;
+        output.failure.message = "outer submission";
+        {
+            const RHIInlineCommandRecordingScope scope;
+            Require(!graph->SubmitQueues(graph, recorder, endpoint, nullptr, {}, false, own::make_shared<int>(1),
+                                         output, error) && !error.empty(),
+                    "Inline recording rejects nested queue submission");
+        }
+        Require(output.plannedBatches == 17 && output.submittedBatches == 11 && output.totalMilliseconds == 123.0 &&
+                    output.failure.message == "outer submission" && output.completion.value == 7 &&
+                    output.retirement.Size() == 1,
+                "Nested submission preserves the outer output and its completion ownership");
+        Require(graph->GetQueueDiagnostics().schedule.compileGeneration == compileGeneration &&
+                    graph->GetQueueDiagnostics().schedule.entries.size() == 1 &&
+                    graph->GetQueueDiagnostics().requestedExecutionMode == 2 && endpoint.nextSignal == 8 &&
+                    recorder.recorded.empty() && recorder.preparations == 0 && queue->submissions == 0 &&
+                    queue->waits.empty() && calls == 0,
+                "Nested submission cannot reset a queue plan, run callbacks or consume a signal");
+        Graph::QueueExecution accepted;
+        Require(!RHIInlineCommandRecordingScope::IsActive() &&
+                    graph->SubmitQueues(graph, recorder, endpoint, nullptr, {}, false, own::make_shared<int>(2),
+                                        accepted, error) && calls == 1,
+                "Rejected nested submission leaves the compiled graph usable after scope exit");
+        queue->Complete();
+        graph->Reset();
+    }
+
     void CheckOwnedSubmissionScratch()
     {
         using namespace ce::regression;
@@ -154,7 +250,7 @@ namespace
             explicit Recorder(PortableRenderServices& device) : services(device) {}
             IRenderDeviceServices& DeviceServices() const override { return services; }
             uint32_t GetWorkerCount() const override { return 4; }
-            bool Record(const own::shared_owner<IRHICommandQueue>&, const std::function<void(RHIEncoder&)>&,
+            bool Record(const own::shared_owner<IRHICommandQueue>&, const ce::owned_func<void(RHIEncoder&)>&,
                         ce::lifetime_token, ce::pooled_owner<IRHIQueueCommandBatch>&, std::string&) override
             {
                 throw std::logic_error("Owned fixture must use independent recording targets");
@@ -269,6 +365,106 @@ namespace
         graph.Reset();
         desc.mipLevels = 0;
         Require(!graph.CreateTexture(desc).IsValid() && !graph.Compile(error), "Zero mip count is rejected");
+    }
+
+    void CheckTransientMipProgramInvalidation()
+    {
+        ce::regression::PortableRenderServices services;
+        services.subresourceCapabilities = {true, true, true};
+        Graph graph{services, RGSchedulingMode::ExplicitVersioned};
+        RGTextureDesc desc{};
+        desc.width = desc.height = 16;
+        desc.arraySize = 2;
+        desc.allowRenderTarget = true;
+        desc.name = "fixed-range mip program";
+        std::string error;
+        uint32_t previousMips{};
+        own::shared_owner<const Graph::GraphProgram> previous;
+        for (const uint32_t mips : {1u, 2u, 1u, 1u})
+        {
+            graph.Reset();
+            if (previous)
+            {
+                graph.InheritProgram(previous);
+                graph.BeginProgramBinding();
+            }
+            desc.mipLevels = mips;
+            const auto texture = graph.Write(graph.CreateTexture(desc));
+            // Only the resource schema changes; pass ranges and recording cost
+            // must not independently invalidate the retained program.
+            graph.AddPass("fixed mip", {{texture, RHIResourceState::RenderTarget, RGAccessMode::Write,
+                                         {0, 1, 1, 1}}}, [](const auto&) {}, true);
+            if (previous)
+            {
+                Require(graph.FinishProgramBinding(error), error);
+            }
+            Require(graph.Compile(error), error);
+            if (previous)
+            {
+                Require(graph.GetStats().programBindingReused == (mips == previousMips),
+                        "Mip-only changes invalidate retained programs while identical schemas reuse them");
+            }
+            const auto program = graph.SnapshotProgram();
+            Graph::FrameBindings bindings;
+            bindings.owner = own::make_shared<int>(1);
+            bindings.resources.resize(1);
+            bindings.passes.resize(1);
+            bindings.passes[0].execute = [](const auto&) {};
+            Graph rebound{services, RGSchedulingMode::ExplicitVersioned};
+            Require(rebound.BindProgram(program, bindings, error) && rebound.Compile(error), error);
+            RGResourceDescription description;
+            const auto reboundTexture =
+                rebound.RebindProgramHandle(program->ResourceHandle(texture.index, texture.version));
+            Require(rebound.DescribeResource(reboundTexture, description) &&
+                        description.mipLevels == mips,
+                    "Published programs preserve the current mip schema for direct frame bindings");
+            previous = program;
+            previousMips = mips;
+        }
+    }
+
+    void CheckTransientMipInitializationAfterReuse()
+    {
+        ce::regression::PortableRenderServices services;
+        services.subresourceCapabilities = {true, true, true};
+        const auto declare = [](Graph& graph, uint32_t mips)
+        {
+            RGTextureDesc desc{};
+            desc.width = desc.height = 16;
+            desc.mipLevels = mips;
+            desc.allowRenderTarget = true;
+            desc.name = "partially initialized mip program";
+            const auto texture = graph.Write(graph.CreateTexture(desc));
+            graph.AddPass("mip zero writer", {{texture, RHIResourceState::RenderTarget, RGAccessMode::Write,
+                                              {0, 1, 0, 1}}}, [](const auto&) {});
+            graph.AddPass("whole texture reader", {{texture, RHIResourceState::ShaderResource, RGAccessMode::Read}},
+                          [](const auto&) {}, true);
+        };
+        Graph retained{services, RGSchedulingMode::ExplicitVersioned};
+        std::string error;
+        declare(retained, 1);
+        Require(retained.Compile(error), error);
+        const auto program = retained.SnapshotProgram();
+        retained.Reset();
+        retained.InheritProgram(program);
+        retained.BeginProgramBinding();
+        declare(retained, 2);
+        Require(retained.FinishProgramBinding(error), error);
+
+        Graph fresh{services, RGSchedulingMode::ExplicitVersioned};
+        declare(fresh, 2);
+        std::string freshError;
+        Require(!fresh.Compile(freshError) && freshError.find("uninitialized subresource") != std::string::npos,
+                "A fresh graph rejects whole-texture reads of an unwritten mip");
+        Require(!retained.Compile(error) && error == freshError,
+                "A retained program must reject the same uninitialized mip read as a fresh graph");
+
+        retained.Reset();
+        retained.BeginProgramBinding();
+        declare(retained, 1);
+        Require(retained.FinishProgramBinding(error) && retained.Compile(error), error);
+        Require(retained.GetStats().programBindingReused,
+                "A rejected mip expansion preserves the last valid program for Reset recovery");
     }
 
     void CheckRg9SplitAndRecovery()
@@ -605,7 +801,7 @@ namespace
             "Compute read", {{input, RHIResourceState::ShaderResource, RGAccessMode::Read}}, [](const auto&) {}, true);
         graph->DeclareAsyncCompute(computePass);
         Require(graph->Compile(error), error);
-        const std::vector<Graph::QueueHint> hints{{graphicsPass, false, 1000000}, {computePass, true, 1000000}};
+        const ce::dynamic_array<Graph::QueueHint> hints{{graphicsPass, false, 1000000}, {computePass, true, 1000000}};
         Graph::QueueSchedule schedule;
         Require(graph->BuildQueueSchedule({true, true, false, true}, hints, 1, schedule, error), error);
         Require(schedule.usesCompute && schedule.waits.empty(), "Supported immutable readers fan out across queues");
@@ -689,7 +885,7 @@ namespace
                 "All-use dependency proof permits safe placed allocation reuse");
         const auto firstNative = graph->ResolveBufferHandle(first), nextNative = graph->ResolveBufferHandle(next);
         recorder.recorded.clear();
-        const std::vector<Graph::QueueHint> aliasHints{
+        const ce::dynamic_array<Graph::QueueHint> aliasHints{
             {a, true, 1000000}, {b, false, 1000000}, {c, true, 1000000}, {d, false, 1000000}};
         Require(graph->SubmitQueues(graph, recorder, graphicsEndpoint, &computeEndpoint, aliasHints, 1,
                                     own::make_shared<int>(2), execution, error),
@@ -993,18 +1189,21 @@ int main()
                 "Streamed binding recompiles changed native resource schema in the same frame");
         CheckDeclarationBufferLifetime();
         CheckQueuePlanReset();
+        CheckInlineRecordingEntryGuards();
         CheckOwnedSubmissionScratch();
         CheckSubresources(services);
         CheckRg9SplitAndRecovery();
         CheckTransientMips();
-        std::cout << "RG9_CPU_OK texture/buffer whole/range split/full adjacent/UAV reset/recovery\n";
+        CheckTransientMipProgramInvalidation();
+        CheckTransientMipInitializationAfterReuse();
+        std::cout << "RG9_CPU_OK texture/buffer whole/range split/full adjacent/UAV mip/program reset/recovery\n";
         CheckAuthoredProgram();
         CheckQueues();
         CheckPartialSubmission();
         CheckPreparationFailure();
         CheckExternalPresentation();
-        std::cout << "program bindings, ownership, partial-range hazards/barriers, shared reads and happens-before "
-                     "async aliasing passed\n";
+        std::cout << "program bindings, ownership, inline recording entry guards, partial-range hazards/barriers, "
+                     "shared reads and happens-before async aliasing passed\n";
     }
     catch (const std::exception& error)
     {

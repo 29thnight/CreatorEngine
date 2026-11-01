@@ -167,7 +167,7 @@
 </head>
 <body>
 <div class="shell has-toc">
-<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#현재-집계">현재 집계</a></li><li><a href="#계산-규칙">계산 규칙</a></li><li><a href="#평가로-바뀐-작업">평가로 바뀐 작업</a></li><li><a href="#확인한-최신-실행-기록의-범위">확인한 최신 실행 기록의 범위</a></li><li><a href="#항목별-완료-산출물과-잔여">항목별 완료 산출물과 잔여</a></li><li><a href="#재계산-자료">재계산 자료</a></li></ol></nav>
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#2026-10-23-집계">2026-10-23 집계</a></li><li><a href="#계산-규칙">계산 규칙</a></li><li><a href="#평가로-바뀐-작업">평가로 바뀐 작업</a></li><li><a href="#확인한-최신-실행-기록의-범위">확인한 최신 실행 기록의 범위</a></li><li><a href="#항목별-완료-산출물과-잔여">항목별 완료 산출물과 잔여</a></li><li><a href="#재계산-자료">재계산 자료</a></li></ol></nav>
 <main>
 <header class="page">
 <nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="Phase4Progress20261022.md">원본 Markdown</a></nav>
@@ -180,7 +180,7 @@
 <span class="ve-label">64 / 141</span></div></div>
 <figure>
 <div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
-<a class="map-row" href="#현재-집계"><span class="ve-label">§01</span><span class="map-name">현재 집계</span><span class="map-bar"><i style="width:1.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2026-10-23-집계"><span class="ve-label">§01</span><span class="map-name">2026-10-23 집계</span><span class="map-bar"><i style="width:1.5%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#계산-규칙"><span class="ve-label">§02</span><span class="map-name">계산 규칙</span><span class="map-bar"><i style="width:3.3%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#평가로-바뀐-작업"><span class="ve-label">§03</span><span class="map-name">평가로 바뀐 작업</span><span class="map-bar"><i style="width:7.5%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#확인한-최신-실행-기록의-범위"><span class="ve-label">§04</span><span class="map-name">확인한 최신 실행 기록의 범위</span><span class="map-bar"><i style="width:1.8%"></i></span><span class="map-marks"></span></a>
@@ -190,12 +190,16 @@
 <figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「항목별 완료 산출물과 잔여」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
 </figure>
 <section class="prose"><blockquote>
+<p>2026-10-31 정정: 아래 수치는 10월 23일까지의 수용 원장이다. RG9의 mip-only retained program 무효화 누락과 기존 검사의 범위 공백이 확인됐으므로, 4.3의 100%를 현재 소스의 결함 부재나 수정본의 native 검증 완료로 읽지 않는다. 수정·CPU 회귀와 남은 native 게이트는 <a href="RenderPipelineAuditFix20261031.html">감사 수정 기록</a>을 따른다. 기존 인일 원장은 새 성능·실행 증거 없이 재산정하지 않는다.</p>
+</blockquote>
+<blockquote>
 <p>2026-10-23 갱신: RG8 현행 구현(16인일)과 RG9 범위·split·Inspector(10인일) 제품 수용. RG9 D/R 빌드·각 512프레임 GPU 및 전체 회귀 완료. 기본 OFF 유지. 추가 개선은 <a href="../plans/RenderGraphDependencySchedulingPlan.html#rg8-f">RG8-F 미래 계획</a>. TR3도 D/R 수명·SSGI GPU·제품 장면 픽셀 검증으로 5/5·5인일 수용했다. TR2도 native 7-route·SDK 5품질×3해상도·멀티뷰의 Debug/Release 픽셀 검증으로 4/4·5인일 수용했다. RG8·RG9·TR2·TR3 외 항목은 10월 22일 평가를 유지한다.</p>
 </blockquote>
 <p>현재 master <code>ea87639ece7b6068456940ddddd83a9d23f86c58</code>와 작업트리의 구현, 전문 계획, 보존된 실행 기록을 대조했다. 대시보드 4.x 작업 90행 중 미완료 55행을 현재 구현과 남은 작업으로 다시 썼다. 기존 완료 기반은 유지했다.</p>
+<p><span id="현재-집계"></span></p>
 </section>
-<section class="doc-sec" id="sec-현재-집계">
-<div class="sec-head"><p class="ve-label">§01</p><h2 id="현재-집계">현재 집계</h2></div>
+<section class="doc-sec" id="sec-2026-10-23-집계">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="2026-10-23-집계">2026-10-23 집계</h2></div>
 <div class="prose"><div class="table-scroll"><table>
 <thead><tr><th>PHASE</th><th style="text-align:right">작업 진척</th><th style="text-align:right">제품 수용</th><th style="text-align:right">수용/기존 산정 인일</th><th>미산정 잔여 체크리스트</th></tr></thead>
 <tbody><tr><td class="num">4</td><td class="num" style="text-align:right">100%</td><td class="num" style="text-align:right">100%</td><td style="text-align:right">18/18</td><td>없음</td></tr>

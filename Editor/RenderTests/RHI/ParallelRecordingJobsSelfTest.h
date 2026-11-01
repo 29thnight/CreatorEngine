@@ -24,13 +24,23 @@ bool VerifyParallelRecordingJobs(IRHIParallelCommandPool& pool, Resources& resou
     try
     {
         std::atomic<uint32_t> calls{ 0 };
-        bool rejected = false;
-        try { pool.RunParallel([&](uint32_t) { ++calls; }, 4); }
-        catch (const std::runtime_error&) { rejected = true; }
-        require(rejected && 0 == calls, "stopped scheduler executed recording inline");
+        for (const uint32_t requested : {1u, 4u})
+        {
+            bool rejected = false;
+            try
+            {
+                pool.RunParallel([&](uint32_t) { ++calls; }, requested);
+            }
+            catch (const std::runtime_error&)
+            {
+                rejected = true;
+            }
+            require(rejected && 0 == calls, "stopped scheduler executed recording work");
+        }
         pool.RunParallel([&](uint32_t) { ++calls; }, 0);
         require(0 == calls, "empty recording ran a callback");
 
+        const auto owner = std::this_thread::get_id();
         for (const uint32_t physicalWorkers : { 1u, 4u })
         {
             scheduler.start(physicalWorkers);
@@ -40,10 +50,19 @@ bool VerifyParallelRecordingJobs(IRHIParallelCommandPool& pool, Resources& resou
                 std::atomic<uint32_t> invalid{ 0 };
                 pool.RunParallel([&](uint32_t lane)
                 {
-                    if (!thread_pool::is_worker_thread() || lane >= visits.size()) ++invalid;
-                    else ++visits[lane];
+                    const bool expectedThread = requested == 1
+                        ? std::this_thread::get_id() == owner && !thread_pool::is_worker_thread()
+                        : std::this_thread::get_id() != owner && thread_pool::is_worker_thread();
+                    if (!expectedThread || lane >= visits.size())
+                    {
+                        ++invalid;
+                    }
+                    else
+                    {
+                        ++visits[lane];
+                    }
                 }, requested);
-                require(0 == invalid, "recording used the caller or an invalid lane");
+                require(0 == invalid, "recording used an unexpected thread or an invalid lane");
                 for (uint32_t lane = 0; lane < visits.size(); ++lane)
                     require(visits[lane] == (lane < (std::min)(requested, 4u) ? 1u : 0u),
                         "recording lane was omitted or executed twice");
@@ -65,13 +84,22 @@ bool VerifyParallelRecordingJobs(IRHIParallelCommandPool& pool, Resources& resou
             }
             require(propagated && 4 == calls, "recording error returned before all lanes finished");
             calls = 0;
-            bool nestedRejected = false;
-            scheduler.submit([&]
+            for (const uint32_t requested : {1u, 4u})
             {
-                try { pool.RunParallel([&](uint32_t) { ++calls; }, 4); }
-                catch (const std::logic_error&) { nestedRejected = true; }
-            }).wait();
-            require(nestedRejected && 0 == calls, "nested recording submitted work before rejection");
+                bool nestedRejected = false;
+                scheduler.submit([&]
+                {
+                    try
+                    {
+                        pool.RunParallel([&](uint32_t) { ++calls; }, requested);
+                    }
+                    catch (const std::logic_error&)
+                    {
+                        nestedRejected = true;
+                    }
+                }).wait();
+                require(nestedRejected && 0 == calls, "nested recording submitted work before rejection");
+            }
             scheduler.shutdown();
         }
 
@@ -124,7 +152,7 @@ bool VerifyParallelRecordingJobs(IRHIParallelCommandPool& pool, Resources& resou
         require(resources.EndFrame(error), error);
         require(GetRHISubmissionThread().Wait(ticket, error), error);
         resources.WaitForGpu();
-        outLog += "[jobs] enkiTS workers=1/4 lanes=1/4/clamped: exactly once, no caller execution, "
+        outLog += "[jobs] enkiTS workers=1/4 lanes=1/4/clamped: exactly once, single owner/multiple workers, "
             "exception drain, nested/stopped rejection, native reset/recovery passed\n";
         return true;
     }

@@ -88,7 +88,10 @@ struct RHIRecordingTaskGraph
             freshCompletion.emplace();
         }
         auto& completedWork = freshCompletion ? *freshCompletion : completion;
-        completedWork.assign(nodes.size(), 0);
+        // Scalar scratch can be reset in place; count/value assign replaces
+        // ce::dynamic_array storage even when its capacity already suffices.
+        completedWork.resize(nodes.size());
+        std::ranges::fill(completedWork, uint64_t{0});
         uint64_t longest = 0;
         for (size_t node = 0; node < nodes.size(); ++node)
         {
@@ -177,7 +180,8 @@ inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, st
     std::ranges::sort(groups);
     groups.erase(std::unique(groups.begin(), groups.end()), groups.end());
     auto& previous = graph.scratch.previous;
-    previous.assign(targetCount, UINT32_MAX);
+    previous.resize(targetCount);
+    std::ranges::fill(previous, UINT32_MAX);
     nodes.resize(groups.size());
     for (uint32_t index = 0; index < groups.size(); ++index)
     {

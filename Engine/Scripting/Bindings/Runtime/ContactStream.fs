@@ -133,7 +133,8 @@ type ContactStream internal (subscriber: Component, owner: ObjectHandle, selfRol
             let target = if reverse then value.First.Owner else value.Second.Owner
             let known = sensorPairs.Contains(pair)
             let grouped = grouping = ContactGrouping.SensorTargets
-            let mutable state = match targets.TryGetValue(target) with | true, state -> state | _ -> struct (0, 0UL)
+            let mutable state = struct (0, 0UL)
+            targets.TryGetValue(target, &state) |> ignore
             let mutable result = phase
             let mutable skip = false
             if phase = ContactPhases.End then

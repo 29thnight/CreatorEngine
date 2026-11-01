@@ -21,6 +21,7 @@ import Creator.Core.DynamicBitset;
 #endif
 #include "../../../EngineDiagnostics/ProfileScope.h"
 #include "EnhancedRenderGraph.h"
+#include "../../RHI/RHICommandRecordingJobs.h"
 #include "../../RHI/RHIProfilingContext.h"
 #include <stdint.h>
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -61,6 +62,11 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
     const ce::dynamic_array<QueueHint>& hints, bool enableAsyncCompute,
     ce::lifetime_token owner, QueueExecution& output, std::string& outError)
 {
+    if (RHIInlineCommandRecordingScope::IsActive())
+    {
+        outError = "Queue execution cannot recurse from an inline recording callback.";
+        return false;
+    }
     output = {};
     outError.clear();
 
@@ -666,10 +672,6 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
             }
             else if (workers == 1)
             {
-                ++m_stats.recordingJobDispatchCount;
-                ++m_stats.recordingOwnerJoinCount;
-                ++m_stats.recordingDispatcherHandoffCount;
-                ++m_stats.recordingWorkerJobCount;
                 recorder.RunParallel([&](uint32_t) { recordSerial(); }, 1);
             }
             for (uint32_t wave = 0; workers > 1 && !recordingSideEffect && wave < waveCount;)
@@ -682,10 +684,6 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
                         ++wave;
                     }
                     const uint32_t end = wave;
-                    ++m_stats.recordingJobDispatchCount;
-                    ++m_stats.recordingOwnerJoinCount;
-                    ++m_stats.recordingDispatcherHandoffCount;
-                    ++m_stats.recordingWorkerJobCount;
                     const auto recordRun = [&](uint32_t)
                     {
                         for (uint32_t run = begin; run < end; ++run)
@@ -699,10 +697,13 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
                 {
                     const auto& active = waveTargets[wave];
                     const uint32_t jobs = (std::min)(workers, static_cast<uint32_t>(active.size()));
-                    ++m_stats.recordingJobDispatchCount;
-                    ++m_stats.recordingOwnerJoinCount;
-                    ++m_stats.recordingDispatcherHandoffCount;
-                    m_stats.recordingWorkerJobCount += jobs;
+                    if (jobs > 1)
+                    {
+                        ++m_stats.recordingJobDispatchCount;
+                        ++m_stats.recordingOwnerJoinCount;
+                        ++m_stats.recordingDispatcherHandoffCount;
+                        m_stats.recordingWorkerJobCount += jobs;
+                    }
                     const auto recordWave = [&](uint32_t job)
                     {
                         for (size_t index = job; index < active.size(); index += jobs)

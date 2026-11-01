@@ -1,5 +1,15 @@
 # RG9 범위·split barrier·Inspector 구현 — 2026-10-23
 
+## 2026-10-31 정정 — mip-only program 무효화
+
+아래 표는 10월 23일 소스·바이너리의 실행 이력이다. 당시 transient mip 검사는 mip 수와 접근 범위를 함께 바꾸므로, **mip 수만 바뀐 경우의 retained program 무효화는 입증하지 못했다.** 구조 서명에는 mip 수가 들어가지만 재사용 선행 비교 `MatchesStructuralSchedule()`의 transient descriptor 비교에는 빠져 있었다.
+
+동일한 mip 0 부분 write와 전체 read를 유지한 채 1 mip에서 2 mip로 바꾸면, retained 경로는 이전 program을 재사용해 초기화하지 않은 mip 1 읽기를 허용했다. 같은 2-mip 선언의 신규 compile은 거부했다. 따라서 아래의 “풀/program 무효화 통과”를 mip-only 변경까지 검증한 것으로 해석하면 안 된다.
+
+후속 수정은 선행 비교에 `mipLevels`를 포함하고, 고정 접근 범위의 mip-only 변경 및 cached/fresh 오류 동치 회귀를 추가한다. 현재 수정본의 CPU 결과와 native 미실행 범위는 [렌더 파이프라인 감사 수정 기록](RenderPipelineAuditFix20261031.md)에 분리한다. 이 정정으로 과거 native 실행 결과를 새 소스의 제품 수용으로 재사용하지 않는다.
+
+## 2026-10-23 구현·검증 이력
+
 master `0509753a3`와 기존 로컬 RG8·viewer 변경을 보존한 작업트리에서 진행했다.
 
 ## 재사용한 구현

@@ -60,7 +60,8 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
         return false;
     }
     uint32_t recordingFrame = 0;
-    std::atomic<uint32_t> callerRecordings{ 0 };
+    const auto recordingOwner = std::this_thread::get_id();
+    std::atomic<uint32_t> unexpectedRecordings{ 0 };
 
     RHIReadback readback{};
     if (!resources.CreateReadback(kParallelWidth, kParallelHeight,
@@ -76,6 +77,7 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
     const auto renderOnce = [&](bool parallel, RHIReadbackImage& outImage,
         EnhancedRenderGraph::Stats& outStats) -> bool
     {
+        std::atomic<uint32_t> expectedThreadRecordings{0};
         if (!resources.BeginFrame(error)) return false;
         const uint32_t frameSlot = recordingFrame++ % VulkanDeviceResources::kFrameCount;
         if (parallel) pool.BeginFrame(frameSlot);
@@ -97,7 +99,17 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
                 { { target, RHIResourceState::RenderTarget } },
                 [&, passIndex](const EnhancedRenderGraph::ExecuteContext& context)
                 {
-                    if (parallel && !thread_pool::is_worker_thread()) ++callerRecordings;
+                    if (parallel)
+                    {
+                        if (std::this_thread::get_id() != recordingOwner && thread_pool::is_worker_thread())
+                        {
+                            ++expectedThreadRecordings;
+                        }
+                        else
+                        {
+                            ++unexpectedRecordings;
+                        }
+                    }
                     const RHITextureHandle color = context.ResolveHandle(target);
                     const RHIRenderTargetBinding binding =
                         resources.CreateRenderTargets({ &color, 1 });
@@ -153,6 +165,14 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
             return false;
         }
         outStats = graph.GetStats();
+        // DeclarationOrder records four command lists on workers and preserves
+        // their order at submission, even when they write the same texture.
+        if (parallel && (expectedThreadRecordings != kColorPassCount || outStats.recordingJobDispatchCount != 1 ||
+                          outStats.recordingDispatcherHandoffCount != 1 || outStats.recordingOwnerJoinCount != 1 ||
+                          outStats.recordingWorkerJobCount != 4))
+        {
+            ++unexpectedRecordings;
+        }
 
         if (!resources.EndFrame(error))
         {
@@ -232,8 +252,8 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
             break;
         }
     }
-    outLog += "[jobs] physical workers=1/4, logical lanes=4, frame slot reuse pixel parity: "
-        + std::string(repeatedPixels && 0 == callerRecordings ? "passed\n" : "failed\n");
+    outLog += "[jobs] physical workers=1/4, logical lanes=4, worker recording and frame slot reuse pixel parity: "
+        + std::string(repeatedPixels && 0 == unexpectedRecordings ? "passed\n" : "failed\n");
 
     const bool sameShape = sequential.width == parallel.width &&
         sequential.height == parallel.height && sequential.rowPitch == parallel.rowPitch &&
@@ -253,7 +273,7 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
     std::string validation;
     const uint32_t problems = resources.DrainDebugMessages(validation);
     bool passed = samePixels && expectedColor && parallelShape && repeatedPixels &&
-        0 == callerRecordings &&
+        0 == unexpectedRecordings &&
         0 == stubs && 0 == problems;
 
     outLog += "[4/4] 순차/병렬 픽셀 " + std::string(samePixels ? "일치" : "불일치")

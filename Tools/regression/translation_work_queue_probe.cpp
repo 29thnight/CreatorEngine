@@ -1,5 +1,9 @@
 // 실제 Translate 본문을 고정 저장소 RHI fixture와 컴파일한다. GPU·드라이버 실행은 검증하지 않는다.
 #include "Engine/RenderEngine/RHI/RHITranslationWorkQueue.h"
+#include "Engine/RenderEngine/RHI/RHIBackendExecution.h"
+#include "Engine/RenderEngine/RHI/RHICommandProvenance.h"
+#include "Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "Engine/EngineDiagnostics/ProfileScope.h"
 #include <algorithm>
 #include <cstdlib>
 #include <exception>
@@ -104,29 +108,6 @@ void operator delete[](void* pointer, std::size_t, std::align_val_t) noexcept
     std::free(pointer);
 }
 
-namespace ce
-{
-    template<std::size_t Size>
-    struct marker_text
-    {
-        char value_[Size];
-        constexpr marker_text(const char (&value)[Size]) { std::copy_n(value, Size, value_); }
-    };
-    template<marker_text>
-    int marker()
-    {
-        return 0;
-    }
-    struct profile_scope
-    {
-        explicit profile_scope(int) {}
-    };
-} // namespace ce
-
-enum class RHICommandFailureStage
-{
-    Translation
-};
 enum class RHICommandTranslationMode
 {
     Serial,
@@ -137,28 +118,6 @@ enum class RHISoftwareBatchState
     Empty,
     Sealed,
     Translating
-};
-enum class RHIQueueKind
-{
-    Graphics
-};
-struct RHIQueueIdentity
-{
-    RHIQueueKind kind{RHIQueueKind::Graphics};
-    bool IsValid() const { return true; }
-    bool operator==(const RHIQueueIdentity&) const = default;
-};
-struct RHICommandFailure
-{
-    RHICommandFailureStage stage{};
-    uint64_t recordingId{}, backendGeneration{}, commandIndex{};
-    uint32_t targetIndex{}, commandType{};
-    std::string message;
-    void Reset()
-    {
-        recordingId = backendGeneration = commandIndex = targetIndex = commandType = 0;
-        message.clear();
-    }
 };
 struct RHICommandTranslationOptions
 {
@@ -177,25 +136,34 @@ struct RHICommandRecordingStats
 };
 struct RHIRecordedBatchDesc
 {
-    uint64_t frameId{}, backendGeneration{}, displayToken{};
-    std::shared_ptr<const void> lifetimeToken;
+    uint64_t frameId{17}, backendGeneration{29}, displayToken{31};
+    uint64_t sourceEngineFrame{41}, renderViewId{43};
+    bool sourceEngineFrameAvailable{true};
+    ce::lifetime_token lifetimeToken;
 };
 struct RHISoftwareBatchDesc : RHIRecordedBatchDesc
 {
     uint64_t uploadRecordingId{1}, descriptorVersion{2};
-    RHIQueueIdentity queue;
+    RHIQueueIdentity queue{11, 13, RHIQueueKind::Graphics};
 };
 struct RHIRecordedBatch
 {
     bool valid{};
+    ce::lifetime_token lifetimeToken;
     bool IsValid() const { return valid; }
 };
 struct RHITranslatedBatch
 {
     RHIRecordedBatch m_native;
+    ce::pooled_owner<IRHIQueueCommandBatch> m_owned;
     RHICommandTranslationStats m_stats;
-    bool IsValid() const { return m_native.IsValid(); }
+    RHICommandProvenance m_provenance;
+    bool IsValid() const { return m_native.IsValid() || bool(m_owned); }
 };
+
+// These value conversions are copied verbatim by the runner from the production
+// header; the shipping profile scopes and backend TLS guard above are real types.
+#include "RHIProfilingContextProduction.inl"
 
 template<typename Value, std::size_t Capacity>
 struct fixed_range
@@ -212,6 +180,8 @@ struct RHIEncoder
 };
 struct ReplayState
 {
+    std::thread::id owner{std::this_thread::get_id()};
+    bool requireInline{};
     std::array<std::atomic<uint32_t>, 8> nextSegment{}, owners{}, visitsByJob{};
     std::array<uint32_t, 8> replayOrder{};
     std::atomic<uint32_t> replayCount{}, costReads{};
@@ -236,6 +206,9 @@ struct RHISoftwareCommandList
     }
     bool Replay(RHIEncoder& encoder, RHICommandTranslationStats& stats, RHICommandFailure& failure)
     {
+        require(RHIBackendExecutionScope::IsActive(), "native replay escaped the production backend scope");
+        require(!state->requireInline || (current_job == 0 && state->owner == std::this_thread::get_id()),
+                "one-job translation left its owner thread");
         require(encoder.target == target, "segment replay used a different target encoder");
         auto unowned = UINT32_MAX;
         state->owners[target].compare_exchange_strong(unowned, current_job);
@@ -253,7 +226,7 @@ struct RHISoftwareCommandList
         if (fail)
         {
             failure.commandIndex = 1;
-            failure.commandType = 17;
+            failure.commandType = RHISoftwareCommandType::Dispatch;
             failure.message = "fixture replay failure";
             return false;
         }
@@ -278,6 +251,14 @@ struct RHISoftwareBatch
     RHISoftwareBatchDesc m_desc;
     RHICommandRecordingStats m_stats;
     RHISoftwareBatchState m_state{RHISoftwareBatchState::Sealed};
+    RHISoftwareBatch() = default;
+    RHISoftwareBatch(const RHISoftwareBatch&) = delete;
+    RHISoftwareBatch& operator=(const RHISoftwareBatch&) = delete;
+    RHISoftwareBatch(RHISoftwareBatch&& other) noexcept
+        : m_storage(std::exchange(other.m_storage, nullptr)), m_desc(std::move(other.m_desc)),
+          m_stats(other.m_stats), m_state(std::exchange(other.m_state, RHISoftwareBatchState::Empty))
+    {
+    }
     bool IsValid() const { return m_state == RHISoftwareBatchState::Sealed; }
     uint64_t GetRecordingId() const { return 3; }
     const auto& GetDesc() const { return m_desc; }
@@ -322,23 +303,30 @@ struct IRHIParallelCommandPool
         return true;
     }
     bool DrainEncoderDrops(std::string&) { return false; }
-    bool FinalizeRecordedBatch(std::span<const uint32_t> order, const RHIRecordedBatchDesc&, RHIRecordedBatch& batch,
+    bool FinalizeRecordedBatch(std::span<const uint32_t> order, const RHIRecordedBatchDesc& desc, RHIRecordedBatch& batch,
                                std::string&)
     {
         RequireOwner();
         require(active.load() == 0 && completed.load() == accepted, "finalize ran before accepted work drained");
         std::copy(order.begin(), order.end(), finalized.values_.begin());
         finalized.size_ = order.size();
+        batch.lifetimeToken = desc.lifetimeToken;
         batch.valid = true;
         return true;
     }
-    void RunParallel(const std::function<void(uint32_t)>& callback, uint32_t jobs)
+    void RunParallel(const ce::owned_func<void(uint32_t)>& callback, uint32_t jobs)
     {
         RequireOwner();
         ranJobs = jobs;
         std::atomic<bool> cancelDelay{};
         const auto invoke = [&](uint32_t job)
         {
+#if CE_TRANSLATION_NATIVE_JOBS
+            if (native_scheduler && !sequentialCallbacks && !delayFirst && !failAfterAccept)
+            {
+                require(thread_pool::is_worker_thread(), "multi-job translation did not run on an engine worker");
+            }
+#endif
             current_job = job + 1;
             if (delayFirst && job == 0)
             {
@@ -451,7 +439,7 @@ namespace
         RHISoftwareBatch input_;
         IRHIParallelCommandPool pool_;
         IRenderDeviceServices services_;
-        RHICommandTranslator translator_{pool_, services_, {}};
+        RHICommandTranslator translator_{pool_, services_, input_.m_desc.queue};
         RHITranslatedBatch output_;
         RHICommandFailure failure_;
 
@@ -483,7 +471,11 @@ namespace
         {
             const RHICommandTranslationOptions options{
                 serial ? RHICommandTranslationMode::Serial : RHICommandTranslationMode::Parallel, jobs, minimum};
-            return translator_.Translate(std::move(input_), options, output_, failure_);
+            const bool previousBackendScope = RHIBackendExecutionScope::IsActive();
+            const bool accepted = translator_.Translate(std::move(input_), options, output_, failure_);
+            require(RHIBackendExecutionScope::IsActive() == previousBackendScope,
+                    "translation leaked its backend scope on success or failure");
+            return accepted;
         }
 
         void check_order_and_completion(bool success) const
@@ -497,6 +489,12 @@ namespace
             {
                 require(pool_.finalized.values_ == storage_.targetOrder.values_, "native submission order changed");
                 require(output_.m_stats.commandCount == input_.m_stats.commandCount, "command aggregation changed");
+                const auto& provenance = output_.m_provenance;
+                require(provenance.recordingId == 3 && provenance.queue == input_.m_desc.queue &&
+                            provenance.frameId == 17 && provenance.sourceEngineFrame == 41 &&
+                            provenance.sourceEngineFrameAvailable && provenance.renderViewId == 43 &&
+                            provenance.backendGeneration == 29 && provenance.targetIndex == UINT32_MAX,
+                        "translated provenance lost its production source/queue identity");
                 for (const auto& count : replay_.nextSegment)
                 {
                     require(count.load() == 2, "active segment coverage changed");
@@ -580,12 +578,43 @@ namespace
         for (unsigned mode = 0; mode < 3; ++mode)
         {
             fixture test;
+            test.replay_.requireInline = true;
             require(test.translate(mode == 2 ? 8 : 1, mode == 0, mode == 2 ? UINT64_MAX : 0),
                     "serial or command-budget fallback failed");
             test.check_order_and_completion(true);
             require(test.replay_.replayOrder == test.storage_.targetOrder.values_ &&
                         test.replay_.costReads.load() == 0 && test.pool_.ranJobs == 0,
                     "serial route reordered targets, scanned costs or submitted jobs");
+        }
+        {
+            fixture test;
+            test.storage_.targetOrder.size_ = 1;
+            test.replay_.requireInline = true;
+            test.input_.m_stats.commandCount = test.segments_[5][0].cost;
+            require(test.translate(8), "single-target translation failed");
+            require(test.output_.m_stats.translationJobCount == 1 && test.pool_.ranJobs == 0 &&
+                        test.replay_.costReads.load() == 0 && test.replay_.replayCount.load() == 1 &&
+                        test.replay_.nextSegment[5].load() == 2 && test.pool_.finalized.size_ == 1 &&
+                        test.pool_.finalized.values_[0] == 5,
+                    "single target admitted a job or lost its original target identity");
+        }
+        for (const uint32_t jobs : {1u, 8u})
+        {
+            for (const bool failure : {false, true})
+            {
+                fixture test;
+                auto owner = own::make_shared<int>(17);
+                const own::weak_owner<int> lifetime = owner;
+                test.input_.m_desc.lifetimeToken = std::move(owner);
+                test.replay_.requireInline = jobs == 1;
+                test.segments_[1][1].raise = failure;
+                require(test.translate(jobs) != failure, "lifetime fixture translation outcome changed");
+                test.check_order_and_completion(!failure);
+                require(lifetime.expired() == failure,
+                        "translation released successful native resources or retained a failed recording");
+                test.output_ = {};
+                require(lifetime.expired(), "retired CPU output retained its recording resources");
+            }
         }
         {
             fixture test;
@@ -628,7 +657,7 @@ namespace
             test.segments_[4][0].fail = true;
             require(!test.translate(4), "target failures were discarded");
             require(test.failure_.targetIndex == 1 && test.failure_.commandIndex == 21 &&
-                        test.failure_.commandType == 17,
+                        test.failure_.commandType == RHISoftwareCommandType::Dispatch,
                     "failure selection followed execution order or lost the segment command offset");
             test.check_order_and_completion(false);
         }
@@ -650,7 +679,8 @@ namespace
         std::cout
             << "PASS exact Translate body: 1/2/4/8 jobs, exactly-once segments, exclusive target owner, "
                "original open/finalize/error order, active-only/saturated costs, serial fallback, delayed participant, "
-               "replay/admission failure drain\n";
+               "replay/admission failure drain, owner inline/worker execution, backend scope restore, "
+               "production provenance, output resource lifetime\n";
     }
 } // namespace
 

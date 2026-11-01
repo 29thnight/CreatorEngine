@@ -483,6 +483,8 @@ struct EnhancedPbrCapture
             auto item = root["draws"].Append();
             item.SetMap();
             item["route"] << "lattice";
+            item["coverageFlags"] << draw.coverage.flags;
+            item["alphaCutoff"] << draw.coverage.cutoff;
             const auto& geometry = draw.geometry->Source()->Geometry();
             WriteMeshIdentity(item, geometry.handle);
             item["world"].SetSequence();
