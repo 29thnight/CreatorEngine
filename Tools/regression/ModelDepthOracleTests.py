@@ -64,6 +64,15 @@ class ModelDepthOracleTests(unittest.TestCase):
         self.assertGreater(result['interiorOpaqueProbes'],1000)
         self.assertLess(result['maxAbsoluteError'],1e-12)
 
+    def test_meshlet_grid_rounding_and_raw_fallback(self):
+        # x uses a 1/65535 grid; y exceeds the 1e-4 error budget and stays raw.
+        positions = np.array([[0,0,2],[.5,.5,2],[1,1000,2]],dtype=np.float32)
+        decoded = oracle.meshlet_positions(positions)
+        expected_x = np.float32(32768)*np.float32(1/65535)
+        self.assertEqual(decoded[1,0],float(expected_x))
+        np.testing.assert_array_equal(decoded[:,1:],positions[:,1:])
+        self.assertLess(abs(decoded[1,0]-.5),1e-4)
+
     def test_wrong_depth_is_rejected_without_changing_probe_count(self):
         self.assertTrue(self.run_oracle())
         count = json.loads((self.root/'result.json').read_text())['interiorOpaqueProbes']

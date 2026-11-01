@@ -13,6 +13,29 @@ import struct
 import numpy as np
 
 
+def meshlet_positions(positions):
+    """Independent QMC1 v2 default position-grid model, before skinning.
+
+    The contract uses a mesh-wide 16-bit grid, separate float32 multiply/add,
+    and retains raw channels if any decoded value violates the 1e-4 budget or
+    source bounds. See MeshletCompression.h and MeshletGeometryAccess.slang.
+    """
+    result = positions.astype(np.float32).copy()
+    for axis in range(3):
+        values = result[:,axis].copy()
+        lo, hi = values.min(), values.max()
+        step = np.float32((float(hi)-float(lo))/65535)
+        if not np.isfinite(step) or step < np.finfo(np.float32).tiny:
+            continue
+        # Codes are nonnegative; floor(x+.5) implements C++ round ties away.
+        codes = np.clip(np.floor((values.astype(np.float64)-float(lo))/float(step)+.5),0,65535)
+        decoded = lo + codes.astype(np.float32)*step
+        if (np.isfinite(decoded).all() and (decoded>=lo).all() and
+                (decoded<=hi).all() and np.abs(decoded-values).max()<=np.float32(.0001)):
+            result[:,axis] = decoded
+    return result.astype(np.float64)
+
+
 def verify(model, capture, output):
     raw = model.read_bytes()
     assert raw[:4] == b'glTF'
@@ -81,6 +104,15 @@ def verify(model, capture, output):
         attrs = primitive['attributes']
         pos = accessor(attrs['POSITION']).astype(np.float64)
         pos[:,2] *= -1  # importer right-handed -> left-handed convention
+        if draw.get('route') == 'lattice':
+            routes = manifest['geometryRoutes']
+            assert routes['source'] == 'joined-command-recording-after-native-submission'
+            assert len(routes['selected']) == len(manifest['draws'])
+            assert all(r['meshShader'] for r in routes['selected']), 'Mixed geometry routes need a separate oracle'
+            decoded = meshlet_positions(pos)
+            material_policies[-1].update(positionCodec='QMC1-v2-default-mesh-wide-16-bit',
+                                        maxSourcePositionError=float(np.abs(decoded-pos).max()))
+            pos = decoded
         pos = np.column_stack((pos,np.ones(len(pos))))
         if draw['pose']:
             packed = np.frombuffer(bytes(draw['pose']),dtype='<f4').reshape(-1,3,4).astype(np.float64)
@@ -155,7 +187,7 @@ def verify(model, capture, output):
                             for y,x in np.argwhere(probes&(error>tolerance))[:50]],
                   exactFloatMatches=int(np.sum(actual[probes]==expected[probes].astype(np.float32))),
                   geometryCoveredPixels=int(np.sum(owner>=0)),gpuCoveredPixels=int(np.sum(actual<1)),
-                  scope='source GLB geometry + captured world/skin/camera/coverage; opaque triangle interiors only',
+                  scope='source GLB geometry with default meshlet position codec + captured world/skin/camera/coverage; opaque triangle interiors only',
                   exclusions='alpha coverage, triangle boundaries, clipping, LOD simplification not certified',
                   perDraw=[dict(mesh=d['meshId'],alpha=alpha[i],probes=int(np.sum(probes&(owner==i))),
                                 materialPolicy=material_policies[i]) for i,d in enumerate(manifest['draws'])])
