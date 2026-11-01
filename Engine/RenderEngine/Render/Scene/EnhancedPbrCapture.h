@@ -89,6 +89,7 @@ struct EnhancedPbrCapture
     own::shared_owner<const material_graph::SceneMaterialWork> materialPacketOwner;
     RHIReadback materialPacketReadback{}, materialRangeReadback{};
     RHIReadback materialRecordReadback{};
+    RHIReadback materialVisibilityReadback{}, materialGeometryReadback{};
 
     bool DeclareMaterialPackets(IRenderDeviceServices& resources, EnhancedRenderGraph& graph,
         const material_graph::SceneHost& host, std::string& error)
@@ -96,25 +97,44 @@ struct EnhancedPbrCapture
         const auto owner = host.MaterialWork();
         if (!owner) return true;
         const auto inputs = owner->GraphInputs(graph);
+        const auto visibility = owner->graphVisibility;
+        RGResourceDescription description{};
+        if (!graph.DescribeResource(visibility, description) ||
+            description.kind != RGResourceKind::Texture || description.format != RHIFormat::RG32Uint)
+        {
+            error = "Material packet visibility source is not an RG32Uint texture.";
+            return false;
+        }
         materialPacketOwner = owner;
         if (!resources.CreateBufferReadback(owner->workBytes, materialPacketReadback, error) ||
             !resources.CreateBufferReadback(uint64_t(owner->commandCount) * 16u, materialRangeReadback, error) ||
-            !resources.CreateBufferReadback(owner->records.size, materialRecordReadback, error))
+            !resources.CreateBufferReadback(owner->records.size, materialRecordReadback, error) ||
+            !resources.CreateBufferReadback(uint64_t(owner->recordCount) * sizeof(material_graph::SceneFrameGeometry::Record),
+                materialGeometryReadback, error) ||
+            !resources.CreateReadback(owner->width, owner->height, RHIFormat::RG32Uint, 1,
+                materialVisibilityReadback, error))
         {
             return false;
         }
         const auto packets = materialPacketReadback;
         const auto ranges = materialRangeReadback;
         const auto records = materialRecordReadback;
+        const auto geometry = materialGeometryReadback;
+        const auto pixels = materialVisibilityReadback;
         graph.AddPass("Capture.MaterialPackets",
             {{inputs[0], RHIResourceState::CopySource, RGAccessMode::Read},
              {owner->packetWork->graphRanges, RHIResourceState::CopySource, RGAccessMode::Read},
-             {owner->sceneRecordsOwner->GraphBuffer(graph), RHIResourceState::CopySource, RGAccessMode::Read}},
-            [owner, packets, ranges, records](const EnhancedRenderGraph::ExecuteContext& context)
+             {owner->sceneRecordsOwner->GraphBuffer(graph), RHIResourceState::CopySource, RGAccessMode::Read},
+             {owner->geometry->GraphTable(graph), RHIResourceState::CopySource, RGAccessMode::Read},
+             {visibility, RHIResourceState::CopySource, RGAccessMode::Read}},
+            [owner, packets, ranges, records, geometry, pixels, visibility](const EnhancedRenderGraph::ExecuteContext& context)
             {
                 context.encoder->CopyBufferToReadback(packets, owner->work, 0, owner->workBytes);
                 context.encoder->CopyBufferToReadback(ranges, owner->ranges, 0, uint64_t(owner->commandCount) * 16u);
                 context.encoder->CopyBufferToReadback(records, owner->records.buffer, owner->records.offset, owner->records.size);
+                context.encoder->CopyBufferToReadback(geometry, owner->geometry->buffer, 0,
+                    uint64_t(owner->recordCount) * sizeof(material_graph::SceneFrameGeometry::Record));
+                context.encoder->CopyToReadback(pixels, context.ResolveHandle(visibility));
             }, true);
         return true;
     }
@@ -124,12 +144,15 @@ struct EnhancedPbrCapture
     {
         if (!materialPacketOwner) return true;
         const auto& owner = *materialPacketOwner;
-        RHIReadbackImage packets, ranges, records;
+        RHIReadbackImage packets, ranges, records, geometry, visibility;
         if (!resources.MapReadback(materialPacketReadback, packets, error) ||
             !resources.MapReadback(materialRangeReadback, ranges, error) ||
-            !resources.MapReadback(materialRecordReadback, records, error)) return false;
+            !resources.MapReadback(materialRecordReadback, records, error) ||
+            !resources.MapReadback(materialGeometryReadback, geometry, error) ||
+            !resources.MapReadback(materialVisibilityReadback, visibility, error)) return false;
         if (packets.data.size() < owner.workBytes || ranges.data.size() < uint64_t(owner.commandCount) * 16u ||
-            records.data.size() < uint64_t(owner.recordCount) * sizeof(material_graph::SceneGpuData::Record))
+            records.data.size() < uint64_t(owner.recordCount) * sizeof(material_graph::SceneGpuData::Record) ||
+            geometry.data.size() < uint64_t(owner.recordCount) * sizeof(material_graph::SceneFrameGeometry::Record))
         {
             error = "Material packet readback is truncated.";
             return false;
@@ -145,6 +168,7 @@ struct EnhancedPbrCapture
         node["buckets"].SetSequence();
         node["recordBuckets"].SetSequence();
         node["records"].SetSequence();
+        node["primitiveRanges"].SetSequence();
         ce::dynamic_array<uint32_t> recordBuckets;
         recordBuckets.reserve(owner.recordCount);
         for (uint32_t record = 0; record < owner.recordCount; ++record)
@@ -153,6 +177,12 @@ struct EnhancedPbrCapture
             std::memcpy(&value, records.data.data() + uint64_t(record) * sizeof(value), sizeof(value));
             recordBuckets.push_back(value.history[2]);
             node["recordBuckets"].Append() << value.history[2];
+            material_graph::SceneFrameGeometry::Record geometryValue{};
+            std::memcpy(&geometryValue, geometry.data.data() + uint64_t(record) * sizeof(geometryValue), sizeof(geometryValue));
+            auto range = node["primitiveRanges"].Append();
+            range.SetSequence();
+            range.Append() << geometryValue.identity.reserved[1];
+            range.Append() << geometryValue.identity.reserved[2];
             auto identity = node["records"].Append();
             identity["record"] << record;
             if (record == 0) continue;
@@ -205,6 +235,35 @@ struct EnhancedPbrCapture
             return false;
         }
         node["count"] << total;
+        const uint64_t rowBytes = uint64_t(owner.width) * 8u;
+        if (visibility.width != owner.width || visibility.height != owner.height ||
+            visibility.format != RHIFormat::RG32Uint || visibility.sliceCount != 1 ||
+            visibility.rowPitch < rowBytes || visibility.data.size() < uint64_t(visibility.rowPitch) * owner.height)
+        {
+            error = "Material visibility readback extent or format mismatch.";
+            return false;
+        }
+        std::ofstream pixels(root / "material-visibility.u32", std::ios::binary | std::ios::trunc);
+        for (uint32_t y = 0; y < owner.height; ++y)
+        {
+            pixels.write(reinterpret_cast<const char*>(visibility.data.data() + uint64_t(y) * visibility.rowPitch),
+                static_cast<std::streamsize>(rowBytes));
+        }
+        pixels.close();
+        if (!pixels)
+        {
+            error = "Material visibility write failed.";
+            return false;
+        }
+        auto source = node["visibility"];
+        source["file"] << "material-visibility.u32";
+        source["encoding"] << "uint32-le-primitive-depth-row-major";
+        source["sourceFrameId"] << result.frameId;
+        source["width"] << owner.width;
+        source["height"] << owner.height;
+        source["resource"] << owner.graphVisibility.index;
+        source["version"] << owner.graphVisibility.version;
+        source["graphEpoch"] << owner.graphVisibility.epoch;
         return true;
     }
 
@@ -1509,6 +1568,8 @@ struct EnhancedPbrCapture
         resources.ReleaseReadback(materialPacketReadback);
         resources.ReleaseReadback(materialRangeReadback);
         resources.ReleaseReadback(materialRecordReadback);
+        resources.ReleaseReadback(materialVisibilityReadback);
+        resources.ReleaseReadback(materialGeometryReadback);
         materialPacketOwner.reset();
     }
     void Fail(const std::string& error)

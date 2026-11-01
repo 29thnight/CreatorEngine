@@ -7,6 +7,7 @@ on:
       - 'Engine/Containers/**'
       - 'Engine/RenderEngine/GpuGeometryVisibility.cpp'
       - 'Engine/RenderEngine/MaterialGraphSceneHost.cpp'
+      - 'Engine/RenderEngine/MaterialGraphWork.h'
       - 'Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h'
       - 'Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp'
       - 'Tools/regression/**'
@@ -16,6 +17,7 @@ on:
       - 'Engine/Containers/**'
       - 'Engine/RenderEngine/GpuGeometryVisibility.cpp'
       - 'Engine/RenderEngine/MaterialGraphSceneHost.cpp'
+      - 'Engine/RenderEngine/MaterialGraphWork.h'
       - 'Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h'
       - 'Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp'
       - 'Tools/regression/**'
@@ -47,6 +49,8 @@ jobs:
         run: python Tools/regression/MaterialPacketTests.py
       - name: Material packet stable input comparison
         run: python Tools/regression/MaterialPacketComparisonTests.py
+      - name: Material packet visibility completeness
+        run: python Tools/regression/MaterialPacketVisibilityTests.py
       - name: Bounds recook geometry identity
         run: python Tools/regression/GeometryRecookIdentityTests.py
 

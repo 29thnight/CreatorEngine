@@ -27,6 +27,7 @@ struct SceneMaterialWork final
     uint32_t width{}, height{}, recordCount{}, commandCount{};
     uint64_t workBytes{};
     own::unique_owner<PacketDispatchWork> packetWork;
+    mutable RGHandle graphVisibility;
 
     bool UploadPackets(RHIBufferSlice sceneRecords, uint32_t bucketCount, std::string& error)
     {
@@ -67,6 +68,7 @@ struct SceneMaterialWork final
     uint32_t PacketCapacity() const { return packetWork ? packetWork->values.packetCapacity : 0; }
     void Declare(EnhancedRenderGraph& graph, RGHandle visibility, own::shared_owner<const SceneMaterialWork> owner) const
     {
+        graphVisibility = visibility;
         packetWork->Declare(graph, owner, pipelines, "METEOR.Scene.Material", true,
             [&graph, owner, visibility](auto& uses) {
                 uses.push_back({visibility, RHIResourceState::ShaderResource, RGAccessMode::Read});
