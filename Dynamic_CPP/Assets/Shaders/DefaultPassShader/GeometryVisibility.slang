@@ -316,11 +316,28 @@ uint MeshletRingCapacity()
     return 256u;
 #endif
 }
+bool MeshletUsesCompactedInstances()
+{
+    return (geometryVisibilityPlaneMask & 0x20000000u) != 0u;
+}
+
+uint MeshletInstanceListBase(uint queue)
+{
+    // Keep the storage ABI independent of the stress permutation's ring capacity.
+    return queue + 16u + 256u;
+}
+
+uint MeshletPartitionCount(uint queue)
+{
+    return (MeshletUsesCompactedInstances()
+        ? geometryVisibleIds[MeshletInstanceListBase(queue)] : geometryVisibilityBinCount) * 16u;
+}
+
 uint MeshletClaimWork(uint queue)
 {
     uint ticket;
     InterlockedAdd(geometryVisibleIds[queue + 6u], 0u, ticket);
-    [loop] while (ticket < geometryVisibilityBinCount * 16u)
+    [loop] while (ticket < MeshletPartitionCount(queue))
     {
         uint observed;
         InterlockedCompareExchange(geometryVisibleIds[queue + 6u], ticket, ticket + 1u, observed);
@@ -860,6 +877,55 @@ bool GeometryInstanceAdmitted(uint bin)
     return !GeometryMeshletBoxOccluded(bin, minimum, maximum, geometryVisibilityBins[bin].firstIndex);
 }
 
+groupshared uint instancePrefix[64];
+groupshared uint instanceSurvivors;
+
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void GeometryCompactInstancesCS(uint lane : SV_GroupIndex)
+{
+    // Exactly one group follows Reset. A graph UAV dependency publishes its
+    // completed list to Cull, avoiding a cross-group counter initialization race.
+    const uint list = MeshletInstanceListBase(MeshletWorkQueueBase());
+    if (lane == 0u)
+    {
+        instanceSurvivors = 0u;
+    }
+    GroupMemoryBarrierWithGroupSync();
+    for (uint first = 0u; first < geometryVisibilityBinCount; first += 64u)
+    {
+        const uint bin = first + lane;
+        uint admitted = 0u;
+        if (bin < geometryVisibilityBinCount && geometryVisibilityBins[bin].indexCount != 0u)
+        {
+            admitted = uint(GeometryInstanceAdmitted(bin));
+        }
+        instancePrefix[lane] = admitted;
+        GroupMemoryBarrierWithGroupSync();
+        for (uint stride = 1u; stride < 64u; stride <<= 1u)
+        {
+            const uint preceding = lane >= stride ? instancePrefix[lane - stride] : 0u;
+            GroupMemoryBarrierWithGroupSync();
+            instancePrefix[lane] += preceding;
+            GroupMemoryBarrierWithGroupSync();
+        }
+        if (admitted != 0u)
+        {
+            geometryVisibleIds[list + instanceSurvivors + instancePrefix[lane]] = bin;
+        }
+        GroupMemoryBarrierWithGroupSync();
+        if (lane == 0u)
+        {
+            instanceSurvivors += instancePrefix[63];
+        }
+        GroupMemoryBarrierWithGroupSync();
+    }
+    if (lane == 0u)
+    {
+        geometryVisibleIds[list] = instanceSurvivors;
+    }
+}
+
 void GeometryCullMeshlet(uint bin, uint meshlet)
 {
     const MeshletViewData view = MeshletView(bin);
@@ -1011,7 +1077,7 @@ void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
         queued = WaveReadLaneFirst(queued);
         producers = WaveReadLaneFirst(producers);
         if (!producerLease && sourceRemaining == 0u && !WaveActiveAnyTrue(pending != 0u) &&
-            partitions == geometryVisibilityBinCount * 16u && queued == 0u && producers == 0u)
+            partitions == MeshletPartitionCount(queue) && queued == 0u && producers == 0u)
         {
             // A gathered job finishes in this wave before the next iteration.
             // Other consumers finish their own jobs before exiting as well.
@@ -1025,7 +1091,7 @@ void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
             // A wave acquires one of sixteen logical subdivisions per bin.
             // Use the published RE subdivision formula, including small inputs
             // and the final subdivision's integer-division remainder.
-            if (partitions < geometryVisibilityBinCount * 16u &&
+            if (partitions < MeshletPartitionCount(queue) &&
                 !WaveActiveAnyTrue(pending != 0u) && sourceRemaining == 0u)
             {
                 uint partition = 0xffffffffu;
@@ -1043,6 +1109,10 @@ void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
                 if (partition != 0xffffffffu)
                 {
                     sourceBin = partition / 16u;
+                    if (MeshletUsesCompactedInstances())
+                    {
+                        sourceBin = geometryVisibleIds[MeshletInstanceListBase(queue) + 1u + sourceBin];
+                    }
                     const uint subdivision = partition & 15u;
                     const uint meshlets = geometryVisibilityBins[sourceBin].indexCount;
                     sourceRemaining = meshlets / 16u;
@@ -1062,7 +1132,7 @@ void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
                         if (WaveIsFirstLane())
                         {
                             InterlockedAdd(geometryVisibleIds[queue + 10u], 1u);
-                            admitted = uint(GeometryInstanceAdmitted(sourceBin));
+                            admitted = MeshletUsesCompactedInstances() ? 1u : uint(GeometryInstanceAdmitted(sourceBin));
                             if (admitted == 0u)
                             {
                                 InterlockedAdd(geometryVisibleIds[queue + 15u], 1u);

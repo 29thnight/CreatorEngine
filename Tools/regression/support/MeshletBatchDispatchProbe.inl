@@ -9,8 +9,8 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
         RHILayout::Srv(8211)};
     const auto layout = roots.GetOrCreate({params, {}}, error);
     Check(layout.IsValid(), "Batch meshlet layout " + error);
-    std::array<LX::Runtime::ComputePipeline, 3> kernels;
-    const char* entries[]{"ShadowMeshletResetCS", "ShadowMeshletCullCS", "MeshletFinalizeCS"};
+    std::array<LX::Runtime::ComputePipeline, 4> kernels;
+    const char* entries[]{"ShadowMeshletResetCS", "ShadowMeshletCullCS", "MeshletFinalizeCS", "GeometryCompactInstancesCS"};
     for (unsigned i = 0; i < kernels.size(); ++i) {
         LX::Runtime::CompiledCompute shader;
         RHIShaderCompileOptions options; options.strictMath = true;
@@ -73,7 +73,7 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
         Check(stressCull[i].Create(pipelines, desc, std::move(shader.description), error), "Ring stress PSO " + error);
     }
     std::uint32_t checkedWords{};
-    constexpr std::uint64_t exactOutputWords = (32ull << 20) / 4 - 5 - GpuGeometryVisibility::kWorkRingHeaderWords - GpuGeometryVisibility::kWorkRingSlots;
+    constexpr std::uint64_t exactOutputWords = (32ull << 20) / 4 - 5 - 2 - GpuGeometryVisibility::kWorkRingHeaderWords - GpuGeometryVisibility::kWorkRingSlots;
     Check(GpuGeometryVisibility::MeshletQueueStorageWords(exactOutputWords, 1, 1, checkedWords),
         "Queue and arguments exactly fit their byte budget");
     Check(!GpuGeometryVisibility::MeshletQueueStorageWords(exactOutputWords + 1, 1, 1, checkedWords) && checkedWords == 0,
@@ -82,13 +82,14 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
         !GpuGeometryVisibility::MeshletQueueStorageWords(UINT64_MAX, 1, 1, checkedWords) &&
         !GpuGeometryVisibility::MeshletQueueStorageWords(1, 1, 4097, checkedWords),
         "Overflow and bin-capacity checks precede queue allocation");
-    unsigned queueCases{}, instanceCases{};
-    for (const unsigned route : {0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u})
+    unsigned queueCases{}, instanceCases{}, compactCases{};
+    for (const unsigned route : {0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 9u, 10u})
     {
         for (const uint32_t fixtureBins : {0u, 1u, 2u, 3u, 4u, 5u, 6u, 4096u})
         {
             const uint32_t binCount = (std::max)(1u, fixtureBins);
             const bool dynamic = route != 0;
+            const bool compact = route >= 9;
             const bool instanceAdmission = route >= 7;
             const bool stress = route == 5 || route == 6;
             const bool ordered = route >= 3 && !instanceAdmission;
@@ -178,7 +179,11 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
             std::array<uint32_t, 48> constants{};
             constants[24] = binCount; constants[25] = binCount; constants[27] = dynamic ? (route == 6 ? 0u : meshletJobs) : groupCount;
             constants[26] = dynamic ? GpuGeometryVisibility::kWaveWorkQueue : 0u;
-            const auto storageWords = outputCount + GpuGeometryVisibility::kWorkRingHeaderWords + GpuGeometryVisibility::kWorkRingSlots;
+            if (compact)
+            {
+                constants[26] |= 0x20000000u;
+            }
+            const auto storageWords = (compact ? 1u + binCount : 0u) + outputCount + GpuGeometryVisibility::kWorkRingHeaderWords + GpuGeometryVisibility::kWorkRingSlots;
             const float one = 1.f;
             for (unsigned c = 0; c < 4; ++c) std::memcpy(&constants[28 + c * 5], &one, sizeof(one));
             constants[47] = 1;
@@ -212,10 +217,10 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
             const RHIBufferTransition before[]{{ids, RHIResourceState::Common, RHIResourceState::UnorderedAccess},
                 {args, RHIResourceState::Common, RHIResourceState::UnorderedAccess}};
             encoder.ResourceBarriers({{}, before});
-            for (unsigned stage = 0; stage < kernels.size(); ++stage) {
+            for (unsigned stage = 0; stage < 3; ++stage) {
                 const auto generation = stage == 0 && stress   ? stressCull[2].GetGeneration()
                                         : stage == 1 && stress ? stressCull[route - 5].GetGeneration()
-                                        : stage == 1 && (route == 4 || route == 8) ? partialCull.GetGeneration()
+                                        : stage == 1 && (route == 4 || route == 8 || route == 10) ? partialCull.GetGeneration()
                                                                                    : kernels[stage].GetGeneration();
                 encoder.SetPipeline(RHIBindPoint::Compute, generation->GetHandle());
                 encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, uniform);
@@ -225,6 +230,14 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
                 encoder.SetBindings(RHIBindPoint::Compute, 4, vertexTable);
                 encoder.SetBindings(RHIBindPoint::Compute, 5, topologyTable);
                 encoder.SetRootBuffer(RHIBindPoint::Compute, 6, worldUpload);
+                if (stage == 1 && compact)
+                {
+                    encoder.SetPipeline(RHIBindPoint::Compute, kernels[3].GetGeneration()->GetHandle());
+                    encoder.Dispatch(1, 1, 1);
+                    const RHIBufferHandle compactBarrier[]{ids};
+                    encoder.ResourceBarriers({{}, {}, {}, compactBarrier});
+                    encoder.SetPipeline(RHIBindPoint::Compute, generation->GetHandle());
+                }
                 const auto groups =
                     stage == 1
                         ? dynamic ? (std::max)(1u, (std::min)(binCount * GpuGeometryVisibility::kInitialSubdivisions,
@@ -330,7 +343,23 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
                 Check(scheduledJobs ? queue[3] > 0 : queue[3] == 0, "Empty/nonempty wave termination");
                 Check(queue[12] == 0 && queue[13] == 0 && queue[14] == 0, "JOB_COUNT and activity leases are quiescent");
                 const auto slots = stress ? 1u : GpuGeometryVisibility::kWorkRingSlots;
-                Check(queue[6] == binCount * 16u && queue[9] == slots, "Ring source exhausted and capacity sealed");
+                uint32_t survivors = 0;
+                if (compact)
+                {
+                    const auto* list = queue + GpuGeometryVisibility::kWorkRingHeaderWords +
+                        GpuGeometryVisibility::kWorkRingSlots;
+                    for (uint32_t bin = 0; bin < binCount; ++bin)
+                    {
+                        if (bins[bin].indexCount != 0u && bin % 3 != 2)
+                        {
+                            Check(list[1u + survivors] == bin, "Compacted instance IDs match independent stable oracle");
+                            ++survivors;
+                        }
+                    }
+                    Check(list[0] == survivors, "Compacted survivor count matches independent oracle");
+                }
+                Check(queue[6] == (compact ? survivors : binCount) * 16u && queue[9] == slots,
+                      "Ring claims only the selected instance partitions");
                 for (uint32_t slot = 0; slot < slots; ++slot)
                 {
                     Check(queue[GpuGeometryVisibility::kWorkRingHeaderWords + slot] == 0, "Ring drained every reusable slot");
@@ -362,13 +391,17 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
                         used[subdivision] = true;
                     }
                     const auto partitions = static_cast<uint32_t>(std::count(used.begin(), used.end(), true));
-                    nonempty += partitions;
-                    rejected += instanceAdmission && binIndex % 3 == 2 ? partitions : 0u;
+                    nonempty += !compact || binIndex % 3 != 2 ? partitions : 0u;
+                    rejected += !compact && instanceAdmission && binIndex % 3 == 2 ? partitions : 0u;
                     ++binIndex;
                 }
                 Check(queue[10] == nonempty, "GPU sixteen-way subdivision matches the independent CPU partition oracle");
                 Check(queue[15] == rejected, "Instance admission reports exactly the rejected source partitions");
-                if (instanceAdmission)
+                if (compact)
+                {
+                    ++compactCases;
+                }
+                else if (instanceAdmission)
                 {
                     ++instanceCases;
                 }
@@ -408,6 +441,8 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
                 << " route=" << route << " cullDispatches=1 validation=0\n";
         }
     }
+    Check(compactCases == 16, "Compaction covers empty, mixed, tail, partial-wave and maximum-bin inputs");
+    std::cout << "METEOR_INSTANCE_COMPACTION_OK cases=16 stableIds=1 partitionClaims=1 validation=0\n";
     Check(instanceCases == 16, "Instance admission covers empty, tail, skewed, partial-wave and maximum-bin queues");
     std::cout << "METEOR_INSTANCE_ADMISSION_OK cases=" << instanceCases
               << " partialWaveCases=8 boundsWords=8 legacyParity=1 validation=0\n";

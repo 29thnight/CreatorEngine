@@ -795,7 +795,8 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                 Check(queueWork && queueWork->WorkQueueTaskCount() != 0, "Production queue has sealed work");
                 RHIReadback queueRead;
                 Check(device.CreateBufferReadback(
-                          (GpuGeometryVisibility::kWorkRingHeaderWords + GpuGeometryVisibility::kWorkRingSlots) *
+                          (GpuGeometryVisibility::kWorkRingHeaderWords + GpuGeometryVisibility::kWorkRingSlots +
+                           1u + queueWork->WorkQueuePartitionCount() / 16u) *
                               sizeof(std::uint32_t),
                           queueRead, error),
                       "Production queue header");
@@ -824,14 +825,19 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                 RHIReadbackImage queueImage;
                 Check(device.MapReadback(queueRead, queueImage, error), "Production queue header map");
                 Check(queueImage.ElementCount<std::uint32_t>() ==
-                          GpuGeometryVisibility::kWorkRingHeaderWords + GpuGeometryVisibility::kWorkRingSlots,
+                          GpuGeometryVisibility::kWorkRingHeaderWords + GpuGeometryVisibility::kWorkRingSlots +
+                          1u + queueWork->WorkQueuePartitionCount() / 16u,
                       "Production queue readback size");
                 const auto header = queueImage.Elements<std::uint32_t>();
+                const auto listOffset = GpuGeometryVisibility::kWorkRingHeaderWords + GpuGeometryVisibility::kWorkRingSlots;
+                const auto survivors = header[listOffset];
+                Check(survivors <= queueWork->WorkQueuePartitionCount() / 16u, "Production survivor count fits source bins");
+                const std::span<const std::uint32_t> selected{header + listOffset + 1u, survivors};
                 // LOD selection/residency filters jobs before publication. The
                 // sealed source count is an upper bound, not the published count.
                 const bool complete = header[0] <= queueWork->WorkQueueTaskCount() && header[1] == header[0] &&
                                       header[2] == 0 && (header[0] ? header[3] != 0 : header[3] == 0) &&
-                                      header[6] == queueWork->WorkQueuePartitionCount() && header[11] > 0 &&
+                                      header[6] == survivors * 16u && header[11] > 0 &&
                                       header[11] <= 64 && header[9] == GpuGeometryVisibility::kWorkRingSlots;
                 if (!complete)
                 {
@@ -854,7 +860,7 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                       "Production lane-batched head/tail reservation accounting");
                 Check(header[12] == 0 && header[13] == 0 && header[14] == 0,
                       "Queue count, producer leases and consumer leases quiesced");
-                Check(header[10] == queueWork->WorkQueueNonemptyPartitions(header[11]),
+                Check(header[10] == queueWork->WorkQueueSelectedPartitions(header[11], selected),
                       "Production initial partition coverage");
                 if (queueWork->WorkQueueViewCount() > 1)
                 {
