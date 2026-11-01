@@ -877,7 +877,7 @@ bool GeometryInstanceAdmitted(uint bin)
     return !GeometryMeshletBoxOccluded(bin, minimum, maximum, geometryVisibilityBins[bin].firstIndex);
 }
 
-groupshared uint instancePrefix[64];
+groupshared uint instanceAdmissionMask[2];
 groupshared uint instanceSurvivors;
 
 [shader("compute")]
@@ -900,23 +900,27 @@ void GeometryCompactInstancesCS(uint lane : SV_GroupIndex)
         {
             admitted = uint(GeometryInstanceAdmitted(bin));
         }
-        instancePrefix[lane] = admitted;
+        // Group-index masks preserve bin order without assuming a wave size or
+        // a mapping between wave lanes and SV_GroupIndex.
+        if (lane < 2u) instanceAdmissionMask[lane] = 0u;
         GroupMemoryBarrierWithGroupSync();
-        for (uint stride = 1u; stride < 64u; stride <<= 1u)
-        {
-            const uint preceding = lane >= stride ? instancePrefix[lane - stride] : 0u;
-            GroupMemoryBarrierWithGroupSync();
-            instancePrefix[lane] += preceding;
-            GroupMemoryBarrierWithGroupSync();
-        }
         if (admitted != 0u)
         {
-            geometryVisibleIds[list + instanceSurvivors + instancePrefix[lane]] = bin;
+            InterlockedOr(instanceAdmissionMask[lane >> 5u], 1u << (lane & 31u));
+        }
+        GroupMemoryBarrierWithGroupSync();
+
+        const uint precedingMask = (1u << (lane & 31u)) - 1u;
+        const uint preceding = countbits(instanceAdmissionMask[lane >> 5u] & precedingMask) +
+            (lane >= 32u ? countbits(instanceAdmissionMask[0]) : 0u);
+        if (admitted != 0u)
+        {
+            geometryVisibleIds[list + 1u + instanceSurvivors + preceding] = bin;
         }
         GroupMemoryBarrierWithGroupSync();
         if (lane == 0u)
         {
-            instanceSurvivors += instancePrefix[63];
+            instanceSurvivors += countbits(instanceAdmissionMask[0]) + countbits(instanceAdmissionMask[1]);
         }
         GroupMemoryBarrierWithGroupSync();
     }
