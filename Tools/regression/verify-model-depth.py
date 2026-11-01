@@ -80,7 +80,9 @@ def verify(model, capture, output):
     primitives = [p for mesh in gltf['meshes'] for p in mesh['primitives']]
     manifest = json.loads((capture/'manifest.json').read_text(encoding='utf-8-sig'))
     assert manifest['source'] == 'product-live' and manifest['validationCount'] == 0
-    assert len(manifest['draws']) == len(primitives) > 0
+    assert primitives and manifest['draws']
+    draw_meshes = [mesh_ids[draw['meshId']] for draw in manifest['draws']]
+    assert set(draw_meshes) == set(range(len(primitives))), 'Capture must contain every source primitive'
     width, height = manifest['width'], manifest['height']
     vp = np.array(manifest['camera']['view']).reshape(4,4) @ np.array(manifest['camera']['projection']).reshape(4,4)
     expected = np.ones((height,width),dtype=np.float64)
