@@ -27,6 +27,32 @@ namespace
     // 엔진 소유 영속 풀이 하나뿐이라 그것으로 충분하다.
     thread_pool::worker_hooks thread_pool_worker_hooks{};
 
+    class assist_observation final
+    {
+      public:
+        explicit assist_observation(thread_pool::assist_phase phase) : phase_(phase)
+        {
+            if (thread_pool_worker_hooks.on_assist_scope)
+            {
+                thread_pool_worker_hooks.on_assist_scope(phase_, true);
+            }
+        }
+
+        ~assist_observation()
+        {
+            if (thread_pool_worker_hooks.on_assist_scope)
+            {
+                thread_pool_worker_hooks.on_assist_scope(phase_, false);
+            }
+        }
+
+        assist_observation(const assist_observation&) = delete;
+        assist_observation& operator=(const assist_observation&) = delete;
+
+      private:
+        thread_pool::assist_phase phase_;
+    };
+
     // 배정 스레드와 합류 지원 슬롯은 enkiTS 외부 번호 1, 2를 사용한다.
     // 워커 훅에는 기존 1..N을 넘겨 프로파일러 레인 신원을 유지한다.
     constexpr std::uint32_t dispatcher_threads = 1;
@@ -661,9 +687,15 @@ struct thread_pool::state
         {
             while (!ready())
             {
-                scheduler_.WaitforTask(nullptr);
-                std::unique_lock lock(done_mutex_);
-                done_.wait_for(lock, std::chrono::microseconds(100), ready);
+                {
+                    assist_observation observation(thread_pool::assist_phase::task_dispatch);
+                    scheduler_.WaitforTask(nullptr);
+                }
+                {
+                    assist_observation observation(thread_pool::assist_phase::completion_wait);
+                    std::unique_lock lock(done_mutex_);
+                    done_.wait_for(lock, std::chrono::microseconds(100), ready);
+                }
             }
         }
         catch (...)

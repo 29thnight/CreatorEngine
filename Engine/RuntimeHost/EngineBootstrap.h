@@ -172,7 +172,7 @@ namespace EngineBootstrap
         // Player 도 이 경로를 탄다. 녹화를 켜지 않으면 recorder 가 stopped 라
         // 마커는 즉시 return 하므로 비용은 사실상 0 이다.
         ce::profiler().initialize();
-        thread_pool::set_worker_hooks({[](unsigned int index)
+        thread_pool::worker_hooks workerHooks{[](unsigned int index)
                                        {
                                            // enkiTS threadnum_ 은 0..GetNumTaskThreads()-1 로 안정 보장된다.
                                            char name[32];
@@ -189,7 +189,26 @@ namespace EngineBootstrap
                                            // 죽은 저장소를 가리킨 채 남는다(옛 코어의 UAF 자리).
                                            ce::profiler().unregister_thread();
                                        },
-                                       []() { ce::profiler().publish_thread(); }});
+                                       []() { ce::profiler().publish_thread(); }};
+        char assistDiagnostics[2]{};
+        if (GetEnvironmentVariableA("CREATOR_JOB_ASSIST_DIAGNOSTICS", assistDiagnostics,
+                                    sizeof(assistDiagnostics)) == 1 && assistDiagnostics[0] == '1')
+        {
+            workerHooks.on_assist_scope = [](thread_pool::assist_phase phase, bool entering) noexcept
+            {
+                if (entering)
+                {
+                    ce::profile_scope_begin(phase == thread_pool::assist_phase::task_dispatch
+                                                ? ce::marker<"JobAssistDispatch">()
+                                                : ce::marker<"JobAssistCompletionWait">());
+                }
+                else
+                {
+                    ce::profile_scope_end();
+                }
+            };
+        }
+        thread_pool::set_worker_hooks(workerHooks);
 
         // 전용 RenderThread 도 같은 역전으로 붙인다 — RenderEngine 은 관측 도구를
         // 모르고 함수를 받아 두기만 한다. 첫 라이브 발행에서 스레드가 만들어지므로

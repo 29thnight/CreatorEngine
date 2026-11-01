@@ -195,7 +195,11 @@ struct GpuGeometryVisibility::BufferPool
     ~BufferPool() { Close(); }
     bool Acquire(std::uint64_t bytes, bool indirect, RHIBufferHandle& handle, std::string& error)
     {
-        std::lock_guard lock(mutex);
+        std::unique_lock lock(mutex, std::defer_lock);
+        {
+            ce::profile_scope lockProfile{ce::marker<"GpuVisibility.BufferPoolLock">()};
+            lock.lock();
+        }
         if (closed)
         {
             return VisibilityFail(error, "Geometry visibility buffer pool is closed.");
@@ -204,6 +208,7 @@ struct GpuGeometryVisibility::BufferPool
             free, [&](const auto& entry) { return entry.bytes == bytes && entry.indirect == indirect; });
         if (found != free.end())
         {
+            ce::profile_scope reuseProfile{ce::marker<"GpuVisibility.BufferReuse">()};
             handle = found->handle;
             cachedBytes -= found->bytes;
             free.erase(found);
@@ -214,6 +219,7 @@ struct GpuGeometryVisibility::BufferPool
         desc.allowUnorderedAccess = true;
         desc.allowIndirectArguments = indirect;
         desc.debugName = indirect ? L"Geometry.Visibility.Arguments" : L"Geometry.Visibility.IDs";
+        ce::profile_scope createProfile{ce::marker<"GpuVisibility.BufferCreate">()};
         return device.CreateBuffer(desc, handle, error);
     }
     void Return(RHIBufferHandle handle, std::uint64_t bytes, bool indirect, bool reusable)
@@ -222,13 +228,31 @@ struct GpuGeometryVisibility::BufferPool
             return;
         std::lock_guard lock(mutex);
         constexpr std::uint64_t budget = 32ull << 20;
-        if (!closed && reusable && free.size() < 64 && bytes <= budget - cachedBytes)
+        if (!closed && reusable && bytes <= budget)
         {
+            ce::profile_scope returnProfile{ce::marker<"GpuVisibility.BufferReturnCached">()};
+            // Exact-size reuse must adapt when the visible set changes. Keeping
+            // an old full cache forever otherwise rejects every new working set.
+            // Only returned, completion-certified buffers enter this list.
+            while (!free.empty() && (free.size() >= 64 || bytes > budget - cachedBytes))
+            {
+                ce::profile_scope evictionProfile{ce::marker<"GpuVisibility.BufferEvict">()};
+                const auto oldest = free.front();
+                free.erase(free.begin());
+                cachedBytes -= oldest.bytes;
+                device.ReleaseBuffer(oldest.handle);
+            }
             free.push_back({handle, bytes, indirect});
             cachedBytes += bytes;
         }
         else
+        {
+            ce::profile_scope releaseProfile{
+                closed ? ce::marker<"GpuVisibility.BufferReturnClosed">()
+                       : !reusable ? ce::marker<"GpuVisibility.BufferReturnUncertified">()
+                                   : ce::marker<"GpuVisibility.BufferReturnOverBudget">()};
             device.ReleaseBuffer(handle);
+        }
     }
     void Close()
     {
@@ -314,6 +338,7 @@ GpuGeometryVisibility::~GpuGeometryVisibility()
 
 GpuGeometryVisibility::Frame::~Frame()
 {
+    ce::profile_scope retirementProfile{ce::marker<"GpuVisibility.FrameDestroy">()};
     for (auto readback : m_streamingFeedback)
     {
         if (m_bufferPool)
@@ -1803,7 +1828,10 @@ void GpuGeometryVisibility::Frame::ConsumeStreamingFeedback(std::span<const own:
     // The completion ledger has already detached these owners. Mapping, union
     // and streaming admission run without its mutex or any GPU wait.
     for (const auto& frame : frames)
+    {
+        ce::profile_scope completionProfile{ce::marker<"GpuVisibility.FrameCompleted">()};
         frame->m_poolReusable.store(true, std::memory_order_release);
+    }
     for (const auto& frame : frames)
     {
         if (!frame->m_feedbackRecorded.exchange(false, std::memory_order_acq_rel))

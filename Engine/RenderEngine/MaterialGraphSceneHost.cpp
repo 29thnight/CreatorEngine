@@ -2420,8 +2420,12 @@ namespace material_graph
                 return false;
             }
         }
-        const bool parallelPreparation =
-            preparedChunks >= 2 && !thread_pool::is_worker_thread() && scheduler_.is_running();
+        // Small views have less binding/packet work than a worker handoff costs.
+        // Keep their existing task bodies and failure handling on the owner;
+        // larger views still overlap geometry, material and shadow preparation.
+        constexpr std::size_t kMinimumParallelPreparationChunks = 16;
+        const bool parallelPreparation = preparedChunks >= kMinimumParallelPreparationChunks &&
+                                         !thread_pool::is_worker_thread() && scheduler_.is_running();
         // This producer owns the material cache/bytes and volume bindings. Mesh
         // preparation owns geometry caches and Draw geometry fields. Neither
         // producer reads the other's output until the explicit join below.
@@ -2734,9 +2738,11 @@ namespace material_graph
                         };
                         const auto appendBytes = [&](std::span<const std::byte> bytes)
                         {
-                            if (accountBytes(bytes.size()))
+                            if (accountBytes(bytes.size()) && !bytes.empty())
                             {
-                                key.insert(key.end(), bytes.begin(), bytes.end());
+                                // The pointer range selects the contiguous append path without
+                                // materializing an input range and relocating the existing key.
+                                key.insert(key.end(), bytes.data(), bytes.data() + bytes.size());
                             }
                         };
                         const auto append = [&](const auto& value)

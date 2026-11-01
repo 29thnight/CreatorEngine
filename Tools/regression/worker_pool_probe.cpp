@@ -10,6 +10,29 @@ import Creator.Concurrency.Jobs;
 import "Creator.EnkiTS.h";
 #endif
 
+namespace
+{
+    std::atomic<unsigned> assistBegins[2]{}, assistEnds[2]{};
+    std::atomic<bool> releaseAssistProbe{false};
+
+    void ObserveAssist(thread_pool::assist_phase phase, bool entering) noexcept
+    {
+        const auto index = static_cast<unsigned>(phase);
+        if (entering)
+        {
+            ++assistBegins[index];
+            if (phase == thread_pool::assist_phase::completion_wait)
+            {
+                releaseAssistProbe = true;
+            }
+        }
+        else
+        {
+            ++assistEnds[index];
+        }
+    }
+}
+
 int main()
 {
     using namespace std::chrono_literals;
@@ -45,9 +68,31 @@ int main()
             rejected = true;
         }
         require(rejected && inline_fallback == 0, "stopped submission must not execute inline");
+        thread_pool::worker_hooks hooks;
+        hooks.on_assist_scope = ObserveAssist;
+        thread_pool::set_worker_hooks(hooks);
         scheduler.start(4);
         scheduler.start(1);
         require(pool.size() == 4 && scheduler.is_running(), "persistent idempotent startup");
+
+        std::atomic<bool> assistProbeEntered{false};
+        auto assistProbe = scheduler.submit([&]
+        {
+            assistProbeEntered = true;
+            while (!releaseAssistProbe.load())
+            {
+                std::this_thread::yield();
+            }
+        });
+        while (!assistProbeEntered.load())
+        {
+            std::this_thread::yield();
+        }
+        assistProbe.wait_assisting();
+        require(assistBegins[0] > 0 && assistBegins[1] > 0,
+                "assisting wait observes dispatch and completion phases");
+        require(assistBegins[0] == assistEnds[0] && assistBegins[1] == assistEnds[1],
+                "assisting observations are paired before completion returns");
 
         std::atomic<bool> release{false}, entered{false};
         std::atomic<unsigned> completed{0};
