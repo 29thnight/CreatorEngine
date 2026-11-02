@@ -1,6 +1,6 @@
 # CreatorBuildTool
 
-배포본 생성, 게임 C# 컴파일, 콘텐츠 cook·PAK·Player 검증·게시를 담당하는 독립 실행 프로젝트다.
+배포본 생성, 게임 F# 컴파일, 콘텐츠 cook·PAK·Player 검증·게시를 담당하는 독립 실행 프로젝트다.
 Editor와 CLI는 같은 `CreatorBuildTool.exe`를 호출한다. 빌드 구현은 이 디렉터리의 C# 코드에 있으며,
 PowerShell을 내부에서 호출하거나 스크립트를 EXE에 내장하지 않는다.
 
@@ -50,10 +50,11 @@ $tool = "$engine\Bin\x64-Debug\Tools\CreatorBuildTool\CreatorBuildTool.exe"
 & $tool open-project --engine-distribution $engine --development-project $project
 ```
 
-- `publish-engine`: native build record·파일 버전·해시와 API를 확인하고 엔진, Roslyn, 참조 어셈블리,
-  source generator, 사설 .NET 런타임, BuildTool, 라이선스를 배치한다. PowerShell 런타임·패키징 스크립트는 배포하지 않는다.
-- `compile-game`: 정확한 엔진 pin을 확인하고 포함된 Roslyn으로 `Assets/Script/**/*.cs`를 컴파일한다.
-  성공한 DLL의 엔진 ID·API·해시를 sidecar에 기록한다. C# 컴파일 실패는 기존 DLL을 교체하지 않는다.
+- `publish-engine`: native build record·파일 버전·해시와 API를 확인하고 엔진, F# 컴파일러, 참조 어셈블리,
+  F# 생성기와 작성 보조 런타임, 사설 .NET 런타임, BuildTool, 라이선스를 배치한다. PowerShell 런타임·패키징 스크립트는 배포하지 않는다.
+- `compile-game`: 정확한 엔진 pin을 확인하고 `Assets/Script/compile.order` 순서로 `.fs` 소스를 읽는다.
+  포함된 F# 생성기로 `ScriptRegistry.g.fs`를 만든 뒤 `fsc.dll`로 `GameScripts.dll`을 컴파일한다.
+  성공한 DLL의 엔진 ID·API·해시를 sidecar에 기록한다. 생성·컴파일 실패는 기존 DLL을 교체하지 않는다.
   `--prebuilt-assembly`도 동일 엔진 ID와 해시가 필요하다. 별도 NuGet 복원은 지원하지 않는다.
 - `package-game`: Project/Workspace/Tracked 입력, 모델 generation, cook 결과, CEDO 문서, PAK 재열거,
   격리된 Player smoke와 추출 파일 해시를 검증한다. 성공한 candidate만 불변 release로 옮긴 뒤 current pointer를 교체한다.
@@ -64,6 +65,31 @@ $tool = "$engine\Bin\x64-Debug\Tools\CreatorBuildTool\CreatorBuildTool.exe"
 명령 간 구성을 명시적으로 맞춘다. Shipping 배포를 패키징할 때는 `--shipping`도 지정한다.
 `--input-mode Workspace|Tracked`는 엔진 소스 checkout의 `Dynamic_CPP`만 지원한다.
 `--build-native`는 엔진 유지보수자용이며 일반 게임 패키징에서는 지정하지 않는다.
+
+엔진 소스에서 F# 작성 보조 런타임과 생성기를 빌드·배포할 때는 인접한
+[FSharp_Tool_Pakage_for_CreatorEngine](https://github.com/29thnight/FSharp_Tool_Pakage_for_CreatorEngine)
+저장소를 사용한다. `publish-engine`은 엔진 저장소의 형제 디렉터리에서 이 도구 저장소를 찾는다.
+
+### F# 입력과 관리 파일 배치
+
+`Assets/Script/compile.order`는 필수이며, 프로젝트의 모든 `.fs` 파일을 의존 순서대로
+정확히 한 번씩 나열한다. 각 줄은 해당 디렉터리 안의 기존 파일을 가리키는 상대 경로다.
+중복·누락·존재하지 않는 파일과 `.fs` 이외의 항목은 거부한다. `.cs` 소스는 게임 컴파일 입력이 아니다.
+
+엔진 배포본의 `Scripting/FSharp`에는 컴파일러, `Scripting/FSharpGenerator`에는 생성기,
+`Scripting/FSharpReferences`와 `Scripting/References`에는 참조 어셈블리,
+`Scripting/FSharpRuntime`에는 작성 보조 런타임을 배치한다. 배포본의 사설 .NET 호스트로
+생성기와 컴파일러를 실행하므로 게임 제작 시 시스템 SDK나 NuGet 복원이 필요하지 않다.
+
+관리 출력 루트에는 `CreatorEngine.NativeBindings.dll`과 deps/runtimeconfig,
+`CreatorEngine.AudioValues.dll`, 엔진용 `FSharp.Core.dll`을 둔다.
+`FSharpNative/Scripts`에는 `GameScripts.dll`·deps·`.engine.json`, 게임용 `FSharp.Core.dll`,
+`CreatorEngine.FSharp.Runtime.dll`을 배치하고, 컴파일에서 생성한 PDB가 있으면 함께 게시한다.
+`--prebuilt-assembly`는 원본 DLL 옆의 `.engine.json`으로 엔진 ID·스크립트 API·바이트 해시를
+검증한다. 패키징의 `--game-scripts-assembly`도 이 사전 빌드 어셈블리 경로를 사용한다.
+
+소스 구성은 [Engine/Scripting](../Engine/Scripting/README.md), 구현은
+[GameCompiler.cs](GameCompiler.cs)와 [EnginePublisher.cs](EnginePublisher.cs)를 참고한다.
 
 ### 내장 볼류메트릭 blue noise
 
@@ -115,7 +141,9 @@ dotnet run --project BuildTool/Tests/CreatorBuildTool.Tests.csproj -c Debug -- -
 ```
 
 외부 테스트 패키지 없이 경로·배포 변조·pin·PAK 목록·Player 판정·원자 게시·프로세스 트리 종료를 검증한다.
-`--engine`을 주면 실제 배포본의 Roslyn 컴파일, 실패 시 기존 DLL 보존, prebuilt DLL 검증도 실행한다.
+`--engine`은 실제 배포본을 사용하는 통합 검사 경로다. 현재 `Tests/Program.cs`의 해당 경로에는
+C# `Example.cs` 입력과 이전 출력 경로 가정이 남아 있어 F# 컴파일 수용 근거로 사용할 수 없다.
+F# 통합 검증에는 `.fs`·`compile.order` 입력과 `FSharpNative/Scripts` 출력에 맞춘 검사 갱신이 필요하다.
 실제 게임 패키지 완료 판정은 `package-game`의 Player 검증까지 통과한 결과로 별도 기록한다.
 2026-09-13 결과와 모델 씬의 기존 실행 제한은 [검증 기록](../docs/analysis/CreatorBuildToolValidation.md)에 있다.
 
@@ -142,7 +170,7 @@ Development bundles the matching `Player.runtime.pdb` through the native runtime
 manifest. Attach the existing native debugger to Player.exe; optimized Release code
 retains its optimization, and engine-module symbol coverage follows each module's
 existing compiler policy. Existing logs and profiler markers remain available.
-This does not add a remote debugger protocol or a managed/C# debugger integration.
+This does not add a remote debugger protocol or a managed/F# debugger integration.
 
 Local Development Player inputs use the same role-filtered registry as HTTP:
 

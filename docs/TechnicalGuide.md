@@ -1,5 +1,9 @@
 # CreatorEngine 기술설명서
 
+## F# 스크립팅 구성 갱신 — 2026-11-02
+
+게임 스크립트와 관리 실행기는 F#으로 전환했습니다. 아래 본문의 스크립팅·접촉 스트림·게임 컴파일 설명과 경로를 현재 작업 트리의 `Engine/Scripting` 및 BuildTool 소스에 맞춰 갱신했습니다. 다른 분야의 기준 커밋과 과거 검증 기록은 당시 범위를 유지합니다. 과거 `ScriptCore/ContactStream.cs` 선언 링크는 2026-10-20의 근거이며 현재 구현은 [F# ContactStream](../Engine/Scripting/Bindings/Runtime/ContactStream.fs)입니다. 이번 갱신은 소스 대조에 따른 문서 수정이며 새 빌드·실행 검증 결과를 뜻하지 않습니다.
+
 <!-- master-doc-review:start -->
 ## 2026-10-20 master 구현 대조
 
@@ -61,7 +65,7 @@
 - [재질 저작과 실행](#재질-저작과-실행)
 - [모델과 텍스처 파이프라인](#모델과-텍스처-파이프라인)
 - [에디터의 리소스 자동 처리](#에디터의-리소스-자동-처리)
-- [C# 스크립팅과 리플렉션](#c-스크립팅과-리플렉션)
+- [F# 스크립팅과 리플렉션](#f-스크립팅과-리플렉션)
 - [물리·오디오·UI](#물리오디오ui)
 - [프로파일링과 명령 서비스](#프로파일링과-명령-서비스)
 - [빌드·배포·게임 패키징](#빌드배포게임-패키징)
@@ -87,7 +91,7 @@ flowchart TB
     Editor["Editor 호스트"] --> Host["RuntimeHost<br/>공통 초기화 · 종료"]
     Player["Player 호스트"] --> Host
     Host --> Scene["SceneRuntime<br/>Scene · Entity · Component"]
-    Scene --> CLR["CoreCLR<br/>ScriptCore · 게임 어셈블리"]
+    Scene --> CLR["CoreCLR<br/>F# 네이티브 바인딩 · 게임 어셈블리"]
     Scene --> Physics["Physics / PhysX"]
     Scene --> Audio["AudioRuntime / miniaudio"]
     Scene -->|불변 렌더 입력| Render["RenderEngine"]
@@ -235,24 +239,26 @@ Editor의 asset watcher와 공통 대기 저장, worker 준비와 owner-thread �
 | shader·include·shadermeta | worker 컴파일 → 프로그램 교체 | stale·컴파일 실패·계약 비호환 거부 |
 | 재질 그래프 | 안정화·컴파일 → 자동 Apply·Save | 정상 preview, 디스크 충돌 검사 |
 | 프리팹 편집 씬 | snapshot 변화 → 자동 저장·기존 instance 갱신 | 기존 override·Undo 정책 유지 |
-| 게임 C# 소스 | 변경 감지 → 비동기 빌드 → 재로드·재연결 | 컴파일 실패 시 이전 코드·인스턴스 유지 |
+| 게임 F# 소스·compile.order | 변경 감지 → 비동기 빌드 → 재로드·재연결 | 컴파일 실패 시 이전 코드·인스턴스 유지 |
 | 렌더 프로필·일반 메타 | 공통 저장 대기열 → 기존 typed 갱신 | 원자 파일 게시·충돌 거부 |
 
 창을 숨기거나 선택을 바꾸는 것과 작업 수명을 분리합니다. 종료 시 대기 저장과 worker를 관련 서비스 해체 전에 정리합니다. 모델·재질·스크립트의 불변 후보가 현재 document/revision과 맞지 않으면 게시하지 않습니다.
 
 모든 외부 파일의 변경이 즉시 화면에 나타난다는 보장은 아닙니다. 준비·GPU pipeline 지연·실패·충돌 상태가 존재하며, 씬 전체 저장과 자산 할당은 별도 사용자 행동입니다.
 
-소스: [EditorAssetDatabase](../Editor/EngineEntry/EditorAssetDatabase.cpp), [EditorScriptAuthoring](../Editor/EngineEntry/EditorScriptAuthoring.cpp), [App](../Editor/EngineEntry/App.cpp). 실제 Debug host에서 확인한 소비자와 미실행 범위는 [자동 처리 기록](analysis/AutomaticResourceEditingValidation20261010.md)을 참고하십시오.
+소스: [EditorAssetDatabase](../Editor/EngineEntry/Assets/EditorAssetDatabase.cpp), [EditorScriptAuthoring](../Editor/EngineEntry/Scripting/EditorScriptAuthoring.cpp), [EditorMain](../Editor/EngineEntry/Bootstrap/EditorMain.cpp). 실제 Debug host에서 확인한 소비자와 미실행 범위는 [자동 처리 기록](analysis/AutomaticResourceEditingValidation20261010.md)을 참고하십시오.
 
-## C# 스크립팅과 리플렉션
+## F# 스크립팅과 리플렉션
 
 ### 관리 코드
 
-CoreCLR host가 .NET 10 `ScriptCore`와 게임 어셈블리를 로드합니다. ScriptCore는 네이티브 엔진 API의 C# 표면이며 Roslyn source generator가 바인딩 관련 코드를 생성합니다. 공개 CLR/native 신원은 generation을 포함한 값 handle이고 네이티브 GC 참조 자체를 ABI로 전달하지 않습니다.
+CoreCLR host가 .NET 10 `CreatorEngine.NativeBindings.dll`과 F# `GameScripts.dll`을 로드합니다. [Bindings 프로젝트](../Engine/Scripting/Bindings/ScriptNative.fsproj)는 reflgen으로 네이티브 API 테이블의 F# 바인딩을 생성하고, 컴포넌트·서비스 API와 프로세스 상주 관리 실행기를 함께 빌드합니다. 생명주기·등록부·접촉 전달·핫리로드·GC 관리는 `Bindings/Runtime`에 있습니다. 공개 CLR/native 신원은 generation을 포함한 값 handle이고 네이티브 GC 참조 자체를 ABI로 전달하지 않습니다.
 
-게임 소스는 `Assets/Script/**/*.cs`를 읽습니다. 자동 빌드는 중복 파일 알림을 내용 비교로 합치고, 빌드 도중 소스가 바뀌면 다시 준비합니다. 성공하면 기존 `PrepareForReload → ReloadScripts → RestoreAfterReload` 경로로 컴포넌트를 재연결합니다. 직렬화 필드 보존과 임의의 비직렬화 런타임 상태 전체 보존은 다릅니다.
+게임 소스는 `Assets/Script` 아래의 `.fs` 파일이며, `compile.order`에 의존 순서대로 상대 경로를 한 줄에 하나씩 기록합니다. 모든 `.fs`를 정확히 한 번씩 나열해야 합니다. Editor의 소스 checkout 경로는 [GameScripts 프로젝트](../Engine/Scripting/GameScripts/ScriptNative.GameScripts.fsproj)를 빌드합니다. F# 생성기는 `ScriptRegistry.g.fs`에 팩토리·필드 접근자·메시지와 생명주기 등록 코드를 만듭니다. 컴포넌트는 `Component`를 상속하고 필요한 생명주기만 `member this.OnTickSimulate(dt: single) : unit = ...`처럼 일반 멤버로 선언합니다. 생명주기에 `override`를 붙이지 않습니다.
 
-엔진의 ScriptCore·제너레이터 변경은 엔진 빌드 범위입니다. 배포본의 게임 컴파일은 포함된 Roslyn·참조 어셈블리·런타임을 사용하며 별도 NuGet 복원이나 사용자 native plugin ABI를 제공하지 않습니다.
+자동 빌드는 `.fs`와 `compile.order`의 변경을 내용 비교로 합치고, 빌드 도중 소스가 바뀌면 다시 준비합니다. 성공하면 기존 `PrepareForReload → ReloadScripts → RestoreAfterReload` 경로로 컴포넌트를 재연결합니다. 게임 어셈블리와 전용 의존성은 세대별 collectible 로더에서 관리하고 엔진 바인딩은 공유합니다. 직렬화 필드 보존과 임의의 비직렬화 런타임 상태 전체 보존은 다릅니다. 상주 엔진 바인딩·실행기 교체는 프로세스 재시작이 필요합니다.
+
+엔진 바인딩·실행기·생성기 변경은 엔진 빌드·배포 범위입니다. 배포본의 게임 컴파일은 포함된 F# 생성기·`fsc.dll`·참조 어셈블리·사설 .NET 런타임을 사용하며 별도 NuGet 복원이나 사용자 native plugin ABI를 제공하지 않습니다. 게임 결과는 `Managed/FSharpNative/Scripts/GameScripts.dll`과 의존 파일로 배치됩니다. 구성별 역할은 [스크립팅 안내](../Engine/Scripting/README.md), 네이티브 컴포넌트·값 접근은 [F# 네이티브 바인딩](design/FSharpNativeReflection.md)을 참고하십시오.
 
 ### 리플렉션과 저장
 
@@ -260,7 +266,7 @@ reflgen이 `[[reflgen::reflect]]` 선언에서 타입 서술자를 생성합니�
 
 저작 텍스트는 ryml 기반 YAML이며, 쿠킹된 실행 문서는 별도 바이너리 계약을 사용합니다. 텍스트 parser를 모든 프레임이나 source-free Player의 실행 데이터 소비에 반복 적용하지 않습니다. 저장·복원 계약을 바꾸면 기존 자산·신원·실패 복구도 함께 확인해야 합니다.
 
-소스: [ScriptCore](../ScriptCore/), [ScriptCore.Generators](../ScriptCore.Generators/), [reflgen overlay port](../ports/reflgen/portfile.cmake). 설명: [리플렉션 정본](design/ReflectionDesign.md), [직렬화 계획](plans/SerializationPlan.md).
+소스: [Engine/Scripting](../Engine/Scripting/README.md), [F# 바인딩 프로젝트](../Engine/Scripting/Bindings/ScriptNative.fsproj), [reflgen overlay port](../ports/reflgen/portfile.cmake). 설명: [리플렉션 정본](design/ReflectionDesign.md), [직렬화 계획](plans/SerializationPlan.md).
 
 ## 물리·오디오·UI
 
@@ -268,9 +274,9 @@ reflgen이 `[[reflgen::reflect]]` 선언에서 타입 서술자를 생성합니�
 
 PhysX를 engine backend 경계에서 사용합니다. 컴포넌트의 body·shape 신원과 Scene lifecycle을 연결하고 시뮬레이션 이후 결과를 소비합니다.
 
-C# `ContactStream`은 owner·self/other shape role·phase로 구독을 등록하고 `PostPhysics`에서 빌린 결과 span을 읽습니다. SDK callback에서 CLR을 호출하지 않으며 native 결과를 frame batch로 전달합니다. shape role은 기존 collision layer와 별개이고 Scope 종료 때 구독·binding을 제거합니다. 결과 span의 수명은 해당 소비 경계에 한정됩니다.
+F# `ContactStream`은 owner·self/other shape role·phase로 구독을 등록하고 `PostPhysics`에서 빌린 결과 span을 읽습니다. SDK callback에서 CLR을 호출하지 않으며 native 결과를 frame batch로 전달합니다. shape role은 기존 collision layer와 별개이고 Scope 종료 때 구독·binding을 제거합니다. 결과 span의 수명은 해당 소비 경계에 한정됩니다.
 
-접촉 스트림 구현은 complete manifold API나 물리 재설계 전체 완료를 뜻하지 않습니다. [PhysicsContactExecutionContract](design/PhysicsContactExecutionContract.md), [ScriptCore/ContactStream.cs](../ScriptCore/ContactStream.cs), [Physics API 계약](design/PhysicsAPIContract.md)을 참고하십시오.
+접촉 스트림 구현은 complete manifold API나 물리 재설계 전체 완료를 뜻하지 않습니다. [PhysicsContactExecutionContract](design/PhysicsContactExecutionContract.md), [F# ContactStream](../Engine/Scripting/Bindings/Runtime/ContactStream.fs), [Physics API 계약](design/PhysicsAPIContract.md)을 참고하십시오.
 
 ### 오디오
 
@@ -322,11 +328,11 @@ Build/Lib/            구성별 정적 라이브러리
 
 ### 게임 제작 흐름
 
-CreatorBuildTool은 독립 C# 실행 파일입니다. 엔진 유지보수자가 `publish-engine`으로 호스트·도구·리소스·ScriptCore·Roslyn·private .NET runtime과 라이선스를 배포합니다. 게임 제작자는 이 배포본으로 기존 프로젝트를 연결하고 컴파일·패키징합니다.
+CreatorBuildTool은 독립 C# 실행 파일입니다. 엔진 유지보수자가 `publish-engine`으로 호스트·도구·리소스·F# 네이티브 바인딩과 관리 실행기·F# 컴파일러와 생성기·참조 어셈블리·private .NET runtime과 라이선스를 배포합니다. 게임 제작자는 이 배포본으로 기존 프로젝트를 연결하고 컴파일·패키징합니다.
 
 ```mermaid
 flowchart LR
-    Project["게임 프로젝트<br/>구성별 엔진 pin"] --> Compile["Roslyn<br/>C# 컴파일"]
+    Project["게임 프로젝트<br/>구성별 엔진 pin"] --> Compile["F# 생성기 · 컴파일러<br/>compile.order → GameScripts.dll"]
     Compile --> Cook["AssetCooker<br/>실행 콘텐츠 준비"]
     Cook --> Stage["candidate 배치"]
     Stage --> Pak["AssetPacker<br/>PAK"]
@@ -354,7 +360,7 @@ flowchart LR
 | LX geometry | 메시렛 프러스텀, CPU LOD, draw HZB와 fallback | GPU LOD·meshlet HZB·전체 GPU-driven/DXR 수용·성능 이득 |
 | 재질 | 자산 기반 그래프 저작·생성 제품·자동 게시 | 모든 조작·투명 preview·Blender 전 품질 대조의 완료는 별도 |
 | 텍스처 | DirectXTex 도구 cook, cooked Player 소비·자동 편집 | 전체 포맷·이미지 품질 코퍼스와 모든 GPU 소비자 수용 |
-| C# 자동 재연결 | 파일 감지·빌드·직렬화 필드 복원 | Debug 실행 기록을 Release/Shipping·임의 상태 복원으로 확대하지 않음 |
+| F# 자동 재연결 | .fs·compile.order 감지·빌드·직렬화 필드 복원 | 과거 C# Debug 기록을 F# 제품·Release/Shipping·임의 상태 복원 검증으로 확대하지 않음 |
 | GCCE | Scene 그래프 tracing·root·점진 수집 | 미커밋 후속 테스트·문서와 성능 주장은 기준에서 제외 |
 | 오디오 | miniaudio 제품 전환과 Windows 수용 기록 | 장치·시간·음질 및 underrun 측정 범위 |
 | 물리·UI·진단 | contact stream, SDF, 별도 profiler viewer 등의 소스 경로 | 분야별 계획 전체 종료·전 환경 실행 성공 |
