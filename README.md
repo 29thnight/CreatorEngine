@@ -7,6 +7,7 @@
 ![MSVC v145](https://img.shields.io/badge/MSVC-v145-5C2D91?style=flat-square)
 ![DirectX 12](https://img.shields.io/badge/Graphics-DirectX%2012-107C10?style=flat-square)
 ![Vulkan](https://img.shields.io/badge/Graphics-Vulkan-AC162C?style=flat-square&logo=vulkan&logoColor=white)
+![F#](https://img.shields.io/badge/Scripting-F%23-378BBA?style=flat-square&logo=fsharp&logoColor=white)
 ![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?style=flat-square&logo=dotnet&logoColor=white)
 ![PhysX](https://img.shields.io/badge/Physics-PhysX-76B900?style=flat-square&logo=nvidia&logoColor=white)
 ![miniaudio](https://img.shields.io/badge/Audio-miniaudio-000000?style=flat-square)
@@ -24,11 +25,11 @@
 
 ## CreatorEngine 소개
 
-CreatorEngine은 씬 편집부터 게임 실행과 패키징까지 하나의 작업 흐름으로 연결하는 게임 엔진입니다. Dear ImGui 기반 에디터에서 씬·프리팹·재질을 편집하고, C#으로 게임 로직을 작성하며, 독립 Player로 게임을 실행합니다. Editor와 Player는 같은 네이티브 런타임과 콘텐츠 파이프라인을 사용합니다.
+CreatorEngine은 씬 편집부터 게임 실행과 패키징까지 하나의 작업 흐름으로 연결하는 게임 엔진입니다. Dear ImGui 기반 에디터에서 씬·프리팹·재질을 편집하고, F#으로 게임 로직을 작성하며, 독립 Player로 게임을 실행합니다. Editor와 Player는 같은 네이티브 런타임과 콘텐츠 파이프라인을 사용합니다.
 
 현재 재설계와 개발은 개인이 주도하며, Legacy 버전에서 이어진 코드와 외부 라이브러리를 함께 사용합니다. 코드 분석·개발·문서 작성에는 생성형 AI를 보조 도구로 활용합니다.
 
-> **개발 버전:** 현재 엔진은 `preview` 상태입니다. API와 자산 형식은 개발 중 변경될 수 있습니다. 이 문서의 기능 설명은 2026-10-10의 커밋된 master를 기준으로 하며, 지원·검증 범위의 세부사항은 [기술설명서](docs/TechnicalGuide.md)에 정리합니다.
+> **개발 버전:** 현재 엔진은 `preview` 상태입니다. API와 자산 형식은 개발 중 변경될 수 있습니다. 기존 기능 설명은 2026-10-10의 커밋된 master를 기준으로 하며, 스크립팅 언어와 소스 경로는 2026-11-02 작업 트리의 F# 구성에 맞춰 갱신했습니다. 지원·검증 범위의 세부사항은 [기술설명서](docs/TechnicalGuide.md)에 정리합니다.
 
 ## 시작하기
 
@@ -63,15 +64,23 @@ Visual Studio에서는 `CreatorEngine.sln`을 열고 `CreatorEditor`를 시작 �
 
 배포본 준비·프로젝트 연결·패키징 명령은 [배포 가이드](Tools/distribution/README.md)와 [BuildTool 사용법](BuildTool/README.md)을 참고하십시오. 현재 프로젝트 연결은 개발용 adapter이며, Launcher와 정식 프로젝트 파일 지원은 후속 작업입니다.
 
+### F# 게임 스크립팅
+
+게임 로직 작성 언어는 C#에서 F#으로 전환했습니다. 현재 게임 스크립트는 프로젝트의 `Assets/Script` 아래에 `.fs` 파일로 작성하며, `compile.order`에 의존 순서대로 상대 경로를 한 줄에 하나씩 기록합니다. 엔진의 F# 게임 스크립트 프로젝트가 이 순서로 소스를 컴파일해 `GameScripts.dll`을 만듭니다.
+
+스크립트 컴포넌트는 `CreatorEngine.Component`를 상속하고, `OnBeginSimulation`이나 `OnTickSimulate(dt: single)` 등 필요한 생명주기 멤버만 일반 인스턴스 멤버로 선언합니다. 생성기가 등록 코드를 만들므로 생명주기에 `override`를 붙이지 않습니다. 네이티브 컴포넌트와 입력·물리·오디오 등의 엔진 API는 F# 바인딩을 통해 사용합니다.
+
+소스 구성은 [Engine/Scripting 안내](Engine/Scripting/README.md), 작성 예시는 [FSharpNativeMover.fs](Dynamic_CPP/Assets/Script/FSharpNativeMover.fs), 네이티브 API 접근은 [F# 네이티브 바인딩 문서](docs/design/FSharpNativeReflection.md)를 참고하십시오.
+
 ## 주요 기능
 
 - **씬과 프리팹 편집** — 도킹 에디터, Scene/Game 뷰, Hierarchy, Inspector, Content Browser, 기즈모와 Play/Stop 전환을 제공합니다.
 - **그래프 기반 재질 제작** — Lattice Material Node Editor에서 재질 자산을 작성하고 미리 볼 수 있습니다. 그래프 편집은 준비·검증 후 자동 반영·저장되며, 메시별 재질 override를 지원합니다.
 - **렌더링 파이프라인** — Slang 재질과 공용 렌더 패스, 의존성·리소스 버전 기반 RenderGraph를 사용합니다. Editor는 DX12로 실행하고, Player와 공용 RHI에는 DX12·Vulkan 경로가 있습니다.
 - **모델과 텍스처 처리** — glTF·FBX 임포트, 기하 LOD와 메시렛 경로, 임포트 설정에 따른 텍스처 mip·압축·쿠킹을 지원합니다. 게임 패키지는 준비된 콘텐츠를 사용합니다.
-- **리소스 편집 자동 반영** — 자산과 메타데이터 변경을 감지해 재임포트·쿠킹·소비자 갱신을 수행합니다. C# 게임 스크립트는 저장 후 자동 빌드·재연결되며, 실패 시 이전 정상 결과를 유지합니다.
+- **리소스 편집 자동 반영** — 자산과 메타데이터 변경을 감지해 재임포트·쿠킹·소비자 갱신을 수행합니다. F# 게임 스크립트는 저장 후 자동 빌드·재연결되며, 실패 시 이전 정상 결과를 유지합니다.
 - **게임 런타임** — Scene·Entity·Component 수명 관리, 공용 작업 스케줄러, 애니메이션 LOD·CPU 버짓, PhysX 물리, miniaudio 오디오와 SDF 텍스트 경로를 갖추고 있습니다.
-- **진단과 패키징** — CPU/GPU 프로파일링, 메모리 스냅샷 비교, `.ceprof` 캡처와 별도 뷰어를 제공합니다. CreatorBuildTool은 C# 컴파일부터 cook·PAK·Player 검증·게시까지 처리합니다.
+- **진단과 패키징** — CPU/GPU 프로파일링, 메모리 스냅샷 비교, `.ceprof` 캡처와 별도 뷰어를 제공합니다. CreatorBuildTool은 F# 게임 스크립트 컴파일부터 cook·PAK·Player 검증·게시까지 처리합니다.
 
 구현된 경로의 전체 품질·성능 수용을 뜻하지는 않습니다. 특히 Vulkan 교차 검증, GPU 기능 확대와 RenderGraph 큐 최적화의 채택 조건은 [기술설명서의 구현 경계](docs/TechnicalGuide.md#구현과-검증의-경계)를 참고하십시오.
 
@@ -81,7 +90,7 @@ Editor와 Player는 씬 런타임을 공유하고, 콘텐츠 도구는 저작 �
 
 ```mermaid
 flowchart LR
-    Editor["Editor<br/>씬 · 재질 · 자산 편집"] --> Runtime["공용 런타임<br/>C# · 애니메이션 · 물리 · 오디오"]
+    Editor["Editor<br/>씬 · 재질 · 자산 편집"] --> Runtime["공용 런타임<br/>F# · 애니메이션 · 물리 · 오디오"]
     Player["Player<br/>게임 실행"] --> Runtime
     Runtime --> Render["RenderEngine<br/>RenderGraph · RHI"]
     Assets["저작 자산"] --> Build["CreatorBuildTool<br/>컴파일 · cook · PAK"]
@@ -96,7 +105,7 @@ flowchart LR
 |---|---|
 | [Engine](Engine/) | 씬 런타임, 렌더링, 물리, 진단과 공용 기반 |
 | [Editor](Editor/) · [Player](Player/) | 편집용 호스트와 게임 실행 호스트 |
-| [ScriptCore](ScriptCore/) · [ScriptCore.Generators](ScriptCore.Generators/) | C# 엔진 API와 소스 제너레이터 |
+| [Engine/Scripting](Engine/Scripting/README.md) | F# 네이티브 바인딩, 관리 런타임, 작성 보조 함수와 게임 스크립트 빌드 |
 | [Lattice](Lattice/) | 그래프 모델, 문서와 편집 캔버스 |
 | [BuildTool](BuildTool/README.md) · [Tools](Tools/) | 배포·컴파일·쿠킹·패키징과 검증 도구 |
 | [Dynamic_CPP](Dynamic_CPP/) · [GameScripts](GameScripts/) | 소스 개발용 프로젝트, 자산과 스크립트 샘플 |
