@@ -22,11 +22,19 @@ export class thread_pool
     //
     // ★ start() **전에** 걸어야 한다. 워커는 start 에서 만들어지고, 그때 이미
     //   걸려 있는 훅만 그 워커의 시작을 본다.
+    enum class assist_phase
+    {
+        task_dispatch,
+        completion_wait
+    };
+
     struct worker_hooks
     {
         void (*on_start)(unsigned int worker_index) = nullptr;
         void (*on_stop)(unsigned int worker_index) = nullptr;
         void (*on_idle)() = nullptr;
+        // Optional paired owner-side observations. Install before start; never throw.
+        void (*on_assist_scope)(assist_phase phase, bool entering) noexcept = nullptr;
     };
     static void set_worker_hooks(const worker_hooks& hooks);
 

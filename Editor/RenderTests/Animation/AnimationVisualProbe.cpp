@@ -29,6 +29,143 @@ import Creator.Core.Uuid;
 
 namespace RenderTest
 {
+    bool SetupAnimationPopulation(const std::string& modelPath, const std::string& clipName,
+        std::size_t actors, AnimationPopulationReport& report, std::string& error)
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        auto& scheduler = SceneManagers->GetAnimationScheduler();
+        if (!scene || !SceneManagers->IsPlayCommitted() || !SceneManagers->IsGamePaused() ||
+            SceneManagers->HasPendingSceneStructureChange() || scheduler.GetAnimatorCount() != 0 ||
+            (actors != 32 && actors != 64))
+        {
+            error = "Population requires committed paused Play, an empty animator registry and 32 or 64 actors.";
+            return false;
+        }
+        const auto generation = DataSystems->LoadModelAssetGenerationByPath(modelPath);
+        if (!generation || !generation->Skeleton() || generation->Skeleton()->bones.empty() ||
+            generation->Skeleton()->bones.size() > kMaxBones)
+        {
+            error = "Population requires a supported skinned model.";
+            return false;
+        }
+        int clip = -1;
+        for (std::size_t index = 0; index < generation->Animations().size(); ++index)
+        {
+            if (generation->Animations()[index].name == clipName)
+            {
+                clip = static_cast<int>(index);
+                break;
+            }
+        }
+        if (clip < 0 || !std::isfinite(generation->Animations()[clip].durationTicks) ||
+            generation->Animations()[clip].durationTicks <= 0.)
+        {
+            error = "Population requires an exact clip name with a positive finite duration.";
+            return false;
+        }
+
+        ce::dynamic_array<EntityHandle> roots;
+        ce::dynamic_array<Animator*> animators;
+        report = {};
+        try
+        {
+            for (std::size_t index = 0; index < actors; ++index)
+            {
+                auto* actor = ModelSceneInstantiation::Instantiate(*scene, generation, {});
+                if (!actor)
+                {
+                    throw std::runtime_error("Population model instantiation failed.");
+                }
+                roots.push_back(scene->HandleOf(actor->m_index));
+                scene->RenameEntity(*actor, "__RenderPose" + std::to_string(index));
+                actor->Transform_().SetPosition({(static_cast<float>(index % 8) - 3.5f) * 2.f,
+                    (static_cast<float>(index / 8) - static_cast<float>(actors / 8 - 1) * .5f) * 2.5f, 0.f});
+                auto* animator = actor->GetComponent<Animator>();
+                if (!animator)
+                {
+                    throw std::runtime_error("Population actor has no Animator.");
+                }
+                animator->ClearControllersAndParams();
+                auto controller = own::make_shared<AnimationController>();
+                controller->m_owner = animator;
+                controller->name = "RenderPopulation";
+                controller->CreateState("Sample", clip);
+                controller->CheckTransition();
+                if (controller->GetAnimationIndex() != clip)
+                {
+                    throw std::runtime_error("Population clip did not become active.");
+                }
+                controller->GetPlayback().timeElapsed = static_cast<float>(
+                    generation->Animations()[clip].durationTicks * (static_cast<double>(index) + .5) / actors);
+                animator->m_animationControllers.push_back(std::move(controller));
+                animator->GetInstance().qualityOverride = 0;
+                animators.push_back(animator);
+                for (auto* mesh : actor->GetComponentsInChildren<MeshRenderer>())
+                {
+                    if (mesh->IsSkinnedMesh())
+                    {
+                        ++report.skinnedMeshes;
+                    }
+                }
+            }
+            scene->DrainPendingLifecycle();
+            scene->SyncDerivedState();
+            if (scheduler.GetAnimatorCount() != actors || !report.skinnedMeshes)
+            {
+                throw std::runtime_error("Population did not register its animators and skinned meshes.");
+            }
+            scheduler.Update(0.f);
+            scene->SyncDerivedState();
+            scene->UpdateRenderData();
+
+            // Compare the full published palettes, not digest equality. GPU page
+            // counts must still be verified from the subsequent renderer capture.
+            const auto bones = generation->Skeleton()->bones.size();
+            ce::dynamic_array<Animator*> distinct;
+            for (auto* animator : animators)
+            {
+                const auto* palette = animator->GetInstance().finalTransforms.data();
+                for (std::size_t bone = 0; bone < bones; ++bone)
+                {
+                    ce::fixed_array<float, 16> values;
+                    std::memcpy(values.data(), palette + bone, sizeof(values));
+                    if (std::ranges::any_of(values, [](float value) { return !std::isfinite(value); }))
+                    {
+                        throw std::runtime_error("Population published a non-finite palette.");
+                    }
+                }
+                if (std::ranges::none_of(distinct, [&](const auto* other)
+                    {
+                        return std::memcmp(palette, other->GetInstance().finalTransforms.data(),
+                            bones * sizeof(*palette)) == 0;
+                    }))
+                {
+                    distinct.push_back(animator);
+                }
+            }
+            report.actors = actors;
+            report.distinctPalettes = distinct.size();
+            if (report.distinctPalettes != actors)
+            {
+                throw std::runtime_error("Selected clip did not produce one distinct palette per actor.");
+            }
+            return true;
+        }
+        catch (const std::exception& exception)
+        {
+            error = exception.what();
+            for (const auto handle : roots)
+            {
+                if (scene->Resolve(handle))
+                {
+                    scene->DestroyEntity(handle.index);
+                }
+            }
+            scene->EndFramePass();
+            return false;
+        }
+    }
+
     bool RunAnimationVisualProbe(const std::string& action, const std::string& modelPath,
         AnimationVisualReport& report, std::string& error)
     {

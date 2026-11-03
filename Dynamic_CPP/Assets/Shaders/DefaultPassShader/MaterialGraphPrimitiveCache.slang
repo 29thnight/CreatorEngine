@@ -1,4 +1,5 @@
 #include "Includes/MaterialGraphPrimitiveCacheTypes.slang"
+#include "Includes/MaterialGraphPacketEncoding.slang"
 #include "Includes/MeshletGeometryAccess.slang"
 #include "Includes/LxMeshletGpuContract.slang"
 
@@ -59,7 +60,7 @@ void PopulatePrimitiveCache(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
     const uint4 range = lx_cacheRanges[lx_cacheSelector.x];
     const uint64_t flat = uint64_t(lx_cacheSelector.z) + group.x + uint64_t(group.y) * lx_cacheSelector.y;
     const bool validPacket = flat < range.y;
-    const uint2 packet = validPacket ? lx_cachePackets[range.x + uint(flat)] : uint2(0u);
+    const uint2 packet = validPacket ? LXLoadMaterialPacket(lx_cachePackets, range.x + uint(flat), lx_cacheSelector.w) : uint2(0u);
     const bool validRecord = packet.x != 0u && packet.x < lx_cacheRecordCount;
     const uint grid = (lx_cacheWidth + 7u) / 8u;
     const uint2 pixel = uint2(packet.y % grid, packet.y / grid) * 8u + uint2(lane & 7u, lane >> 3u);

@@ -560,6 +560,7 @@ namespace material_graph
             };
             ce::dynamic_array<Key> m_keys;
             ce::dynamic_array<Entry> m_entries;
+            ce::dynamic_array<size_t> m_pageOrder;
             ce::dynamic_array<SceneFrameGeometry::Record> m_geometryRecords;
             ce::dynamic_array<SceneGpuData::Record> m_sceneRecords;
             uint32_t m_nextPrimitive{};
@@ -651,6 +652,41 @@ namespace material_graph
                              (draw.coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0,
                              program->hasSurface && !program->editorPreview && shadows && draw.queue != SceneCoverage::Blended});
                     }
+                }
+                // Reuse the order with the immutable caster plan. Draw records
+                // and ordered primitive lists retain their original identities.
+                m_pageOrder.resize(m_entries.size());
+                for (size_t index = 0; index < m_entries.size(); ++index)
+                {
+                    m_pageOrder[index] = index;
+                }
+                static const bool groupPages = []
+                {
+                    char* value{};
+                    size_t length{};
+                    const bool enabled = _dupenv_s(&value, &length, "CREATOR_MATERIAL_PAGE_GROUPING") == 0 &&
+                                         value && std::strcmp(value, "1") == 0;
+                    std::free(value);
+                    return enabled;
+                }();
+                if (groupPages)
+                {
+                    std::sort(m_pageOrder.begin(), m_pageOrder.end(), [&](size_t left, size_t right)
+                    {
+                        const auto& a = m_entries[left];
+                        const auto& b = m_entries[right];
+                        const auto& aKey = programs[a.m_input]->generation->cooked.product.program.semanticKey;
+                        const auto& bKey = programs[b.m_input]->generation->cooked.product.program.semanticKey;
+                        if (aKey != bKey)
+                        {
+                            return aKey < bKey;
+                        }
+                        if (a.m_doubleSided != b.m_doubleSided)
+                        {
+                            return a.m_doubleSided < b.m_doubleSided;
+                        }
+                        return a.m_output < b.m_output;
+                    });
                 }
                 m_valid = true;
                 return false;
@@ -2420,8 +2456,12 @@ namespace material_graph
                 return false;
             }
         }
-        const bool parallelPreparation =
-            preparedChunks >= 2 && !thread_pool::is_worker_thread() && scheduler_.is_running();
+        // Small views have less binding/packet work than a worker handoff costs.
+        // Keep their existing task bodies and failure handling on the owner;
+        // larger views still overlap geometry, material and shadow preparation.
+        constexpr std::size_t kMinimumParallelPreparationChunks = 16;
+        const bool parallelPreparation = preparedChunks >= kMinimumParallelPreparationChunks &&
+                                         !thread_pool::is_worker_thread() && scheduler_.is_running();
         // This producer owns the material cache/bytes and volume bindings. Mesh
         // preparation owns geometry caches and Draw geometry fields. Neither
         // producer reads the other's output until the explicit join below.
@@ -2734,9 +2774,11 @@ namespace material_graph
                         };
                         const auto appendBytes = [&](std::span<const std::byte> bytes)
                         {
-                            if (accountBytes(bytes.size()))
+                            if (accountBytes(bytes.size()) && !bytes.empty())
                             {
-                                key.insert(key.end(), bytes.begin(), bytes.end());
+                                // The pointer range selects the contiguous append path without
+                                // materializing an input range and relocating the existing key.
+                                key.insert(key.end(), bytes.data(), bytes.data() + bytes.size());
                             }
                         };
                         const auto append = [&](const auto& value)
@@ -3206,11 +3248,6 @@ namespace material_graph
                 // cover those entries too. Volume-only programs emit no mesh
                 // raster work and keep their existing compute/composite route.
                 const bool rasterGeometry = program->hasSurface || program->hasSpecial;
-                if (rasterGeometry &&
-                    !sceneData->AssignGeometry(item.geometryRecord, item.geometry, item.previousGeometry, error))
-                {
-                    return false;
-                }
                 // Opaque and blended surfaces are culled per meshlet; the owner gate is
                 // the sealed visibleOwner. No instance-level culling route exists.
                 if (rasterGeometry && !candidate->UsesMeshlets(item))
@@ -3219,6 +3256,18 @@ namespace material_graph
                                 ordered
                                     ? "METEOR blended surface requires supported cooked meshlets; reimport the asset."
                                     : "METEOR opaque surface requires supported cooked meshlets; reimport the asset.");
+                }
+            }
+        }
+        {
+            ce::profile_scope pages{ce::marker<"MaterialSceneDescriptorPages">()};
+            for (const auto index : casterPlan.m_pageOrder)
+            {
+                const auto& item = candidate->draws[casterPlan.m_entries[index].m_output];
+                if ((item.program->hasSurface || item.program->hasSpecial) &&
+                    !sceneData->AssignGeometry(item.geometryRecord, item.geometry, item.previousGeometry, error))
+                {
+                    return false;
                 }
             }
         }
@@ -3969,7 +4018,7 @@ namespace material_graph
             }
             const auto& cache = candidate->m_primitiveCache;
             if (!sceneData->CreatePacketBindings(
-                    *device_, work->work, work->PacketCapacity(), work->ranges,
+                    *device_, work->work, work->PacketStorageElements(), work->ranges,
                     static_cast<uint32_t>(work->buckets.size()), candidate->materialPacketBindings, error,
                     cache ? cache->Keys() : RHIBufferHandle{}, cache ? cache->Data() : RHIBufferHandle{}))
             {
@@ -4234,6 +4283,32 @@ namespace material_graph
     own::shared_owner<const SceneMaterialWork> SceneHost::MaterialWork() const
     {
         return frame_ ? frame_->materialWorkStage.materialWork : nullptr;
+    }
+
+    SceneMaterialPageDiagnostics SceneHost::MaterialPageDiagnostics() const
+    {
+        SceneMaterialPageDiagnostics result;
+        if (!frame_ || !frame_->sceneData)
+        {
+            return result;
+        }
+
+        const auto& data = *frame_->sceneData;
+        result.pages.reserve(data.pages.size());
+        for (const auto& page : data.pages)
+        {
+            result.pages.push_back({static_cast<uint32_t>(page.vertices.size()),
+                                    static_cast<uint32_t>(page.topology.size())});
+        }
+        result.records.resize(data.records.size());
+        for (const auto& draw : frame_->draws)
+        {
+            auto& record = result.records.at(draw.geometryRecord);
+            record.page = data.recordPages.at(draw.geometryRecord);
+            record.semanticKey = draw.program->generation->cooked.product.program.semanticKey;
+            record.doubleSided = draw.doubleSided;
+        }
+        return result;
     }
 
     own::shared_owner<const SceneFrameGeometry> SceneHost::FrameGeometry() const

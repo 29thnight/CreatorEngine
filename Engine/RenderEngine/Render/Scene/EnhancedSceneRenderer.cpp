@@ -7714,6 +7714,43 @@ namespace
                     return false;
                 }
 
+                if (capture && capture->controlled)
+                {
+                    if (!capture->DeclareGeometryLists(dx12.Resources(), graph, p.Execution().graphMaterials, outError) ||
+                        !capture->DeclareMaterialPackets(dx12.Resources(), graph, p.Execution().graphMaterials, outError))
+                    {
+                        return false;
+                    }
+                    // Preserve the normal HDR stage names and capture each GI boundary
+                    // separately so a final-color difference can be localized.
+                    const std::pair<const char*, RGHandle> intermediates[]{
+                        {"ssgi-trace", view.ssgi.GetTraceResult()},
+                        {"ssgi-resolved", view.ssgi.GetResolvedResult()},
+                        {"ssgi-filtered", view.ssgi.GetFilteredResult()}};
+                    for (const auto& [name, handle] : intermediates)
+                    {
+                        if (!handle.IsValid())
+                        {
+                            continue;
+                        }
+
+                        RGResourceDescription description{};
+                        if (!graph.DescribeResource(handle, description) ||
+                            description.kind != RGResourceKind::Texture ||
+                            description.format != RHIFormat::RGBA16Float)
+                        {
+                            outError = "SSGI diagnostic intermediate has an invalid texture description.";
+                            return false;
+                        }
+
+                        if (!capture->DeclareStageTexture(dx12.Resources(), graph, handle, name,
+                                                          description.width, description.height, outError))
+                        {
+                            return false;
+                        }
+                    }
+                }
+
                 if (!p.Execution().blackboard.Get(LiveSlots::kDisplayLdr).IsValid())
                 {
                     outError = "포스트 체인 출력이 없다";

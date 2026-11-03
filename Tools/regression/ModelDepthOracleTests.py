@@ -73,6 +73,23 @@ class ModelDepthOracleTests(unittest.TestCase):
         np.testing.assert_array_equal(decoded[:,1:],positions[:,1:])
         self.assertLess(abs(decoded[1,0]-.5),1e-4)
 
+    def test_repeated_mesh_instances_keep_nearest_world_depth(self):
+        front = dict(self.manifest['draws'][0])
+        front['world'] = front['world'].copy()
+        front['world'][14] = -.1
+        self.manifest['draws'].append(front)
+        self.pixels[self.pixels < 1] = .4
+        self.pixels.tofile(self.root/'depth.f32')
+
+        for draws in (self.manifest['draws'], list(reversed(self.manifest['draws']))):
+            self.manifest['draws'] = draws
+            self.write_manifest()
+            self.assertTrue(self.run_oracle())
+
+        self.pixels[32,32] = .5
+        self.pixels.tofile(self.root/'depth.f32')
+        self.assertFalse(self.run_oracle())
+
     def test_wrong_depth_is_rejected_without_changing_probe_count(self):
         self.assertTrue(self.run_oracle())
         count = json.loads((self.root/'result.json').read_text())['interiorOpaqueProbes']

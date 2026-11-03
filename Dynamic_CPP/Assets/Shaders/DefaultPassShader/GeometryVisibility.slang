@@ -316,11 +316,28 @@ uint MeshletRingCapacity()
     return 256u;
 #endif
 }
+bool MeshletUsesCompactedInstances()
+{
+    return (geometryVisibilityPlaneMask & 0x20000000u) != 0u;
+}
+
+uint MeshletInstanceListBase(uint queue)
+{
+    // Keep the storage ABI independent of the stress permutation's ring capacity.
+    return queue + 16u + 256u;
+}
+
+uint MeshletPartitionCount(uint queue)
+{
+    return (MeshletUsesCompactedInstances()
+        ? geometryVisibleIds[MeshletInstanceListBase(queue)] : geometryVisibilityBinCount) * 16u;
+}
+
 uint MeshletClaimWork(uint queue)
 {
     uint ticket;
     InterlockedAdd(geometryVisibleIds[queue + 6u], 0u, ticket);
-    [loop] while (ticket < geometryVisibilityBinCount * 16u)
+    [loop] while (ticket < MeshletPartitionCount(queue))
     {
         uint observed;
         InterlockedCompareExchange(geometryVisibleIds[queue + 6u], ticket, ticket + 1u, observed);
@@ -565,6 +582,30 @@ void GeometryResetInstanceBounds(uint bin, uint lane)
         return;
     }
     const uint address = MeshletInstanceOffset(bin);
+#if defined(GEOMETRY_VISIBILITY_SHARED_VIEWS) || defined(GEOMETRY_VISIBILITY_RECOVERY)
+    // The CPU reuse proof requires the same sealed geometry, view and LOD inputs.
+    // Invalid bounds deliberately leave coordinates unspecified in the first pass.
+    if ((geometryVisibilityCandidates[bin].flags & 128u) != 0u)
+    {
+#if defined(GEOMETRY_VISIBILITY_SHARED_VIEWS)
+        const uint viewIndex = NonUniformResourceIndex(geometryVisibilityCandidates[bin].bin);
+        const uint valid = meshletViewFirst[viewIndex][address + 6u];
+        if (lane < 8u)
+        {
+            MESHLET_IDS(bin)[address + lane] = lane < 6u && valid == 0u
+                ? 0u : meshletViewFirst[viewIndex][address + lane];
+        }
+#else
+        const uint valid = meshletFirstStage[address + 6u];
+        if (lane < 8u)
+        {
+            MESHLET_IDS(bin)[address + lane] = lane < 6u && valid == 0u
+                ? 0u : meshletFirstStage[address + lane];
+        }
+#endif
+        return;
+    }
+#endif
     const uint worldBase = MeshletWorldBase(bin);
     const float4 minimum = meshletWorldColumns[worldBase + 3u];
     const float4 maximum = meshletWorldColumns[worldBase + 4u];
@@ -577,14 +618,41 @@ void GeometryResetInstanceBounds(uint bin, uint lane)
         }
         return;
     }
-    // 가중치가 모두 0인 정점은 bind pose를 쓴다. 본의 변환 경계와 함께
-    // 보존하여 현재 포즈가 원래 메시 경계를 벗어나도 조기 컬링에서 빠지지 않는다.
+    // Legacy packets retain the whole bind-pose box. New packets store only
+    // the vertices influenced by each bone and a separate zero-weight box.
     float3 posedMinimum = minimum.xyz;
     float3 posedMaximum = maximum.xyz;
     bool valid = true;
     const uint boneCount = MeteorPoseWord(shadowMeshletVertices[NonUniformResourceIndex(bin)], 0u);
+    const bool tightBounds = boneCount != 0u &&
+        MeteorPoseWord(shadowMeshletVertices[NonUniformResourceIndex(bin)], 4u) == 0x31424249u &&
+        MeteorPoseWord(shadowMeshletVertices[NonUniformResourceIndex(bin)], 12u) == boneCount + 1u;
+    const uint boundsBase = tightBounds
+        ? MeteorPoseWord(shadowMeshletVertices[NonUniformResourceIndex(bin)], 8u) : 0u;
+    if (tightBounds)
+    {
+        const uint fallback = boundsBase + boneCount * 32u;
+        const float4 lower = MeteorPose4(shadowMeshletVertices[NonUniformResourceIndex(bin)], fallback);
+        const float4 upper = MeteorPose4(shadowMeshletVertices[NonUniformResourceIndex(bin)], fallback + 16u);
+        posedMinimum = lower.w != 0.0f ? lower.xyz : float3(3.402823466e+38f);
+        posedMaximum = upper.w != 0.0f ? upper.xyz : float3(-3.402823466e+38f);
+    }
     for (uint bone = lane; bone < boneCount; bone += 64u)
     {
+        float3 boneMinimum = minimum.xyz;
+        float3 boneMaximum = maximum.xyz;
+        if (tightBounds)
+        {
+            const uint address = boundsBase + bone * 32u;
+            const float4 lower = MeteorPose4(shadowMeshletVertices[NonUniformResourceIndex(bin)], address);
+            const float4 upper = MeteorPose4(shadowMeshletVertices[NonUniformResourceIndex(bin)], address + 16u);
+            if (lower.w == 0.0f && upper.w == 0.0f)
+            {
+                continue;
+            }
+            boneMinimum = lower.xyz;
+            boneMaximum = upper.xyz;
+        }
         const float4x4 matrix = MeteorBone(shadowMeshletVertices[NonUniformResourceIndex(bin)], bone);
         float4 columns[3];
         [unroll] for (uint column = 0u; column < 3u; ++column)
@@ -592,7 +660,7 @@ void GeometryResetInstanceBounds(uint bin, uint lane)
             columns[column] = float4(matrix[0][column], matrix[1][column], matrix[2][column], matrix[3][column]);
         }
         float3 lower, upper;
-        valid = GeometryTransformInstanceBounds(minimum.xyz, maximum.xyz, columns, lower, upper) && valid;
+        valid = GeometryTransformInstanceBounds(boneMinimum, boneMaximum, columns, lower, upper) && valid;
         posedMinimum = min(posedMinimum, lower);
         posedMaximum = max(posedMaximum, upper);
     }
@@ -733,6 +801,10 @@ bool GeometryPrepareMeshlet(uint bin, uint meshlet)
 
 bool GeometryMeshletBoxOccluded(uint bin, float3 minimumWorld, float3 maximumWorld, uint firstAddress)
 {
+    if ((geometryVisibilityCandidates[bin].flags & 1024u) != 0u)
+    {
+        return false;
+    }
 #if defined(GEOMETRY_VISIBILITY_OCCLUSION)
     const MeshletViewData view = MeshletView(bin);
 #if defined(GEOMETRY_VISIBILITY_SHARED_VIEWS)
@@ -781,6 +853,10 @@ bool GeometryMeshletBoxOccluded(uint bin, float3 minimumWorld, float3 maximumWor
 
 bool GeometryInstanceAdmitted(uint bin)
 {
+    if ((geometryVisibilityCandidates[bin].flags & 1024u) != 0u)
+    {
+        return true;
+    }
     if (!MeshletHasInstanceBounds(bin))
     {
         return true;
@@ -799,6 +875,59 @@ bool GeometryInstanceAdmitted(uint bin)
     const float3 maximum =
         asfloat(uint3(MESHLET_IDS(bin)[address + 3u], MESHLET_IDS(bin)[address + 4u], MESHLET_IDS(bin)[address + 5u]));
     return !GeometryMeshletBoxOccluded(bin, minimum, maximum, geometryVisibilityBins[bin].firstIndex);
+}
+
+groupshared uint instanceAdmissionMask[2];
+groupshared uint instanceSurvivors;
+
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void GeometryCompactInstancesCS(uint lane : SV_GroupIndex)
+{
+    // Exactly one group follows Reset. A graph UAV dependency publishes its
+    // completed list to Cull, avoiding a cross-group counter initialization race.
+    const uint list = MeshletInstanceListBase(MeshletWorkQueueBase());
+    if (lane == 0u)
+    {
+        instanceSurvivors = 0u;
+    }
+    GroupMemoryBarrierWithGroupSync();
+    for (uint first = 0u; first < geometryVisibilityBinCount; first += 64u)
+    {
+        const uint bin = first + lane;
+        uint admitted = 0u;
+        if (bin < geometryVisibilityBinCount && geometryVisibilityBins[bin].indexCount != 0u)
+        {
+            admitted = uint(GeometryInstanceAdmitted(bin));
+        }
+        // Group-index masks preserve bin order without assuming a wave size or
+        // a mapping between wave lanes and SV_GroupIndex.
+        if (lane < 2u) instanceAdmissionMask[lane] = 0u;
+        GroupMemoryBarrierWithGroupSync();
+        if (admitted != 0u)
+        {
+            InterlockedOr(instanceAdmissionMask[lane >> 5u], 1u << (lane & 31u));
+        }
+        GroupMemoryBarrierWithGroupSync();
+
+        const uint precedingMask = (1u << (lane & 31u)) - 1u;
+        const uint preceding = countbits(instanceAdmissionMask[lane >> 5u] & precedingMask) +
+            (lane >= 32u ? countbits(instanceAdmissionMask[0]) : 0u);
+        if (admitted != 0u)
+        {
+            geometryVisibleIds[list + 1u + instanceSurvivors + preceding] = bin;
+        }
+        GroupMemoryBarrierWithGroupSync();
+        if (lane == 0u)
+        {
+            instanceSurvivors += countbits(instanceAdmissionMask[0]) + countbits(instanceAdmissionMask[1]);
+        }
+        GroupMemoryBarrierWithGroupSync();
+    }
+    if (lane == 0u)
+    {
+        geometryVisibleIds[list] = instanceSurvivors;
+    }
 }
 
 void GeometryCullMeshlet(uint bin, uint meshlet)
@@ -822,7 +951,8 @@ void GeometryCullMeshlet(uint bin, uint meshlet)
             !GeometryClusterSelected(bin, descriptor.groupId, false)) return;
     }
     const uint count = descriptor.vertexCount;
-    uint outside = view.valid != 0u ? 63u : 0u;
+    const bool allVisible = (geometryVisibilityCandidates[bin].flags & 1024u) != 0u;
+    uint outside = view.valid != 0u && !allVisible ? 63u : 0u;
 #if defined(GEOMETRY_VISIBILITY_OCCLUSION)
     float3 minimumWorld = float3(3.402823466e+38f);
     float3 maximumWorld = -minimumWorld;
@@ -951,7 +1081,7 @@ void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
         queued = WaveReadLaneFirst(queued);
         producers = WaveReadLaneFirst(producers);
         if (!producerLease && sourceRemaining == 0u && !WaveActiveAnyTrue(pending != 0u) &&
-            partitions == geometryVisibilityBinCount * 16u && queued == 0u && producers == 0u)
+            partitions == MeshletPartitionCount(queue) && queued == 0u && producers == 0u)
         {
             // A gathered job finishes in this wave before the next iteration.
             // Other consumers finish their own jobs before exiting as well.
@@ -965,7 +1095,7 @@ void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
             // A wave acquires one of sixteen logical subdivisions per bin.
             // Use the published RE subdivision formula, including small inputs
             // and the final subdivision's integer-division remainder.
-            if (partitions < geometryVisibilityBinCount * 16u &&
+            if (partitions < MeshletPartitionCount(queue) &&
                 !WaveActiveAnyTrue(pending != 0u) && sourceRemaining == 0u)
             {
                 uint partition = 0xffffffffu;
@@ -983,6 +1113,10 @@ void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
                 if (partition != 0xffffffffu)
                 {
                     sourceBin = partition / 16u;
+                    if (MeshletUsesCompactedInstances())
+                    {
+                        sourceBin = geometryVisibleIds[MeshletInstanceListBase(queue) + 1u + sourceBin];
+                    }
                     const uint subdivision = partition & 15u;
                     const uint meshlets = geometryVisibilityBins[sourceBin].indexCount;
                     sourceRemaining = meshlets / 16u;
@@ -1002,7 +1136,7 @@ void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
                         if (WaveIsFirstLane())
                         {
                             InterlockedAdd(geometryVisibleIds[queue + 10u], 1u);
-                            admitted = uint(GeometryInstanceAdmitted(sourceBin));
+                            admitted = MeshletUsesCompactedInstances() ? 1u : uint(GeometryInstanceAdmitted(sourceBin));
                             if (admitted == 0u)
                             {
                                 InterlockedAdd(geometryVisibleIds[queue + 15u], 1u);

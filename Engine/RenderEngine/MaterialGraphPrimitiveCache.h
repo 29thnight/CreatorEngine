@@ -221,7 +221,7 @@ namespace material_graph
             const ce::fixed_array inputDescriptions{
                 RHIBindingDesc::SrvBuffer(m_sceneData->recordBuffer->Buffer(), constants.recordCount,
                                           sizeof(SceneGpuData::Record)),
-                RHIBindingDesc::SrvBuffer(m_material->work, m_material->PacketCapacity(), 8),
+                RHIBindingDesc::SrvBuffer(m_material->work, m_material->PacketStorageElements(), 8),
                 RHIBindingDesc::SrvBuffer(m_material->ranges, static_cast<std::uint32_t>(m_material->buckets.size()),
                                           16)};
             const ce::fixed_array outputDescriptions{

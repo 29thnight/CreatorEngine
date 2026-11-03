@@ -994,6 +994,70 @@ namespace material_graph
         lower.w = upper.w = 1.0f;
         m_instanceMinimum = lower;
         m_instanceMaximum = upper;
+
+        if (bones_.empty() || streamedTopology_)
+        {
+            // Streamed inputs own descriptors, not vertex bytes. BuildStreamed
+            // supplies authenticated cooked bone bounds without opening pages.
+            return;
+        }
+        // Coarse LOD remaps reference the same source vertices. Build these boxes
+        // once from every owned vertex, including those outside current residency.
+        // Cluster position decoding can move each component by positionError.
+        const auto boxCount = bones_.size() + 1u;
+        ce::dynamic_array<ce::fixed_array<double, 6>> boxes(boxCount);
+        for (auto& box : boxes)
+        {
+            box = {infinity, infinity, infinity, -infinity, -infinity, -infinity};
+        }
+        const auto include = [&](std::size_t bone, const ce::fixed_array<float, 3>& position)
+        {
+            auto& box = boxes[bone];
+            for (unsigned axis = 0; axis < 3; ++axis)
+            {
+                box[axis] = (std::min)(box[axis], double(position[axis]) - positionError - 1e-5);
+                box[axis + 3] = (std::max)(box[axis + 3], double(position[axis]) + positionError + 1e-5);
+            }
+        };
+        const auto mask = geometry_.vertexAttributeMask;
+        for (uint32_t vertexIndex = 0; vertexIndex < Count(); ++vertexIndex)
+        {
+            const auto* vertex = vertices_.data() + std::size_t(vertexIndex) * geometry_.vertexStride;
+            const auto position = Read<ce::fixed_array<float, 3>>(vertex, mask, assets::VertexAttribute::Position);
+            const auto indices = Read<ce::fixed_array<uint8_t, 4>>(vertex, mask, assets::VertexAttribute::BoneIndices);
+            const auto weights = Read<ce::fixed_array<float, 4>>(vertex, mask, assets::VertexAttribute::BoneWeights);
+            bool influenced = false;
+            for (unsigned influence = 0; influence < 4; ++influence)
+            {
+                if (weights[influence] > 0.0f)
+                {
+                    include(indices[influence], position);
+                    influenced = true;
+                }
+            }
+            if (!influenced)
+            {
+                include(bones_.size(), position);
+            }
+        }
+        m_boneBounds.resize(boxCount);
+        for (std::size_t bone = 0; bone < boxCount; ++bone)
+        {
+            const auto& box = boxes[bone];
+            if (box[0] == infinity)
+            {
+                continue;
+            }
+            auto& bound = m_boneBounds[bone];
+            for (unsigned axis = 0; axis < 3; ++axis)
+            {
+                bound.minimum[axis] = std::nextafter(static_cast<float>(box[axis]),
+                    -std::numeric_limits<float>::infinity());
+                bound.maximum[axis] = std::nextafter(static_cast<float>(box[axis + 3]),
+                    std::numeric_limits<float>::infinity());
+            }
+            bound.minimum.w = bound.maximum.w = 1.0f;
+        }
     }
 
     bool MeshSurfaceInput::Seal(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,
@@ -1258,7 +1322,7 @@ namespace material_graph
             (candidate->source_->ClusterArchive() ? candidate->source_->ClusterArchive()->Bytes() * 2 : 0) +
             geometry.vertexBytes * 2ull + assets::quantized::HeaderBytes +
             std::uint64_t(candidate->source_->Geometry().indexCount) * sizeof(std::uint32_t) + lods.size_bytes() +
-            boneBytes;
+            boneBytes + candidate->source_->BoneBounds().size_bytes();
         if (const auto* cooked = &candidate->source_->Meshlets())
         {
             cost.cpuPayloadBytes += cooked->descriptors.size() * sizeof(experiment::MeshletDescriptor) +
@@ -1415,7 +1479,7 @@ namespace material_graph
             }
             const std::uint64_t cpuAddition =
                 std::uint64_t(additional) * (geometry.vertexStride * 2ull + 12ull) + 12 +
-                (chunk->indices_.empty() ? assets::quantized::HeaderBytes + boneBytes +
+                (chunk->indices_.empty() ? assets::quantized::HeaderBytes + boneBytes + source.BoneBounds().size_bytes() +
                                                source.Hierarchy().groups.size() * sizeof(experiment::MeshClusterGroup)
                                          : 0);
             // Payload only: source upload + world/material/bake buffers and index/LOD.
@@ -1427,7 +1491,7 @@ namespace material_graph
                 12 +
                 (chunk->indices_.empty()
                      ? (source.ClusterArchive() ? source.Hierarchy().groups.size() * 4 + 192 : 0) +
-                           assets::quantized::HeaderBytes +
+                           assets::quantized::HeaderBytes + source.BoneBounds().size_bytes() +
                            std::max(boneBytes, std::uint64_t(sizeof(PackedBoneMatrix))) +
                            (clusters.empty() ? 0 : sizeof(RHIMeshletBufferHeader) + source.Hierarchy().GpuBytes())
                      : 0);
@@ -2039,7 +2103,9 @@ namespace material_graph
         description.bytes = candidate->Count() * sizeof(SurfacePoint);
         if (candidate->directClusters_)
         {
-            const auto bytes = 32 + source.Bones().size_bytes();
+            const auto bounds = source.BoneBounds();
+            const auto boundsOffset = 32 + source.Bones().size_bytes();
+            const auto bytes = boundsOffset + bounds.size_bytes();
             description.bytes = ((bytes + sizeof(SurfacePoint) - 1) / sizeof(SurfacePoint)) * sizeof(SurfacePoint);
             candidate->bufferBytes_ = description.bytes;
             candidate->clusterPoseUpload_ = device.AllocateUpload({description.bytes, RHIUploadUsage::BufferCopy, 16});
@@ -2054,6 +2120,17 @@ namespace material_graph
             {
                 std::memcpy(static_cast<std::byte*>(candidate->clusterPoseUpload_.cpuAddress) + 32,
                             source.Bones().data(), source.Bones().size_bytes());
+            }
+            if (!bounds.empty())
+            {
+                // Existing bone matrices keep their offset. The reserved header
+                // identifies an appended immutable per-bone bounds table.
+                const uint32_t header[]{0x31424249u, static_cast<uint32_t>(boundsOffset),
+                    static_cast<uint32_t>(bounds.size())};
+                std::memcpy(static_cast<std::byte*>(candidate->clusterPoseUpload_.cpuAddress) + 4,
+                    header, sizeof(header));
+                std::memcpy(static_cast<std::byte*>(candidate->clusterPoseUpload_.cpuAddress) + boundsOffset,
+                    bounds.data(), bounds.size_bytes());
             }
         }
         description.allowUnorderedAccess = !candidate->directClusters_;

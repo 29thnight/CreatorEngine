@@ -31,7 +31,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     struct BufferPool;
     struct MeshletInputs;
     struct SharedBatch;
-    enum class MeshletStage : std::uint8_t { Reset, Cull, Count, Finalize, Scatter };
+    enum class MeshletStage : std::uint8_t { Reset, Compact, Cull, Count, Finalize, Scatter };
 
   public:
     static constexpr std::uint32_t kConservative = 1;
@@ -43,6 +43,8 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     static constexpr std::uint32_t kReuseFirstGroups = 128;
     static constexpr std::uint32_t kReuseBinGroups = 256;
     static constexpr std::uint32_t kInstanceBounds = 512;
+    // Diagnostic reference: retain resident LOD selection, bypass spatial culling.
+    static constexpr std::uint32_t kDiagnosticAllVisible = 1024;
     static constexpr std::uint32_t kInstanceBoundsWords = 8;
     static constexpr std::uint32_t kMeshletInstanceRows = 5;
     static constexpr std::uint32_t kWaveWorkQueue = 0x80000000u;
@@ -189,12 +191,15 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         std::uint32_t WorkQueuePartitionCount() const;
         std::uint32_t WorkQueueViewCount() const;
         std::uint32_t WorkQueueNonemptyPartitions(std::uint32_t width) const;
+        std::uint32_t WorkQueueSelectedPartitions(std::uint32_t width, std::span<const std::uint32_t> bins) const;
 
         const own::shared_owner<const material_graph::MeshSurfaceBatch>& MeshletGeometry(std::uint32_t bin) const
         {
             return m_meshletGeometries.at(bin);
         }
         std::uint32_t MeshletOutputOffset(std::uint32_t bin) const { return m_meshletOffsets.at(bin); }
+        std::uint32_t MeshletBinCount() const { return static_cast<std::uint32_t>(m_meshletGeometries.size()); }
+        bool BypassesMeshletCulling() const;
         PreparedStats GetPreparedStats() const { return m_preparedStats; }
         std::uint64_t ArgsOffset(std::uint32_t bin) const;
 
@@ -239,7 +244,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         own::shared_owner<const GpuGeometryOcclusion::Pyramid> m_historyPyramid;
         bool m_ordered{};
         mutable RHIBufferSlice m_meshletWorlds;
-        own::shared_owner<const LX::Runtime::ComputeGeneration> m_reset, m_cull, m_meshletCount,
+        own::shared_owner<const LX::Runtime::ComputeGeneration> m_reset, m_cull, m_compact, m_occlusionCompact, m_meshletCount,
             m_meshletFinalize, m_meshletScatter;
         own::shared_owner<const LX::Runtime::ComputeGeneration> m_occlusionCull;
         GpuGeometryOcclusion::ViewKey m_occlusionView;
@@ -251,7 +256,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         mutable std::uint64_t m_graphEpoch{};
         mutable RGHandle m_graphVisibleIds, m_graphArguments;
         mutable own::shared_owner<SharedBatch> m_sharedBatch;
-        own::shared_owner<const LX::Runtime::ComputeGeneration> m_sharedReset, m_sharedCull,
+        own::shared_owner<const LX::Runtime::ComputeGeneration> m_sharedReset, m_sharedCompact, m_sharedOcclusionCompact, m_sharedCull,
             m_sharedOcclusion, m_sharedCount, m_sharedFinalize, m_sharedScatter;
     };
 
@@ -322,14 +327,15 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
 
     IRenderDeviceServices* m_device{};
     own::shared_owner<BufferPool> m_bufferPool;
-    LX::Runtime::ComputePipeline m_reset, m_cull, m_meshletReset, m_meshletCull,
+    LX::Runtime::ComputePipeline m_reset, m_cull, m_meshletReset, m_meshletCompact, m_meshletCull,
         m_meshletCount, m_meshletFinalize, m_meshletScatter;
-    LX::Runtime::ComputePipeline m_meshletOcclusionCull;
-    LX::Runtime::ComputePipeline m_meshletHistoryCull, m_meshletRecoveryCull;
+    LX::Runtime::ComputePipeline m_meshletOcclusionCull, m_meshletOcclusionCompact;
+    LX::Runtime::ComputePipeline m_meshletHistoryCompact, m_meshletRecoveryCompact, m_meshletCameraPredictionCompact;
+    LX::Runtime::ComputePipeline m_meshletHistoryCull, m_meshletRecoveryCull, m_meshletRecoveryReset;
     LX::Runtime::ComputePipeline m_meshletCameraPredictionCull;
     LX::Runtime::ComputePipeline m_occlusionCull;
 
-    LX::Runtime::ComputePipeline m_sharedReset, m_sharedCull, m_sharedOcclusion,
+    LX::Runtime::ComputePipeline m_sharedReset, m_sharedCompact, m_sharedOcclusionCompact, m_sharedCull, m_sharedOcclusion,
         m_sharedCount, m_sharedFinalize, m_sharedScatter;
     std::mutex m_recordingMutex;
     ce::engine_ordered_map<std::uint64_t, Recording> m_recordings;

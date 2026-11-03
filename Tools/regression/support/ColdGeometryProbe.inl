@@ -46,6 +46,59 @@ ColdGeometryFixture MakeColdGeometryFixture(const experiment::cooked::ModelGeome
     Check(ck::ModelGeometryStreamPrefixSize(std::span(source.bytes).first(12), source.bytes.size(), prefix, error), "Cold prefix size");
     ck::ModelGeometryStreamMetadata table;
     Check(ck::ReadModelGeometryStreamMetadata(std::span(source.bytes).first(prefix), source.bytes.size(), table, error), "Cold page table " + error);
+    Check(table.boneBounds.size() == (artifact.requiredBoneCount ? artifact.requiredBoneCount + 1u : 0u),
+          "Cold bone bounds match the authenticated palette");
+    uint64_t boundSamples{};
+    for (std::size_t vertexIndex = 0; artifact.requiredBoneCount && vertexIndex < artifact.mesh.vertices.size();
+         ++vertexIndex)
+    {
+        const auto vertex = artifact.mesh.vertices[vertexIndex];
+        const auto contains = [&](uint32_t bone)
+        {
+            const auto& box = table.boneBounds.at(bone);
+            Check(box[3] == 1.0f && box[7] == 1.0f, "Influenced vertex needs an active bone bound");
+            for (unsigned axis = 0; axis < 3; ++axis)
+            {
+                Check(double(box[axis]) <= double(vertex.position[axis]) - table.archive->grid.positionError &&
+                          double(box[axis + 4]) >= double(vertex.position[axis]) + table.archive->grid.positionError,
+                      "Cold bone bound contains source and quantization error");
+            }
+            ++boundSamples;
+        };
+        bool influenced = false;
+        for (unsigned slot = 0; slot < 4; ++slot)
+        {
+            if (vertex.boneWeights[slot] > 0.0f)
+            {
+                contains(vertex.boneIndices[slot]);
+                influenced = true;
+            }
+        }
+        if (!influenced)
+        {
+            contains(artifact.requiredBoneCount);
+        }
+    }
+    // Bone bounds precede the authenticated page directory. Corrupt the wire,
+    // not the decoded object, to exercise reader rejection before page access.
+    const auto boundsOffset = prefix - 4ull - table.archive->packets.size() * 44ull - table.boneBounds.size() * 32ull;
+    const auto rejectBoundWord = [&](uint64_t offset, uint32_t bits)
+    {
+        auto corrupt = source.bytes;
+        std::memcpy(corrupt.data() + offset, &bits, sizeof(bits));
+        ck::ModelGeometryStreamMetadata rejected;
+        Check(!ck::ReadModelGeometryStreamMetadata(std::span(corrupt).first(prefix), corrupt.size(), rejected, error),
+              "Malformed cold bone bounds rejected before reading pages");
+    };
+    rejectBoundWord(boundsOffset - 4, static_cast<uint32_t>(table.boneBounds.size() + 1u));
+    if (!table.boneBounds.empty())
+    {
+        rejectBoundWord(boundsOffset, 0x7fc00000u);
+        rejectBoundWord(boundsOffset + 12, std::bit_cast<uint32_t>(2.0f));
+        rejectBoundWord(boundsOffset, std::bit_cast<uint32_t>(std::numeric_limits<float>::max()));
+    }
+    std::cout << "METEOR_COLD_BONE_BOUNDS_OK samples=" << boundSamples
+              << " boxes=" << table.boneBounds.size() << "\n";
     Check(!table.archive->fileOffsets.empty() && table.archive->fileOffsets.front() == prefix,
           "Current geometry contains no deferred body between metadata and pages");
     uint64_t end = prefix;
@@ -55,13 +108,13 @@ ColdGeometryFixture MakeColdGeometryFixture(const experiment::cooked::ModelGeome
         end += table.archive->packetSizes[page];
     }
     Check(end == source.bytes.size(),"Geometry artifact is exactly metadata plus pages");
-    for (uint32_t version : {6u,7u,8u})
+    for (uint32_t version : {6u,7u,8u,9u})
     {
         auto old = source.bytes; std::memcpy(old.data() + 4,&version,4);
         ck::ModelGeometryArtifact rejected;
         Check(!ck::ExpandModelGeometryPages(old,rejected,error),"Legacy geometry reader must not exist");
     }
-    std::cout << "METEOR_GEOMETRY_PAGE_ONLY_OK schema=9 bodyBytes=0 oldSchemasRejected=3\n";
+    std::cout << "METEOR_GEOMETRY_PAGE_ONLY_OK schema=10 bodyBytes=0 oldSchemasRejected=4\n";
     source.prefixBytes = prefix;
     source.allowed.push_back({0, prefix});
     for (uint32_t page = 0; page < table.archive->packets.size(); ++page)

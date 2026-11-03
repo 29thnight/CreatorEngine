@@ -21,6 +21,8 @@ import Creator.Core.Ownership;
 #include "../../RHI/IRHIDeviceResources.h"
 #include "../../MaterialGraphSceneInput.h"
 #include "../../MaterialGraphSceneHost.h"
+#include "../../MaterialGraphWork.h"
+#include "../../MaterialGraphSceneGpuData.h"
 
 // Explicit diagnostic capture only. The render thread owns this object and its
 // readbacks. Release must run after submission completion (or frame abort).
@@ -74,6 +76,358 @@ struct EnhancedPbrCapture
     };
     ce::dynamic_array<StageReadback> stageReadbacks;
     ce::dynamic_array<StageDiagnostic> stages;
+
+    struct GeometryReadback
+    {
+        std::string name;
+        own::shared_owner<const GpuGeometryVisibility::Frame> owner;
+        RHIReadback readback;
+        uint64_t bytes{};
+    };
+    ce::dynamic_array<GeometryReadback> geometryReadbacks;
+
+    own::shared_owner<const material_graph::SceneMaterialWork> materialPacketOwner;
+    material_graph::SceneMaterialPageDiagnostics materialPageDiagnostics;
+    RHIReadback materialPacketReadback{}, materialRangeReadback{};
+    RHIReadback materialRecordReadback{};
+    RHIReadback materialVisibilityReadback{}, materialGeometryReadback{};
+
+    bool DeclareMaterialPackets(IRenderDeviceServices& resources, EnhancedRenderGraph& graph,
+        const material_graph::SceneHost& host, std::string& error)
+    {
+        const auto owner = host.MaterialWork();
+        if (!owner) return true;
+        const auto inputs = owner->GraphInputs(graph);
+        const auto visibility = owner->graphVisibility;
+        RGResourceDescription description{};
+        if (!graph.DescribeResource(visibility, description) ||
+            description.kind != RGResourceKind::Texture || description.format != RHIFormat::RG32Uint)
+        {
+            error = "Material packet visibility source is not an RG32Uint texture.";
+            return false;
+        }
+        materialPacketOwner = owner;
+        materialPageDiagnostics = host.MaterialPageDiagnostics();
+        if (!resources.CreateBufferReadback(owner->workBytes, materialPacketReadback, error) ||
+            !resources.CreateBufferReadback(uint64_t(owner->commandCount) * 16u, materialRangeReadback, error) ||
+            !resources.CreateBufferReadback(owner->records.size, materialRecordReadback, error) ||
+            !resources.CreateBufferReadback(uint64_t(owner->recordCount) * sizeof(material_graph::SceneFrameGeometry::Record),
+                materialGeometryReadback, error) ||
+            !resources.CreateReadback(owner->width, owner->height, RHIFormat::RG32Uint, 1,
+                materialVisibilityReadback, error))
+        {
+            return false;
+        }
+        const auto packets = materialPacketReadback;
+        const auto ranges = materialRangeReadback;
+        const auto records = materialRecordReadback;
+        const auto geometry = materialGeometryReadback;
+        const auto pixels = materialVisibilityReadback;
+        graph.AddPass("Capture.MaterialPackets",
+            {{inputs[0], RHIResourceState::CopySource, RGAccessMode::Read},
+             {owner->packetWork->graphRanges, RHIResourceState::CopySource, RGAccessMode::Read},
+             {owner->sceneRecordsOwner->GraphBuffer(graph), RHIResourceState::CopySource, RGAccessMode::Read},
+             {owner->geometry->GraphTable(graph), RHIResourceState::CopySource, RGAccessMode::Read},
+             {visibility, RHIResourceState::CopySource, RGAccessMode::Read}},
+            [owner, packets, ranges, records, geometry, pixels, visibility](const EnhancedRenderGraph::ExecuteContext& context)
+            {
+                context.encoder->CopyBufferToReadback(packets, owner->work, 0, owner->workBytes);
+                context.encoder->CopyBufferToReadback(ranges, owner->ranges, 0, uint64_t(owner->commandCount) * 16u);
+                context.encoder->CopyBufferToReadback(records, owner->records.buffer, owner->records.offset, owner->records.size);
+                context.encoder->CopyBufferToReadback(geometry, owner->geometry->buffer, 0,
+                    uint64_t(owner->recordCount) * sizeof(material_graph::SceneFrameGeometry::Record));
+                context.encoder->CopyToReadback(pixels, context.ResolveHandle(visibility));
+            }, true);
+        return true;
+    }
+
+    bool SaveMaterialPackets(IRenderDeviceServices& resources, const std::filesystem::path& root,
+        std::string& error)
+    {
+        if (!materialPacketOwner) return true;
+        const auto& owner = *materialPacketOwner;
+        RHIReadbackImage packets, ranges, records, geometry, visibility;
+        if (!resources.MapReadback(materialPacketReadback, packets, error) ||
+            !resources.MapReadback(materialRangeReadback, ranges, error) ||
+            !resources.MapReadback(materialRecordReadback, records, error) ||
+            !resources.MapReadback(materialGeometryReadback, geometry, error) ||
+            !resources.MapReadback(materialVisibilityReadback, visibility, error)) return false;
+        if (packets.data.size() < owner.workBytes || ranges.data.size() < uint64_t(owner.commandCount) * 16u ||
+            records.data.size() < uint64_t(owner.recordCount) * sizeof(material_graph::SceneGpuData::Record) ||
+            geometry.data.size() < uint64_t(owner.recordCount) * sizeof(material_graph::SceneFrameGeometry::Record))
+        {
+            error = "Material packet readback is truncated.";
+            return false;
+        }
+        auto node = manifest.Root()["gpuMaterialPackets"];
+        node["file"] << "material-packets.u32";
+        node["encoding"] << "uint32-le-bucket-record-tile";
+        node["sourceFrameId"] << result.frameId;
+        node["width"] << owner.width;
+        node["height"] << owner.height;
+        node["recordCount"] << owner.recordCount;
+        node["capacity"] << owner.PacketCapacity();
+        node["storageBytes"] << owner.workBytes;
+        node["packedTileBits"] << owner.PacketTileBits();
+        node["buckets"].SetSequence();
+        node["recordBuckets"].SetSequence();
+        node["records"].SetSequence();
+        node["primitiveRanges"].SetSequence();
+        if (materialPageDiagnostics.records.size() != owner.recordCount)
+        {
+            error = "Material page diagnostics do not match the captured record table.";
+            return false;
+        }
+        auto descriptors = node["descriptorPages"];
+        descriptors["sourceFrameId"] << result.frameId;
+        descriptors["capacity"] << material_graph::SceneGpuData::kGeometryPageSize;
+        descriptors["pages"].SetSequence();
+        descriptors["records"].SetSequence();
+        for (uint32_t index = 0; index < materialPageDiagnostics.pages.size(); ++index)
+        {
+            const auto& page = materialPageDiagnostics.pages[index];
+            auto entry = descriptors["pages"].Append();
+            entry["page"] << index;
+            entry["vertexCount"] << page.vertices;
+            entry["topologyCount"] << page.topology;
+        }
+        ce::dynamic_array<uint32_t> recordBuckets;
+        recordBuckets.reserve(owner.recordCount);
+        for (uint32_t record = 0; record < owner.recordCount; ++record)
+        {
+            material_graph::SceneGpuData::Record value{};
+            std::memcpy(&value, records.data.data() + uint64_t(record) * sizeof(value), sizeof(value));
+            recordBuckets.push_back(value.history[2]);
+            node["recordBuckets"].Append() << value.history[2];
+            material_graph::SceneFrameGeometry::Record geometryValue{};
+            std::memcpy(&geometryValue, geometry.data.data() + uint64_t(record) * sizeof(geometryValue), sizeof(geometryValue));
+            auto range = node["primitiveRanges"].Append();
+            range.SetSequence();
+            range.Append() << geometryValue.identity.reserved[1];
+            range.Append() << geometryValue.identity.reserved[2];
+            auto identity = node["records"].Append();
+            identity["record"] << record;
+            if (record == 0) continue;
+            const auto& descriptor = materialPageDiagnostics.records.at(record);
+            auto pageRecord = descriptors["records"].Append();
+            pageRecord["record"] << record;
+            pageRecord["page"] << descriptor.page;
+            pageRecord["semanticKey"] << descriptor.semanticKey;
+            pageRecord["doubleSided"] << descriptor.doubleSided;
+            pageRecord["currentVertex"] << value.geometry[0];
+            pageRecord["previousVertex"] << value.geometry[1];
+            pageRecord["topology"] << value.geometry[2];
+            const auto& geometry = owner.geometry->geometry.at(record);
+            WriteMeshIdentity(identity, geometry->Input()->Geometry().handle);
+            identity["materialSlot"] << value.identity.materialSlot;
+            identity["lodIndex"] << value.identity.lodIndex;
+            identity["chunkIndex"] << owner.geometry->records.at(record).chunkIndex;
+            identity["worldColumns"].SetSequence();
+            ce::fixed_array<float, 12> world;
+            std::memcpy(world.data(), value.worldColumns.data(), sizeof(world));
+            for (float component : world) identity["worldColumns"].Append() << component;
+        }
+        const uint64_t tileCount = ((uint64_t(owner.width) + 7u) / 8u) * ((uint64_t(owner.height) + 7u) / 8u);
+        uint64_t total = 0;
+        std::ofstream output(root / "material-packets.u32", std::ios::binary | std::ios::trunc);
+        for (uint32_t bucket = 0; bucket < owner.commandCount; ++bucket)
+        {
+            ce::fixed_array<uint32_t, 4> range{};
+            std::memcpy(range.data(), ranges.data.data() + uint64_t(bucket) * 16u, 16u);
+            if (range[0] != total || range[1] != range[2] ||
+                uint64_t(range[0]) + range[1] > owner.PacketCapacity())
+            {
+                error = "Material packet range/count does not match its sealed capacity.";
+                return false;
+            }
+            auto item = node["buckets"].Append();
+            item["bucket"] << bucket;
+            item["offsetPackets"] << total;
+            item["count"] << range[1];
+            item["representative"] << uint64_t(owner.buckets[bucket].representative);
+            for (uint32_t index = 0; index < range[1]; ++index)
+            {
+                ce::fixed_array<uint32_t, 3> packet{bucket, 0u, 0u};
+                const uint64_t packetIndex = uint64_t(range[0]) + index;
+                const auto tileBits = owner.PacketTileBits();
+                if (tileBits)
+                {
+                    uint32_t word{};
+                    std::memcpy(&word, packets.data.data() + packetIndex * 4u, sizeof(word));
+                    packet[1] = word >> tileBits;
+                    packet[2] = word & ((1u << tileBits) - 1u);
+                }
+                else
+                {
+                    std::memcpy(packet.data() + 1, packets.data.data() + packetIndex * 8u, 8u);
+                }
+                if (packet[1] == 0 || packet[1] >= owner.recordCount || packet[2] >= tileCount ||
+                    recordBuckets[packet[1]] != bucket)
+                {
+                    error = "Material packet record or tile exceeds its source extent.";
+                    return false;
+                }
+                output.write(reinterpret_cast<const char*>(packet.data()), sizeof(packet));
+            }
+            total += range[1];
+        }
+        output.close();
+        if (!output)
+        {
+            error = "Material packet write failed.";
+            return false;
+        }
+        node["count"] << total;
+        const uint64_t rowBytes = uint64_t(owner.width) * 8u;
+        if (visibility.width != owner.width || visibility.height != owner.height ||
+            visibility.format != RHIFormat::RG32Uint || visibility.sliceCount != 1 ||
+            visibility.rowPitch < rowBytes || visibility.data.size() < uint64_t(visibility.rowPitch) * owner.height)
+        {
+            error = "Material visibility readback extent or format mismatch.";
+            return false;
+        }
+        std::ofstream pixels(root / "material-visibility.u32", std::ios::binary | std::ios::trunc);
+        for (uint32_t y = 0; y < owner.height; ++y)
+        {
+            pixels.write(reinterpret_cast<const char*>(visibility.data.data() + uint64_t(y) * visibility.rowPitch),
+                static_cast<std::streamsize>(rowBytes));
+        }
+        pixels.close();
+        if (!pixels)
+        {
+            error = "Material visibility write failed.";
+            return false;
+        }
+        auto source = node["visibility"];
+        source["file"] << "material-visibility.u32";
+        source["encoding"] << "uint32-le-primitive-depth-row-major";
+        source["sourceFrameId"] << result.frameId;
+        source["width"] << owner.width;
+        source["height"] << owner.height;
+        source["resource"] << owner.graphVisibility.index;
+        source["version"] << owner.graphVisibility.version;
+        source["graphEpoch"] << owner.graphVisibility.epoch;
+        return true;
+    }
+
+    bool DeclareGeometryLists(IRenderDeviceServices& resources, EnhancedRenderGraph& graph,
+        const material_graph::SceneHost& host, std::string& error)
+    {
+        const std::pair<const char*, own::shared_owner<const GpuGeometryVisibility::Frame>> sources[]{
+            {"camera-first", host.CameraDepthMeshletWork()}, {"camera-final", host.CameraMeshletWork()}};
+        for (const auto& [name, owner] : sources)
+        {
+            if (!owner || owner->MeshletBinCount() == 0)
+            {
+                continue;
+            }
+            const auto last = owner->MeshletBinCount() - 1u;
+            const uint64_t bytes = (uint64_t(owner->MeshletOutputOffset(last)) +
+                owner->MeshletGeometry(last)->MeshletCount() + 1u) * sizeof(uint32_t);
+            RHIReadback readback{};
+            if (!resources.CreateBufferReadback(bytes, readback, error))
+            {
+                return false;
+            }
+            geometryReadbacks.push_back({name, owner, readback, bytes});
+            graph.AddPass(std::string("Capture.Geometry.") + name,
+                {{owner->GraphVisibleIds(graph), RHIResourceState::CopySource, RGAccessMode::Read}},
+                [owner, readback, bytes](const EnhancedRenderGraph::ExecuteContext& context)
+                {
+                    context.encoder->CopyBufferToReadback(readback, owner->VisibleIdBuffer(), 0, bytes);
+                }, true);
+        }
+        return true;
+    }
+
+    bool SaveGeometryLists(IRenderDeviceServices& resources, const std::filesystem::path& root, std::string& error)
+    {
+        auto lists = manifest.Root()["gpuMeshletLists"];
+        lists.SetSequence();
+        for (const auto& source : geometryReadbacks)
+        {
+            RHIReadbackImage image;
+            if (!resources.MapReadback(source.readback, image, error))
+            {
+                return false;
+            }
+            if (image.data.size() < source.bytes)
+            {
+                error = "GPU meshlet list readback is truncated.";
+                return false;
+            }
+            const auto word = [&](uint64_t offset)
+            {
+                uint32_t value{};
+                std::memcpy(&value, image.data.data() + offset * sizeof(value), sizeof(value));
+                return value;
+            };
+            const auto file = source.name + "-meshlets.u32";
+            std::ofstream output(root / file, std::ios::binary | std::ios::trunc);
+            auto list = lists.Append();
+            list["stage"] << source.name;
+            list["spatialCulling"] << (source.owner->BypassesMeshletCulling() ? "bypassed-diagnostic" : "enabled");
+            list["file"] << file;
+            list["encoding"] << "uint32-le-local-meshlet-id";
+            list["scope"] << "GPU accepted meshlets; not rasterized pixel coverage or visible draw count";
+            list["sourceFrameId"] << result.frameId;
+            list["bins"].SetSequence();
+            uint64_t writtenWords = 0;
+            for (uint32_t bin = 0; bin < source.owner->MeshletBinCount(); ++bin)
+            {
+                const auto& geometry = source.owner->MeshletGeometry(bin);
+                const auto offset = source.owner->MeshletOutputOffset(bin);
+                const auto capacity = geometry->MeshletCount();
+                const auto count = word(offset);
+                if (count > capacity || (uint64_t(offset) + count + 1u) * sizeof(uint32_t) > source.bytes)
+                {
+                    error = "GPU meshlet list exceeds its sealed capacity.";
+                    return false;
+                }
+                ce::dynamic_array<uint32_t> sorted;
+                sorted.reserve(count);
+                for (uint32_t index = 0; index < count; ++index)
+                {
+                    const auto id = word(uint64_t(offset) + index + 1u);
+                    if (id >= capacity)
+                    {
+                        error = "GPU meshlet ID exceeds its sealed geometry.";
+                        return false;
+                    }
+                    sorted.push_back(id);
+                    output.write(reinterpret_cast<const char*>(&id), sizeof(id));
+                }
+                std::sort(sorted.begin(), sorted.end());
+                if (std::adjacent_find(sorted.begin(), sorted.end()) != sorted.end())
+                {
+                    error = "GPU meshlet list contains duplicate IDs.";
+                    return false;
+                }
+                auto item = list["bins"].Append();
+                item["bin"] << bin;
+                item["offsetWords"] << writtenWords;
+                item["count"] << count;
+                item["capacity"] << capacity;
+                WriteMeshIdentity(item, geometry->Input()->Geometry().handle);
+                item["world"].SetSequence();
+                ce::fixed_array<float, 16> world;
+                std::memcpy(world.data(), &geometry->ObjectToWorld(), sizeof(world));
+                for (float value : world)
+                {
+                    item["world"].Append() << value;
+                }
+                writtenWords += count;
+            }
+            output.close();
+            if (!output)
+            {
+                error = "GPU meshlet list write failed.";
+                return false;
+            }
+            list["acceptedMeshlets"] << writtenWords;
+        }
+        return true;
+    }
 
     bool DeclareHistory(IRenderDeviceServices& resources, EnhancedRenderGraph& graph,
         RGHandle handle, uint32_t width, uint32_t height, std::string& error)
@@ -1172,6 +1526,10 @@ struct EnhancedPbrCapture
                 item["channels"] << 4;
                 item["nonfinite"] << image.nonfinite;
             }
+            if (!SaveGeometryLists(resources, root, error) || !SaveMaterialPackets(resources, root, error))
+            {
+                return false;
+            }
             auto graphNode = rootNode["graph"];
             graphNode.SetMap();
             graphNode["declared"] << stats.passesDeclared;
@@ -1230,7 +1588,7 @@ struct EnhancedPbrCapture
                 return true;
             }
         }
-        return !stageReadbacks.empty();
+        return !stageReadbacks.empty() || !geometryReadbacks.empty();
     }
 
     void Release(IRenderDeviceServices& resources)
@@ -1245,6 +1603,18 @@ struct EnhancedPbrCapture
         }
         stageReadbacks.clear();
         stages.clear();
+        for (auto& geometry : geometryReadbacks)
+        {
+            resources.ReleaseReadback(geometry.readback);
+        }
+        geometryReadbacks.clear();
+        resources.ReleaseReadback(materialPacketReadback);
+        resources.ReleaseReadback(materialRangeReadback);
+        resources.ReleaseReadback(materialRecordReadback);
+        resources.ReleaseReadback(materialVisibilityReadback);
+        resources.ReleaseReadback(materialGeometryReadback);
+        materialPacketOwner.reset();
+        materialPageDiagnostics = {};
     }
     void Fail(const std::string& error)
     {

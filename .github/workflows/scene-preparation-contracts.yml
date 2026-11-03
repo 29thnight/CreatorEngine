@@ -1,0 +1,98 @@
+name: Scene preparation and capture contracts
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'Engine/Containers/**'
+      - 'Engine/RenderEngine/GpuGeometryVisibility.cpp'
+      - 'Engine/RenderEngine/MaterialGraphSceneHost.*'
+      - 'Engine/RenderEngine/MaterialGraphWork.h'
+      - 'Engine/RenderEngine/MaterialGraphPacket*.h'
+      - 'Engine/RenderEngine/MaterialGraphProduct.h'
+      - 'Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h'
+      - 'Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp'
+      - 'Tools/regression/**'
+      - '.github/workflows/scene-preparation-contracts.yml'
+  pull_request:
+    paths:
+      - 'Engine/Containers/**'
+      - 'Engine/RenderEngine/GpuGeometryVisibility.cpp'
+      - 'Engine/RenderEngine/MaterialGraphSceneHost.*'
+      - 'Engine/RenderEngine/MaterialGraphWork.h'
+      - 'Engine/RenderEngine/MaterialGraphPacket*.h'
+      - 'Engine/RenderEngine/MaterialGraphProduct.h'
+      - 'Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h'
+      - 'Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp'
+      - 'Tools/regression/**'
+      - '.github/workflows/scene-preparation-contracts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture-contracts:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Profile capture read budget
+        run: python Tools/regression/ProfileCaptureBudgetTests.py
+      - name: Material capture input identity
+        run: python Tools/regression/MaterialCaptureIdentityTests.py
+      - name: GPU meshlet list evidence
+        run: python Tools/regression/GpuMeshletListTests.py
+      - name: Material packet structure and density
+        run: python Tools/regression/MaterialPacketTests.py
+      - name: Material packet stable input comparison
+        run: python Tools/regression/MaterialPacketComparisonTests.py
+      - name: Material packet visibility completeness
+        run: python Tools/regression/MaterialPacketVisibilityTests.py
+      - name: Material descriptor page partitioning
+        run: python Tools/regression/MaterialPacketPageTests.py
+      - name: Bounds recook geometry identity
+        run: python Tools/regression/GeometryRecookIdentityTests.py
+
+  native-preparation:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Source-bound buffer and shadow-key regressions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (!$vs) { throw 'Visual Studio C++ build tools are required.' }
+          Import-Module (Join-Path $vs 'Common7/Tools/Microsoft.VisualStudio.DevShell.dll')
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
+          python Tools/regression/verify-visibility-buffer-pool.py --configuration '${{ matrix.configuration }}' --output Build/Verification/ScenePreparation/buffer.cpp
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python Tools/regression/verify-shadow-key-append.py --configuration '${{ matrix.configuration }}' --output Build/Verification/ScenePreparation/shadow-key.cpp
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python Tools/regression/verify-material-packet-encoding.py --configuration '${{ matrix.configuration }}'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scene-preparation-${{ matrix.configuration }}
+          path: |
+            Build/Verification/ScenePreparation/*.json
+            Build/Verification/ScenePreparation/*.cpp
+          if-no-files-found: ignore
+          retention-days: 7

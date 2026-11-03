@@ -225,8 +225,11 @@ def snapshot(data):
                 finalized=True, losses={})
 
 
-def read_capture(path):
-    require(path.stat().st_size <= 256 * 1024 * 1024, 'Capture exceeds this tool\'s 256 MiB limit; use ProfilerViewer')
+def read_capture(path, max_capture_mib=256):
+    require(isinstance(max_capture_mib, int) and 1 <= max_capture_mib <= 1024,
+            'Capture read budget must be an integer in [1, 1024] MiB')
+    require(path.stat().st_size <= max_capture_mib * 1024 * 1024,
+            f'Capture exceeds the {max_capture_mib} MiB read budget; use --max-capture-mib or ProfilerViewer')
     data = path.read_bytes()
     require(len(data) >= 16 and data[:8] == b'CEPROF\0\0', 'Not a CEPROF capture')
     version, count = struct.unpack_from('<II', data, 8)
@@ -299,8 +302,8 @@ def rhi_event_key(value):
                                     'queue', 'submission', 'view'))
 
 
-def analyze(path, include_rhi_identities=False):
-    capture = read_capture(Path(path))
+def analyze(path, include_rhi_identities=False, max_capture_mib=256):
+    capture = read_capture(Path(path), max_capture_mib)
     frames, hz = capture['frames'], capture['hz']
     require(frames, 'Empty capture is not a measurement')
     events, counters = collections.defaultdict(list), collections.defaultdict(list)
@@ -404,7 +407,8 @@ def analyze(path, include_rhi_identities=False):
         group_rows.append(dict(zip(names, key), realFrameCount=len(group['realFrames']),
                                cpuRenderSubmitMs=stats(group['cpu']), cpuSamples=len(group['cpu']),
                                gpuPassMs=stats(group['gpu']), gpuPassSamples=len(group['gpu'])))
-    return dict(path=str(path), sha256=capture['sha256'], formatVersion=capture['version'], frames=len(frames),
+    return dict(path=str(path), sha256=capture['sha256'], captureReadBudgetMiB=max_capture_mib,
+                formatVersion=capture['version'], frames=len(frames),
                 frameMs=stats([(f['end'] - f['begin']) * 1000 / hz for f in frames]),
                 frameMsAxis='engine-frame-boundaries-not-real-render-or-presented-fps',
                 complete=capture['complete'], unacked=capture['unacked'], droppedEvents=sum(f['dropped'] for f in frames),
@@ -436,12 +440,14 @@ def analyze(path, include_rhi_identities=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--require-native-real', action='store_true')
+    parser.add_argument('--max-capture-mib', type=int, default=256,
+                        help='Explicit bounded input budget, 1..1024 MiB; default 256')
     parser.add_argument('--include-rhi-identities', action='store_true',
                         help='Retain raw RHI sidecars and exact-match status outside render/FPS aggregates')
     parser.add_argument('paths', nargs='+')
     args = parser.parse_args()
     for path in args.paths:
-        result = analyze(path, args.include_rhi_identities)
+        result = analyze(path, args.include_rhi_identities, args.max_capture_mib)
         Path(str(path) + '.summary.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
         print(json.dumps(dict(result, markers=result['markers'][:35]), indent=2))
         require(not args.require_native_real or result['nativeRealPerformanceGateEligible'],

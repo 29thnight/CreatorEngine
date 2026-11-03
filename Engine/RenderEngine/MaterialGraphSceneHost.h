@@ -42,6 +42,23 @@ import Creator.Concurrency.Jobs;
 
 namespace material_graph
 {
+// Constructed only for explicit captures, never on the normal preparation path.
+struct SceneMaterialPageDiagnostics
+{
+    struct Page
+    {
+        uint32_t vertices{}, topology{};
+    };
+    struct Record
+    {
+        uint32_t page = UINT32_MAX;
+        std::string semanticKey;
+        bool doubleSided{};
+    };
+    ce::dynamic_array<Page> pages;
+    ce::dynamic_array<Record> records;
+};
+
 // Exact evaluated-pixel cache. Work and memory scale with the viewport; a cold
 // cache is still a reference integrator and needs a separate real-time cost gate.
 struct SceneHostBudget
@@ -258,6 +275,7 @@ class SceneHost final : private IRHIUploadTransactionListener
     RGHandle DeclareVolume(EnhancedRenderGraph& graph, RGHandle lighting, RGHandle depth, RGHandle shadowMap) const;
     own::shared_owner<const SceneFrameGeometry> FrameGeometry() const;
     own::shared_owner<const SceneMaterialWork> MaterialWork() const;
+    SceneMaterialPageDiagnostics MaterialPageDiagnostics() const;
     own::shared_owner<const SceneHybridVisibility> HybridVisibility() const;
     own::shared_owner<const SceneHybridVisibility> OccluderVisibility() const;
     bool HasDraws() const;

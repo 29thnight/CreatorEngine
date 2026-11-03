@@ -38,21 +38,22 @@ struct GpuGeometryVisibility::SharedBatch
     RHIBufferSlice constants, candidates, binData, worlds, viewData;
     RHIBindingTable outputs, vertices, topologies, ids, arguments, first;
     ce::fixed_array<own::shared_owner<const GpuGeometryOcclusion::Pyramid>, kSharedViewCapacity> pyramids;
-    own::shared_owner<const LX::Runtime::ComputeGeneration> reset, cull, count, finalize, scatter;
-    static constexpr std::uint64_t kQueueBytes = (kWorkRingHeaderWords + kWorkRingSlots) * sizeof(std::uint32_t);
+    own::shared_owner<const LX::Runtime::ComputeGeneration> reset, compact, cull, count, finalize, scatter;
+    std::uint64_t queueBytes{};
     ~SharedBatch()
     {
         // Every contributing frame is retained by its upload transaction until
         // completion/rejection. Graph callbacks retain the whole set as well.
         if (pool)
         {
-            pool->Return(queue, kQueueBytes, false, true);
+            pool->Return(queue, queueBytes, false, true);
         }
     }
     void Dispatch(const EnhancedRenderGraph::ExecuteContext& execution, MeshletStage stage) const
     {
         auto& encoder = *execution.encoder;
         const auto& pipeline = stage == MeshletStage::Reset      ? reset
+                               : stage == MeshletStage::Compact  ? compact
                                : stage == MeshletStage::Cull     ? cull
                                : stage == MeshletStage::Count    ? count
                                : stage == MeshletStage::Finalize ? finalize
@@ -69,7 +70,7 @@ struct GpuGeometryVisibility::SharedBatch
         encoder.SetBindings(RHIBindPoint::Compute, 8, ids);
         encoder.SetBindings(RHIBindPoint::Compute, 9, arguments);
         encoder.SetBindings(RHIBindPoint::Compute, 10, first);
-        if (stage == MeshletStage::Cull)
+        if (stage == MeshletStage::Cull || stage == MeshletStage::Compact)
         {
             const auto fallback = std::ranges::find_if(pyramids, [](const auto& pyramid) { return bool(pyramid); });
             if (fallback != pyramids.end())
@@ -89,7 +90,7 @@ struct GpuGeometryVisibility::SharedBatch
                 encoder.SetBindings(RHIBindPoint::Compute, 11, textures);
             }
         }
-        DispatchGroups(encoder, stage == MeshletStage::Cull
+        DispatchGroups(encoder, stage == MeshletStage::Compact ? 1u : stage == MeshletStage::Cull
                                     ? (std::min)(bins * kInitialSubdivisions, kPersistentConsumerGroups)
                                 : stage == MeshletStage::Count || stage == MeshletStage::Scatter ? groups
                                 : stage == MeshletStage::Finalize && !ordered ? VisibilityGroups(bins)
@@ -150,6 +151,53 @@ std::uint32_t GpuGeometryVisibility::Frame::WorkQueueNonemptyPartitions(std::uin
         }
     }
     return count;
+}
+
+std::uint32_t GpuGeometryVisibility::Frame::WorkQueueSelectedPartitions(
+    std::uint32_t width, std::span<const std::uint32_t> bins) const
+{
+    if (width == 0 || width > 64)
+    {
+        throw std::runtime_error("Invalid queue wave width.");
+    }
+    std::uint32_t total{}, previous{};
+    bool first = true;
+    for (auto selected : bins)
+    {
+        if ((!first && selected <= previous) || selected >= WorkQueuePartitionCount() / kInitialSubdivisions)
+        {
+            throw std::runtime_error("Compacted queue bins must be unique, ordered and in range.");
+        }
+        previous = selected;
+        first = false;
+        std::uint32_t meshlets{};
+        if (m_sharedBatch)
+        {
+            for (const auto& input : m_sharedBatch->inputs)
+            {
+                if (!input)
+                {
+                    continue;
+                }
+                if (selected < input->bins.size())
+                {
+                    meshlets = input->bins[selected].indexCount;
+                    break;
+                }
+                selected -= static_cast<std::uint32_t>(input->bins.size());
+            }
+        }
+        else
+        {
+            meshlets = m_meshletGeometries.at(selected)->MeshletCount();
+        }
+        if (meshlets == 0)
+        {
+            throw std::runtime_error("Compacted queue contains an empty bin.");
+        }
+        total += (std::min)(kInitialSubdivisions, (meshlets + width - 1u) / width);
+    }
+    return total;
 }
 
 void GpuGeometryVisibility::Frame::UploadMeshletInputs() const
@@ -389,7 +437,7 @@ own::shared_owner<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Fra
     }
     GeometryVisibilityConstants constants{};
     constants.candidateCount = constants.binCount = batch->bins;
-    constants.planeMask = kWaveWorkQueue;
+    constants.planeMask = kWaveWorkQueue | kCompactedInstances;
     if (batch->ordered)
     {
         constants.planeMask |= kOrderedScanDispatch;
@@ -415,11 +463,13 @@ own::shared_owner<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Fra
         arguments[index] = arguments.front();
         first[index] = first.front();
     }
-    if (!batch->pool->Acquire(SharedBatch::kQueueBytes, false, batch->queue, error))
+    const auto queueWords = kWorkRingHeaderWords + kWorkRingSlots + 1u + batch->bins;
+    batch->queueBytes = std::uint64_t(queueWords) * sizeof(std::uint32_t);
+    if (!batch->pool->Acquire(batch->queueBytes, false, batch->queue, error))
     {
         throw std::runtime_error(error);
     }
-    const RHIBindingDesc outputs[]{RHIBindingDesc::UavBuffer(batch->queue, kWorkRingHeaderWords + kWorkRingSlots, 4),
+    const RHIBindingDesc outputs[]{RHIBindingDesc::UavBuffer(batch->queue, queueWords, 4),
                                    arguments.front()};
     {
         // CPU 배열 조립과 descriptor 테이블 생성은 같은 Declare 안에서도 별도 비용이다.
@@ -437,6 +487,7 @@ own::shared_owner<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Fra
         }
     }
     const bool occlusion = std::ranges::any_of(batch->pyramids, [](const auto& pyramid) { return bool(pyramid); });
+    batch->compact = occlusion ? firstFrame.m_sharedOcclusionCompact : firstFrame.m_sharedCompact;
     batch->cull = occlusion ? firstFrame.m_sharedOcclusion : firstFrame.m_sharedCull;
     for (const auto& frame : frames)
     {

@@ -27,6 +27,7 @@ struct SceneMaterialWork final
     uint32_t width{}, height{}, recordCount{}, commandCount{};
     uint64_t workBytes{};
     own::unique_owner<PacketDispatchWork> packetWork;
+    mutable RGHandle graphVisibility;
 
     bool UploadPackets(RHIBufferSlice sceneRecords, uint32_t bucketCount, std::string& error)
     {
@@ -55,18 +56,33 @@ struct SceneMaterialWork final
         // Few-material views reserve records*tiles rather than one packet per
         // viewport pixel; the pixel bound still caps heavily overlapping views.
         packetWork = own::make_unique<PacketDispatchWork>();
+        static const bool packing = []
+        {
+            char* value{};
+            size_t length{};
+            // Storage savings are verified, but whole-frame performance is not.
+            // Keep the experiment explicit until producer/consumer cost is accepted.
+            const bool enabled = _dupenv_s(&value, &length, "CREATOR_MATERIAL_PACKET_PACKING") == 0 &&
+                                 value && std::strcmp(value, "1") == 0;
+            std::free(value);
+            return enabled;
+        }();
+        const auto tileBits = packing ? MaterialPacketEncoding::TileBits(recordCount, width, height) : 0;
         if (!packetWork->Prepare(*device, pool, recordCount, static_cast<uint32_t>(capacity), capacities,
-                                 width, height, "METEOR.Scene.Material", error))
+                                 width, height, "METEOR.Scene.Material", error, tileBits))
             return false;
         work = packetWork->packets;
         ranges = packetWork->ranges;
         arguments = packetWork->arguments;
-        workBytes = capacity * 8;
+        workBytes = uint64_t(MaterialPacketEncoding::StorageElements(static_cast<uint32_t>(capacity), tileBits)) * 8;
         return true;
     }
     uint32_t PacketCapacity() const { return packetWork ? packetWork->values.packetCapacity : 0; }
+    uint32_t PacketStorageElements() const { return static_cast<uint32_t>(workBytes / 8); }
+    uint32_t PacketTileBits() const { return packetWork ? packetWork->values.tileBits : 0; }
     void Declare(EnhancedRenderGraph& graph, RGHandle visibility, own::shared_owner<const SceneMaterialWork> owner) const
     {
+        graphVisibility = visibility;
         packetWork->Declare(graph, owner, pipelines, "METEOR.Scene.Material", true,
             [&graph, owner, visibility](auto& uses) {
                 uses.push_back({visibility, RHIResourceState::ShaderResource, RGAccessMode::Read});

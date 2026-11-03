@@ -7,7 +7,7 @@ cbuffer LXPacketConstants : register(b0)
     uint lx_input_count; uint lx_bucket_count; uint lx_packet_capacity; uint lx_dispatch_width;
     uint lx_scan_count; uint lx_scan_source; uint lx_scan_destination; uint lx_scan_sums;
     uint lx_scan_parent; uint lx_scan_base; uint lx_packet_width; uint lx_packet_height;
-    uint lx_slice_capacity; uint3 lx_packet_padding;
+    uint lx_slice_capacity; uint lx_packet_tile_bits; uint2 lx_packet_padding;
 };
 RWStructuredBuffer<uint> lx_indirect_commands : register(u0);
 RWStructuredBuffer<uint4> lx_packet_ranges : register(u1);

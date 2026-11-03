@@ -1,6 +1,7 @@
 #pragma once
 #define LX_SCENE_VOLUME_TRANSPORT 1
 #include "MaterialGraphSurfacePoint.slang"
+#include "MaterialGraphPacketEncoding.slang"
 #include "MaterialEvaluation.slang"
 #include "PrincipledIblLookup.slang"
 #include "PbrCoverage.slang"
@@ -866,7 +867,7 @@ void LXSceneReconstructMS(uint lane : SV_GroupIndex, uint3 group : SV_GroupID,
     const bool valid = flatWork < range.y;
     SetMeshOutputCounts(4u * uint(valid), 2u * uint(valid));
     if (!valid) return;
-    const uint2 packet = lx_scenePackets[range.x + index];
+    const uint2 packet = LXLoadMaterialPacket(lx_scenePackets, range.x + index, lx_packetSelector.w);
     const uint record = packet.x, tile = packet.y;
     const uint grid = (lx_width + 7u) / 8u;
     const uint2 origin = uint2(tile % grid, tile / grid) * 8u;
