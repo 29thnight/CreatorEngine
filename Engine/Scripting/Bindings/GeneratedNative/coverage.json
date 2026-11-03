@@ -2,7 +2,7 @@
   "format": "creator-native-fsharp-facades",
   "version": 1,
   "namespace": "CreatorEngine.NativeTypes",
-  "sourceSha256": "679255ecc50bff19a2fd3ea33d06b9b242a733922eac5ad4587dcb7adef0d734",
+  "sourceSha256": "f4ed9e2b8f2e7fd2a674661f2f0a8ac997f40f3b0371f93038e890ae675a8c9e",
   "counts": {
     "components": 27,
     "nativeDeclarations": 328,
@@ -60553,7 +60553,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 143,
+        "line": 144,
         "column": 5
       },
       "nativeSignature": "bool (const BindingLayout &) const",
@@ -60582,7 +60582,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 137,
+        "line": 138,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -60601,7 +60601,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 138,
+        "line": 139,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<material_graph::ParameterBinding>",
@@ -60620,7 +60620,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 139,
+        "line": 140,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<material_graph::TextureEncodingBinding>",
@@ -60639,7 +60639,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 140,
+        "line": 141,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<LX::LXMaterialResource>",
@@ -60658,7 +60658,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 141,
+        "line": 142,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<LX::LXMaterialResource>",
@@ -60677,7 +60677,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 66,
+        "line": 67,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -60696,7 +60696,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 67,
+        "line": 68,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -60715,7 +60715,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 68,
+        "line": 69,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -60734,7 +60734,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 69,
+        "line": 70,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -60753,7 +60753,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 70,
+        "line": 71,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -60772,7 +60772,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 71,
+        "line": 72,
         "column": 5
       },
       "nativeType": "unsigned long long",
@@ -60791,7 +60791,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 56,
+        "line": 57,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -60810,7 +60810,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 57,
+        "line": 58,
         "column": 5
       },
       "nativeType": "bool",
@@ -60829,7 +60829,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 58,
+        "line": 59,
         "column": 5
       },
       "nativeType": "bool",
@@ -60848,7 +60848,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 59,
+        "line": 60,
         "column": 5
       },
       "nativeType": "bool",
@@ -60867,7 +60867,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 60,
+        "line": 61,
         "column": 5
       },
       "nativeType": "bool",
@@ -60886,7 +60886,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 61,
+        "line": 62,
         "column": 5
       },
       "nativeType": "bool",
@@ -60905,7 +60905,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 153,
+        "line": 154,
         "column": 5
       },
       "nativeType": "RHIShaderBinary",
@@ -60924,7 +60924,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 154,
+        "line": 155,
         "column": 5
       },
       "nativeType": "std::basic_string<char>",
@@ -60943,7 +60943,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 155,
+        "line": 156,
         "column": 5
       },
       "nativeType": "std::basic_string<char>",
@@ -60962,7 +60962,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 230,
+        "line": 231,
         "column": 5
       },
       "nativeType": "material_graph::VerifiedProduct",
@@ -60981,7 +60981,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 231,
+        "line": 232,
         "column": 5
       },
       "nativeType": "std::basic_string<char>",
@@ -61000,7 +61000,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 232,
+        "line": 233,
         "column": 5
       },
       "nativeType": "std::basic_string<char>",
@@ -61019,7 +61019,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 234,
+        "line": 235,
         "column": 5
       },
       "nativeType": "std::basic_string<char>",
@@ -61038,7 +61038,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 235,
+        "line": 236,
         "column": 5
       },
       "nativeType": "std::basic_string<char>",
@@ -61057,7 +61057,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 237,
+        "line": 238,
         "column": 5
       },
       "nativeType": "std::filesystem::path",
@@ -61667,7 +61667,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 111,
+        "line": 112,
         "column": 5
       },
       "nativeSignature": "bool (const ParameterBinding &) const",
@@ -61696,7 +61696,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 107,
+        "line": 108,
         "column": 5
       },
       "nativeType": "LX::LXMaterialParameter",
@@ -61715,7 +61715,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 108,
+        "line": 109,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -61734,7 +61734,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 109,
+        "line": 110,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -61753,7 +61753,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 190,
+        "line": 191,
         "column": 5
       },
       "nativeType": "unsigned long long",
@@ -61772,7 +61772,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 191,
+        "line": 192,
         "column": 5
       },
       "nativeType": "std::variant<std::monostate, bool, long long, double, ce::fixed_array<double, 3>, ce::fixed_array<double, 4>, std::basic_string<char>>",
@@ -61791,7 +61791,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 205,
+        "line": 206,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<unsigned char>",
@@ -61810,7 +61810,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 206,
+        "line": 207,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<RHIBindingDesc>",
@@ -61829,7 +61829,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 207,
+        "line": 208,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<RHISamplerDesc>",
@@ -61848,7 +61848,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 209,
+        "line": 210,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<own::shared_owner<const Texture>>",
@@ -61867,7 +61867,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 76,
+        "line": 77,
         "column": 5
       },
       "nativeType": "material_graph::Tier",
@@ -61886,7 +61886,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 77,
+        "line": 78,
         "column": 5
       },
       "nativeType": "material_graph::Route",
@@ -61905,7 +61905,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 78,
+        "line": 79,
         "column": 5
       },
       "nativeType": "std::basic_string<char>",
@@ -61924,7 +61924,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 196,
+        "line": 197,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -61943,7 +61943,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 197,
+        "line": 198,
         "column": 5
       },
       "nativeType": "RHITextureEntry",
@@ -61962,7 +61962,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 199,
+        "line": 200,
         "column": 5
       },
       "nativeType": "own::shared_owner<const Texture>",
@@ -61981,7 +61981,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 200,
+        "line": 201,
         "column": 5
       },
       "nativeType": "bool",
@@ -62000,7 +62000,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 127,
+        "line": 128,
         "column": 5
       },
       "nativeSignature": "bool (const TextureEncodingBinding &) const",
@@ -62029,7 +62029,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 124,
+        "line": 125,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -62048,7 +62048,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 125,
+        "line": 126,
         "column": 5
       },
       "nativeType": "unsigned int",
@@ -62105,7 +62105,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 160,
+        "line": 161,
         "column": 5
       },
       "nativeType": "LX::LXMaterialProgram",
@@ -62124,7 +62124,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 161,
+        "line": 162,
         "column": 5
       },
       "nativeType": "material_graph::Selection",
@@ -62143,7 +62143,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 162,
+        "line": 163,
         "column": 5
       },
       "nativeType": "material_graph::BindingLayout",
@@ -62162,7 +62162,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 163,
+        "line": 164,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<LX::LXMaterialShaderArtifact>",
@@ -62181,7 +62181,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 164,
+        "line": 165,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<material_graph::CompileTarget>",
@@ -62200,7 +62200,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 166,
+        "line": 167,
         "column": 5
       },
       "nativeType": "own::shared_owner<const material_graph::GeneratedMaterialShader>",
@@ -62219,7 +62219,7 @@
       "reason": "",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 169,
+        "line": 170,
         "column": 5
       },
       "nativeType": "ce::dynamic_array<std::filesystem::path>",

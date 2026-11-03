@@ -108240,7 +108240,7 @@
       "schema_name": "\"material_graph::BindingLayout\"",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 135,
+        "line": 136,
         "column": 78
       },
       "nested": false,
@@ -108255,7 +108255,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 137,
+            "line": 138,
             "column": 5
           },
           "type": {
@@ -108279,7 +108279,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 138,
+            "line": 139,
             "column": 5
           },
           "type": {
@@ -108303,7 +108303,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 139,
+            "line": 140,
             "column": 5
           },
           "type": {
@@ -108327,7 +108327,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 140,
+            "line": 141,
             "column": 5
           },
           "type": {
@@ -108351,7 +108351,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 141,
+            "line": 142,
             "column": 5
           },
           "type": {
@@ -108377,7 +108377,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 143,
+            "line": 144,
             "column": 5
           },
           "signature": "bool (const BindingLayout &) const",
@@ -108431,7 +108431,7 @@
               },
               "source": {
                 "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-                "line": 143,
+                "line": 144,
                 "column": 41
               }
             }
@@ -108449,7 +108449,7 @@
       "schema_name": "\"material_graph::Budget\"",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 64,
+        "line": 65,
         "column": 78
       },
       "nested": false,
@@ -108460,30 +108460,6 @@
       "fields": [
         {
           "name": "textureSamples",
-          "owner": "material_graph::Budget",
-          "access": "public",
-          "source": {
-            "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 66,
-            "column": 5
-          },
-          "type": {
-            "spelling": "std::uint32_t",
-            "canonical_spelling": "unsigned int",
-            "kind": "unsigned_integer",
-            "declaration": "",
-            "is_const": false,
-            "is_volatile": false,
-            "size_bytes": 4,
-            "pointee": null,
-            "element_type": null,
-            "array_size": -1
-          },
-          "accessor": false,
-          "attributes": []
-        },
-        {
-          "name": "textures",
           "owner": "material_graph::Budget",
           "access": "public",
           "source": {
@@ -108507,7 +108483,7 @@
           "attributes": []
         },
         {
-          "name": "samplers",
+          "name": "textures",
           "owner": "material_graph::Budget",
           "access": "public",
           "source": {
@@ -108531,7 +108507,7 @@
           "attributes": []
         },
         {
-          "name": "uniformBytes",
+          "name": "samplers",
           "owner": "material_graph::Budget",
           "access": "public",
           "source": {
@@ -108555,7 +108531,7 @@
           "attributes": []
         },
         {
-          "name": "variants",
+          "name": "uniformBytes",
           "owner": "material_graph::Budget",
           "access": "public",
           "source": {
@@ -108579,12 +108555,36 @@
           "attributes": []
         },
         {
-          "name": "compiledBytes",
+          "name": "variants",
           "owner": "material_graph::Budget",
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
             "line": 71,
+            "column": 5
+          },
+          "type": {
+            "spelling": "std::uint32_t",
+            "canonical_spelling": "unsigned int",
+            "kind": "unsigned_integer",
+            "declaration": "",
+            "is_const": false,
+            "is_volatile": false,
+            "size_bytes": 4,
+            "pointee": null,
+            "element_type": null,
+            "array_size": -1
+          },
+          "accessor": false,
+          "attributes": []
+        },
+        {
+          "name": "compiledBytes",
+          "owner": "material_graph::Budget",
+          "access": "public",
+          "source": {
+            "file": "Engine/RenderEngine/MaterialGraphProduct.h",
+            "line": 72,
             "column": 5
           },
           "type": {
@@ -108614,7 +108614,7 @@
       "schema_name": "\"material_graph::Capabilities\"",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 54,
+        "line": 55,
         "column": 78
       },
       "nested": false,
@@ -108629,7 +108629,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 56,
+            "line": 57,
             "column": 5
           },
           "type": {
@@ -108653,7 +108653,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 57,
+            "line": 58,
             "column": 5
           },
           "type": {
@@ -108677,7 +108677,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 58,
+            "line": 59,
             "column": 5
           },
           "type": {
@@ -108701,7 +108701,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 59,
+            "line": 60,
             "column": 5
           },
           "type": {
@@ -108725,7 +108725,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 60,
+            "line": 61,
             "column": 5
           },
           "type": {
@@ -108749,7 +108749,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 61,
+            "line": 62,
             "column": 5
           },
           "type": {
@@ -108779,7 +108779,7 @@
       "schema_name": "\"material_graph::CompileTarget\"",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 151,
+        "line": 152,
         "column": 78
       },
       "nested": false,
@@ -108794,7 +108794,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 153,
+            "line": 154,
             "column": 5
           },
           "type": {
@@ -108818,7 +108818,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 154,
+            "line": 155,
             "column": 5
           },
           "type": {
@@ -108842,7 +108842,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 155,
+            "line": 156,
             "column": 5
           },
           "type": {
@@ -108872,7 +108872,7 @@
       "schema_name": "\"material_graph::CookedProgram\"",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 228,
+        "line": 229,
         "column": 78
       },
       "nested": false,
@@ -108887,7 +108887,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 230,
+            "line": 231,
             "column": 5
           },
           "type": {
@@ -108911,7 +108911,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 231,
+            "line": 232,
             "column": 5
           },
           "type": {
@@ -108935,7 +108935,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 232,
+            "line": 233,
             "column": 5
           },
           "type": {
@@ -108959,7 +108959,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 234,
+            "line": 235,
             "column": 5
           },
           "type": {
@@ -108983,7 +108983,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 235,
+            "line": 236,
             "column": 5
           },
           "type": {
@@ -109007,7 +109007,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 237,
+            "line": 238,
             "column": 5
           },
           "type": {
@@ -109921,7 +109921,7 @@
       "schema_name": "\"material_graph::ParameterBinding\"",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 105,
+        "line": 106,
         "column": 78
       },
       "nested": false,
@@ -109936,7 +109936,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 107,
+            "line": 108,
             "column": 5
           },
           "type": {
@@ -109960,7 +109960,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 108,
+            "line": 109,
             "column": 5
           },
           "type": {
@@ -109984,7 +109984,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 109,
+            "line": 110,
             "column": 5
           },
           "type": {
@@ -110010,7 +110010,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 111,
+            "line": 112,
             "column": 5
           },
           "signature": "bool (const ParameterBinding &) const",
@@ -110064,7 +110064,7 @@
               },
               "source": {
                 "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-                "line": 111,
+                "line": 112,
                 "column": 44
               }
             }
@@ -110082,7 +110082,7 @@
       "schema_name": "\"material_graph::ParameterOverride\"",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 188,
+        "line": 189,
         "column": 78
       },
       "nested": false,
@@ -110097,7 +110097,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 190,
+            "line": 191,
             "column": 5
           },
           "type": {
@@ -110121,7 +110121,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 191,
+            "line": 192,
             "column": 5
           },
           "type": {
@@ -110151,7 +110151,7 @@
       "schema_name": "\"material_graph::ResourcePacket\"",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 203,
+        "line": 204,
         "column": 78
       },
       "nested": false,
@@ -110166,7 +110166,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 205,
+            "line": 206,
             "column": 5
           },
           "type": {
@@ -110190,7 +110190,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 206,
+            "line": 207,
             "column": 5
           },
           "type": {
@@ -110214,7 +110214,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 207,
+            "line": 208,
             "column": 5
           },
           "type": {
@@ -110238,7 +110238,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 209,
+            "line": 210,
             "column": 5
           },
           "type": {
@@ -110268,7 +110268,7 @@
       "schema_name": "\"material_graph::Selection\"",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 74,
+        "line": 75,
         "column": 78
       },
       "nested": false,
@@ -110283,7 +110283,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 76,
+            "line": 77,
             "column": 5
           },
           "type": {
@@ -110307,7 +110307,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 77,
+            "line": 78,
             "column": 5
           },
           "type": {
@@ -110331,7 +110331,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 78,
+            "line": 79,
             "column": 5
           },
           "type": {
@@ -110361,7 +110361,7 @@
       "schema_name": "\"material_graph::TextureBinding\"",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 194,
+        "line": 195,
         "column": 78
       },
       "nested": false,
@@ -110376,7 +110376,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 196,
+            "line": 197,
             "column": 5
           },
           "type": {
@@ -110400,7 +110400,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 197,
+            "line": 198,
             "column": 5
           },
           "type": {
@@ -110424,7 +110424,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 199,
+            "line": 200,
             "column": 5
           },
           "type": {
@@ -110448,7 +110448,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 200,
+            "line": 201,
             "column": 5
           },
           "type": {
@@ -110478,7 +110478,7 @@
       "schema_name": "\"material_graph::TextureEncodingBinding\"",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 122,
+        "line": 123,
         "column": 78
       },
       "nested": false,
@@ -110493,7 +110493,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 124,
+            "line": 125,
             "column": 5
           },
           "type": {
@@ -110517,7 +110517,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 125,
+            "line": 126,
             "column": 5
           },
           "type": {
@@ -110543,7 +110543,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 127,
+            "line": 128,
             "column": 5
           },
           "signature": "bool (const TextureEncodingBinding &) const",
@@ -110597,7 +110597,7 @@
               },
               "source": {
                 "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-                "line": 127,
+                "line": 128,
                 "column": 50
               }
             }
@@ -110684,7 +110684,7 @@
       "schema_name": "\"material_graph::VerifiedProduct\"",
       "source": {
         "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-        "line": 158,
+        "line": 159,
         "column": 78
       },
       "nested": false,
@@ -110699,7 +110699,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 160,
+            "line": 161,
             "column": 5
           },
           "type": {
@@ -110723,7 +110723,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 161,
+            "line": 162,
             "column": 5
           },
           "type": {
@@ -110747,7 +110747,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 162,
+            "line": 163,
             "column": 5
           },
           "type": {
@@ -110771,7 +110771,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 163,
+            "line": 164,
             "column": 5
           },
           "type": {
@@ -110795,7 +110795,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 164,
+            "line": 165,
             "column": 5
           },
           "type": {
@@ -110819,7 +110819,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 166,
+            "line": 167,
             "column": 5
           },
           "type": {
@@ -110843,7 +110843,7 @@
           "access": "public",
           "source": {
             "file": "Engine/RenderEngine/MaterialGraphProduct.h",
-            "line": 169,
+            "line": 170,
             "column": 5
           },
           "type": {
