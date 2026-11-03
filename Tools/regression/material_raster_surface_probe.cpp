@@ -3680,8 +3680,12 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     "Material packet ranges fit their conservative capacity without truncation");
                 std::set<MaterialTile> actual;
                 for(uint32_t i=0;i<count;++i) {
-                    const auto index=uint64_t(prefix+i)*2;
-                    const MaterialTile packet{tileWord(index),tileWord(index+1)};
+                    const auto tileBits = materialWork->PacketTileBits();
+                    const auto index = uint64_t(prefix + i) * (tileBits ? 1u : 2u);
+                    const auto word = tileWord(index);
+                    const MaterialTile packet = tileBits
+                        ? MaterialTile{word >> tileBits, word & ((1u << tileBits) - 1u)}
+                        : MaterialTile{word, tileWord(index + 1)};
                     Check(packet.first>0 && packet.first<gpuRecords.size() &&
                         gpuRecords[packet.first].history[2]==bucket, "Every packet retains its exact material bucket and record");
                     Check(actual.insert(packet).second, "No duplicate material record/tile work");
@@ -3714,7 +3718,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     Check(dispatch==std::array<uint32_t,3>{(std::min)(remaining,width),
                         remaining ? 1u+(remaining-1)/width : 1u,1u},
                         "Visible packet counts alone drive each indirect slice, including empty work");
-                    const std::array<uint32_t,4> selector{bucket,width,static_cast<uint32_t>(begin),0};
+                    const std::array<uint32_t,4> selector{bucket,width,static_cast<uint32_t>(begin),materialWork->PacketTileBits()};
                     Check(plan.selector.cpuAddress && plan.selector.size>=sizeof(selector) &&
                         std::memcmp(plan.selector.cpuAddress,selector.data(),sizeof(selector))==0,
                         "Material slices retain their exact bucket, dispatch width and packet base");
@@ -4783,9 +4787,9 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         const auto first = SceneCooked(instances[0]);
         auto obsolete = first->generation->cooked.product;
         obsolete.program.semanticKey.replace(obsolete.program.semanticKey.size() - SceneHostIdentity.size(),
-            SceneHostIdentity.size(), "|lx-scene-host:30");
+            SceneHostIdentity.size(), "|lx-scene-host:42");
         SceneShaderSet rejected; std::string rejection;
-        Check(!LoadSceneShaders(obsolete, RHIShaderBinary::Dxil, rejected, rejection), "Previous visibility payload ABI must be recooked");
+        Check(!LoadSceneShaders(obsolete, RHIShaderBinary::Dxil, rejected, rejection), "Unpacked-only material packet consumers must be recooked");
         auto description = first->description;
         ce::erase_if(description.parameters, [](const auto& value) { return value.id == 900; });
         description.parameters.push_back({900, 1.9});

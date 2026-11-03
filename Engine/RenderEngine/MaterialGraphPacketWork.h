@@ -7,6 +7,7 @@ import Creator.Core.Ownership;
 #endif
 #include "MaterialGraphTransientBufferPool.h"
 #include "MaterialGraphPacketPlan.h"
+#include "MaterialGraphPacketEncoding.h"
 
 namespace material_graph
 {
@@ -20,7 +21,7 @@ namespace material_graph
             uint32_t inputCount{}, bucketCount{}, packetCapacity{}, dispatchWidth{};
             uint32_t scanCount{}, scanSource{}, scanDestination{}, scanSums{};
             uint32_t scanParent{}, scanBase{}, width{}, height{};
-            uint32_t sliceCapacity{}, padding[3]{};
+            uint32_t sliceCapacity{}, tileBits{}, padding[2]{};
         };
         static_assert(sizeof(Constants) == 64);
         struct ScanLevel
@@ -77,7 +78,7 @@ namespace material_graph
         }
         bool Prepare(IRenderDeviceServices& services, own::shared_owner<TransientBufferPool> buffers,
                      uint32_t inputCount, uint32_t capacity, std::span<const uint32_t> bucketCapacities, uint32_t width,
-                     uint32_t height, std::string_view name, std::string& error)
+                     uint32_t height, std::string_view name, std::string& error, uint32_t tileBits = 0)
         {
             ResetForReuse();
             device = &services;
@@ -103,6 +104,7 @@ namespace material_graph
             values.width = width;
             values.height = height;
             values.sliceCapacity = sliceCapacity;
+            values.tileBits = tileBits;
             if (!plan || !PacketDispatchPlanCache::Enabled() ||
                 !plan->Matches(capacity, dispatchWidth, sliceCapacity, bucketCapacities))
             {
@@ -158,7 +160,8 @@ namespace material_graph
             slices.reserve(plan->selectors.size());
             for (size_t index = 0; index < plan->selectors.size(); ++index)
             {
-                const auto& selector = plan->selectors[index];
+                auto selector = plan->selectors[index];
+                selector[3] = tileBits;
                 const auto uploaded = device->UploadConstants(selector.data(), sizeof(selector));
                 if (!uploaded.IsValid())
                 {
@@ -180,7 +183,8 @@ namespace material_graph
             const std::wstring label(name.begin(), name.end());
             ce::fixed_array<RHIBufferDesc, 4> descriptions{};
             const ce::fixed_array sizes{uint64_t(argumentWords) * 4, uint64_t(values.bucketCount) * 16,
-                                   uint64_t(capacity) * 8, uint64_t(scratchWords) * 4};
+                                   uint64_t(MaterialPacketEncoding::StorageElements(capacity, tileBits)) * 8,
+                                   uint64_t(scratchWords) * 4};
             for (std::size_t index = 0; index < descriptions.size(); ++index)
             {
                 auto& desc = descriptions[index];
@@ -216,7 +220,7 @@ namespace material_graph
             }
             const RHIBindingDesc views[]{RHIBindingDesc::UavBuffer(arguments, argumentWords, 4),
                                          RHIBindingDesc::UavBuffer(ranges, values.bucketCount, 16),
-                                         RHIBindingDesc::UavBuffer(packets, capacity, 8),
+                                         RHIBindingDesc::UavBuffer(packets, MaterialPacketEncoding::StorageElements(capacity, tileBits), 8),
                                          RHIBindingDesc::UavBuffer(scratch, scratchWords, 4)};
             {
                 ce::profile_scope bindings{ce::marker<"MaterialScenePacketOutputBindings">()};

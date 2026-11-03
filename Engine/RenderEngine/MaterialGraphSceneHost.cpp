@@ -3975,7 +3975,7 @@ namespace material_graph
             }
             const auto& cache = candidate->m_primitiveCache;
             if (!sceneData->CreatePacketBindings(
-                    *device_, work->work, work->PacketCapacity(), work->ranges,
+                    *device_, work->work, work->PacketStorageElements(), work->ranges,
                     static_cast<uint32_t>(work->buckets.size()), candidate->materialPacketBindings, error,
                     cache ? cache->Keys() : RHIBufferHandle{}, cache ? cache->Data() : RHIBufferHandle{}))
             {
@@ -4240,6 +4240,32 @@ namespace material_graph
     own::shared_owner<const SceneMaterialWork> SceneHost::MaterialWork() const
     {
         return frame_ ? frame_->materialWorkStage.materialWork : nullptr;
+    }
+
+    SceneMaterialPageDiagnostics SceneHost::MaterialPageDiagnostics() const
+    {
+        SceneMaterialPageDiagnostics result;
+        if (!frame_ || !frame_->sceneData)
+        {
+            return result;
+        }
+
+        const auto& data = *frame_->sceneData;
+        result.pages.reserve(data.pages.size());
+        for (const auto& page : data.pages)
+        {
+            result.pages.push_back({static_cast<uint32_t>(page.vertices.size()),
+                                    static_cast<uint32_t>(page.topology.size())});
+        }
+        result.records.resize(data.records.size());
+        for (const auto& draw : frame_->draws)
+        {
+            auto& record = result.records.at(draw.geometryRecord);
+            record.page = data.recordPages.at(draw.geometryRecord);
+            record.semanticKey = draw.program->generation->cooked.product.program.semanticKey;
+            record.doubleSided = draw.doubleSided;
+        }
+        return result;
     }
 
     own::shared_owner<const SceneFrameGeometry> SceneHost::FrameGeometry() const

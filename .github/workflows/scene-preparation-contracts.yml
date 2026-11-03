@@ -6,8 +6,10 @@ on:
     paths:
       - 'Engine/Containers/**'
       - 'Engine/RenderEngine/GpuGeometryVisibility.cpp'
-      - 'Engine/RenderEngine/MaterialGraphSceneHost.cpp'
+      - 'Engine/RenderEngine/MaterialGraphSceneHost.*'
       - 'Engine/RenderEngine/MaterialGraphWork.h'
+      - 'Engine/RenderEngine/MaterialGraphPacket*.h'
+      - 'Engine/RenderEngine/MaterialGraphProduct.h'
       - 'Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h'
       - 'Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp'
       - 'Tools/regression/**'
@@ -16,8 +18,10 @@ on:
     paths:
       - 'Engine/Containers/**'
       - 'Engine/RenderEngine/GpuGeometryVisibility.cpp'
-      - 'Engine/RenderEngine/MaterialGraphSceneHost.cpp'
+      - 'Engine/RenderEngine/MaterialGraphSceneHost.*'
       - 'Engine/RenderEngine/MaterialGraphWork.h'
+      - 'Engine/RenderEngine/MaterialGraphPacket*.h'
+      - 'Engine/RenderEngine/MaterialGraphProduct.h'
       - 'Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h'
       - 'Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp'
       - 'Tools/regression/**'
@@ -51,6 +55,8 @@ jobs:
         run: python Tools/regression/MaterialPacketComparisonTests.py
       - name: Material packet visibility completeness
         run: python Tools/regression/MaterialPacketVisibilityTests.py
+      - name: Material descriptor page partitioning
+        run: python Tools/regression/MaterialPacketPageTests.py
       - name: Bounds recook geometry identity
         run: python Tools/regression/GeometryRecookIdentityTests.py
 
@@ -78,6 +84,8 @@ jobs:
           python Tools/regression/verify-visibility-buffer-pool.py --configuration '${{ matrix.configuration }}' --output Build/Verification/ScenePreparation/buffer.cpp
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python Tools/regression/verify-shadow-key-append.py --configuration '${{ matrix.configuration }}' --output Build/Verification/ScenePreparation/shadow-key.cpp
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python Tools/regression/verify-material-packet-encoding.py --configuration '${{ matrix.configuration }}'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: always()

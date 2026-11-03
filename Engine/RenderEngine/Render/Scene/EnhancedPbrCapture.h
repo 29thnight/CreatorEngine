@@ -87,6 +87,7 @@ struct EnhancedPbrCapture
     ce::dynamic_array<GeometryReadback> geometryReadbacks;
 
     own::shared_owner<const material_graph::SceneMaterialWork> materialPacketOwner;
+    material_graph::SceneMaterialPageDiagnostics materialPageDiagnostics;
     RHIReadback materialPacketReadback{}, materialRangeReadback{};
     RHIReadback materialRecordReadback{};
     RHIReadback materialVisibilityReadback{}, materialGeometryReadback{};
@@ -106,6 +107,7 @@ struct EnhancedPbrCapture
             return false;
         }
         materialPacketOwner = owner;
+        materialPageDiagnostics = host.MaterialPageDiagnostics();
         if (!resources.CreateBufferReadback(owner->workBytes, materialPacketReadback, error) ||
             !resources.CreateBufferReadback(uint64_t(owner->commandCount) * 16u, materialRangeReadback, error) ||
             !resources.CreateBufferReadback(owner->records.size, materialRecordReadback, error) ||
@@ -165,10 +167,30 @@ struct EnhancedPbrCapture
         node["height"] << owner.height;
         node["recordCount"] << owner.recordCount;
         node["capacity"] << owner.PacketCapacity();
+        node["storageBytes"] << owner.workBytes;
+        node["packedTileBits"] << owner.PacketTileBits();
         node["buckets"].SetSequence();
         node["recordBuckets"].SetSequence();
         node["records"].SetSequence();
         node["primitiveRanges"].SetSequence();
+        if (materialPageDiagnostics.records.size() != owner.recordCount)
+        {
+            error = "Material page diagnostics do not match the captured record table.";
+            return false;
+        }
+        auto descriptors = node["descriptorPages"];
+        descriptors["sourceFrameId"] << result.frameId;
+        descriptors["capacity"] << material_graph::SceneGpuData::kGeometryPageSize;
+        descriptors["pages"].SetSequence();
+        descriptors["records"].SetSequence();
+        for (uint32_t index = 0; index < materialPageDiagnostics.pages.size(); ++index)
+        {
+            const auto& page = materialPageDiagnostics.pages[index];
+            auto entry = descriptors["pages"].Append();
+            entry["page"] << index;
+            entry["vertexCount"] << page.vertices;
+            entry["topologyCount"] << page.topology;
+        }
         ce::dynamic_array<uint32_t> recordBuckets;
         recordBuckets.reserve(owner.recordCount);
         for (uint32_t record = 0; record < owner.recordCount; ++record)
@@ -186,6 +208,15 @@ struct EnhancedPbrCapture
             auto identity = node["records"].Append();
             identity["record"] << record;
             if (record == 0) continue;
+            const auto& descriptor = materialPageDiagnostics.records.at(record);
+            auto pageRecord = descriptors["records"].Append();
+            pageRecord["record"] << record;
+            pageRecord["page"] << descriptor.page;
+            pageRecord["semanticKey"] << descriptor.semanticKey;
+            pageRecord["doubleSided"] << descriptor.doubleSided;
+            pageRecord["currentVertex"] << value.geometry[0];
+            pageRecord["previousVertex"] << value.geometry[1];
+            pageRecord["topology"] << value.geometry[2];
             const auto& geometry = owner.geometry->geometry.at(record);
             WriteMeshIdentity(identity, geometry->Input()->Geometry().handle);
             identity["materialSlot"] << value.identity.materialSlot;
@@ -217,7 +248,19 @@ struct EnhancedPbrCapture
             for (uint32_t index = 0; index < range[1]; ++index)
             {
                 ce::fixed_array<uint32_t, 3> packet{bucket, 0u, 0u};
-                std::memcpy(packet.data() + 1, packets.data.data() + (uint64_t(range[0]) + index) * 8u, 8u);
+                const uint64_t packetIndex = uint64_t(range[0]) + index;
+                const auto tileBits = owner.PacketTileBits();
+                if (tileBits)
+                {
+                    uint32_t word{};
+                    std::memcpy(&word, packets.data.data() + packetIndex * 4u, sizeof(word));
+                    packet[1] = word >> tileBits;
+                    packet[2] = word & ((1u << tileBits) - 1u);
+                }
+                else
+                {
+                    std::memcpy(packet.data() + 1, packets.data.data() + packetIndex * 8u, 8u);
+                }
                 if (packet[1] == 0 || packet[1] >= owner.recordCount || packet[2] >= tileCount ||
                     recordBuckets[packet[1]] != bucket)
                 {
@@ -1571,6 +1614,7 @@ struct EnhancedPbrCapture
         resources.ReleaseReadback(materialVisibilityReadback);
         resources.ReleaseReadback(materialGeometryReadback);
         materialPacketOwner.reset();
+        materialPageDiagnostics = {};
     }
     void Fail(const std::string& error)
     {

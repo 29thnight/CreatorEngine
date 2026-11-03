@@ -423,6 +423,7 @@ namespace material_graph
         RHIBufferHandle work, ranges, arguments;
         mutable bool m_declared{true};
         std::uint32_t PacketCapacity() const { return 64; }
+        std::uint32_t PacketStorageElements() const { return 64; }
         std::array<RGHandle, 2> GraphInputs(const EnhancedRenderGraph& graph) const
         {
             if (!m_declared)

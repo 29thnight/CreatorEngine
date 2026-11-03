@@ -49,6 +49,18 @@ void ScatterMaterialTiles(uint lane : SV_GroupIndex, uint3 tile : SV_GroupID)
         uint local;
         InterlockedAdd(lx_packet_ranges[bucket].z, 1, local);
         const uint offset = lx_packet_ranges[bucket].x + local;
-        lx_packets[offset] = uint2(record, tile.y * ((lx_packet_width + 7) / 8) + tile.x);
+        const uint tileIndex = tile.y * ((lx_packet_width + 7) / 8) + tile.x;
+        if (lx_packet_tile_bits != 0u)
+        {
+            // Adjacent packets may be produced by different groups. Update only
+            // this packet's word, without reading or replacing its neighbour.
+            const uint word = (record << lx_packet_tile_bits) | tileIndex;
+            uint ignored;
+            InterlockedExchange(lx_packets[offset >> 1u][offset & 1u], word, ignored);
+        }
+        else
+        {
+            lx_packets[offset] = uint2(record, tileIndex);
+        }
     }
 }

@@ -37,6 +37,15 @@ class MaterialPacketTests(unittest.TestCase):
         self.data['buckets'].append(dict(bucket=1, offsetPackets=3, count=0))
         self.assertTrue(self.inspect()['passed'])
 
+    def test_packed_storage(self):
+        self.data.update(storageBytes=16, packedTileBits=1)
+        self.assertEqual(self.inspect()['logicalPacketBytes'], 4)
+        for bits, size in [(0, 16), (1, 8), (33, 16), (31, 16)]:
+            with self.subTest(bits=bits, size=size):
+                self.data.update(storageBytes=size, packedTileBits=bits)
+                with self.assertRaises(ValueError):
+                    self.inspect()
+
     def test_metadata_mutations(self):
         for field, value in [('sourceFrameId', 8), ('count', 4), ('capacity', 2),
                              ('file', '../escape.bin'), ('width', 0), ('encoding', 'native')]:

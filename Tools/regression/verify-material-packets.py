@@ -27,6 +27,16 @@ def inspect_capture(directory):
     if len(record_buckets) != data['recordCount']:
         raise ValueError('Record bucket table size mismatch')
     tiles = ((data['width'] + 7) // 8) * ((data['height'] + 7) // 8)
+    storage = {}
+    if 'storageBytes' in data or 'packedTileBits' in data:
+        bits = data['packedTileBits']
+        if not 0 <= bits < 32 or (bits and (tiles > 1 << bits or (data['recordCount'] - 1) << bits > 0xffffffff)):
+            raise ValueError('Packed packet IDs exceed their lossless bit allocation')
+        expected_bytes = ((data['capacity'] + 1) // 2 if bits else data['capacity']) * 8
+        if data['storageBytes'] != expected_bytes:
+            raise ValueError('Packet storage size does not match its encoding and capacity')
+        storage = {'storageBytes': expected_bytes, 'packedTileBits': bits,
+                   'unpackedStorageBytes': data['capacity'] * 8, 'logicalPacketBytes': 4 if bits else 8}
     packets = list(struct.iter_unpack('<III', raw))
     offset = 0
     seen = set()
@@ -49,7 +59,7 @@ def inspect_capture(directory):
         offset += count
     if offset != len(packets):
         raise ValueError('Unclaimed packet payload')
-    return {'capture': str(directory), 'passed': True, 'sha256': hashlib.sha256(raw).hexdigest(),
+    return {'capture': str(directory), 'passed': True, 'sha256': hashlib.sha256(raw).hexdigest(), **storage,
             'packets': len(packets), 'capacity': data['capacity'], 'occupiedTiles': len(occupied_tiles),
             'uniqueBucketTiles': len(bucket_tiles), 'additionalRecordsInSameBucketTile': len(packets) - len(bucket_tiles),
             'maxRecordsPerBucketTile': max(bucket_tiles.values(), default=0), 'buckets': buckets,
