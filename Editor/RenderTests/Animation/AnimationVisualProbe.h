@@ -4,6 +4,13 @@
 
 namespace RenderTest
 {
+    struct AnimationPopulationReport
+    {
+        std::size_t actors{}, skinnedMeshes{}, distinctPalettes{};
+    };
+    bool SetupAnimationPopulation(const std::string& modelPath, const std::string& clipName,
+        std::size_t actors, AnimationPopulationReport& report, std::string& error);
+
     struct AnimationVisualReport
     {
         std::string modelId, markerMeshId, bone;

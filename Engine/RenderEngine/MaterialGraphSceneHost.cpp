@@ -560,6 +560,7 @@ namespace material_graph
             };
             ce::dynamic_array<Key> m_keys;
             ce::dynamic_array<Entry> m_entries;
+            ce::dynamic_array<size_t> m_pageOrder;
             ce::dynamic_array<SceneFrameGeometry::Record> m_geometryRecords;
             ce::dynamic_array<SceneGpuData::Record> m_sceneRecords;
             uint32_t m_nextPrimitive{};
@@ -651,6 +652,41 @@ namespace material_graph
                              (draw.coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0,
                              program->hasSurface && !program->editorPreview && shadows && draw.queue != SceneCoverage::Blended});
                     }
+                }
+                // Reuse the order with the immutable caster plan. Draw records
+                // and ordered primitive lists retain their original identities.
+                m_pageOrder.resize(m_entries.size());
+                for (size_t index = 0; index < m_entries.size(); ++index)
+                {
+                    m_pageOrder[index] = index;
+                }
+                static const bool groupPages = []
+                {
+                    char* value{};
+                    size_t length{};
+                    const bool enabled = _dupenv_s(&value, &length, "CREATOR_MATERIAL_PAGE_GROUPING") == 0 &&
+                                         value && std::strcmp(value, "1") == 0;
+                    std::free(value);
+                    return enabled;
+                }();
+                if (groupPages)
+                {
+                    std::sort(m_pageOrder.begin(), m_pageOrder.end(), [&](size_t left, size_t right)
+                    {
+                        const auto& a = m_entries[left];
+                        const auto& b = m_entries[right];
+                        const auto& aKey = programs[a.m_input]->generation->cooked.product.program.semanticKey;
+                        const auto& bKey = programs[b.m_input]->generation->cooked.product.program.semanticKey;
+                        if (aKey != bKey)
+                        {
+                            return aKey < bKey;
+                        }
+                        if (a.m_doubleSided != b.m_doubleSided)
+                        {
+                            return a.m_doubleSided < b.m_doubleSided;
+                        }
+                        return a.m_output < b.m_output;
+                    });
                 }
                 m_valid = true;
                 return false;
@@ -3212,11 +3248,6 @@ namespace material_graph
                 // cover those entries too. Volume-only programs emit no mesh
                 // raster work and keep their existing compute/composite route.
                 const bool rasterGeometry = program->hasSurface || program->hasSpecial;
-                if (rasterGeometry &&
-                    !sceneData->AssignGeometry(item.geometryRecord, item.geometry, item.previousGeometry, error))
-                {
-                    return false;
-                }
                 // Opaque and blended surfaces are culled per meshlet; the owner gate is
                 // the sealed visibleOwner. No instance-level culling route exists.
                 if (rasterGeometry && !candidate->UsesMeshlets(item))
@@ -3225,6 +3256,18 @@ namespace material_graph
                                 ordered
                                     ? "METEOR blended surface requires supported cooked meshlets; reimport the asset."
                                     : "METEOR opaque surface requires supported cooked meshlets; reimport the asset.");
+                }
+            }
+        }
+        {
+            ce::profile_scope pages{ce::marker<"MaterialSceneDescriptorPages">()};
+            for (const auto index : casterPlan.m_pageOrder)
+            {
+                const auto& item = candidate->draws[casterPlan.m_entries[index].m_output];
+                if ((item.program->hasSurface || item.program->hasSpecial) &&
+                    !sceneData->AssignGeometry(item.geometryRecord, item.geometry, item.previousGeometry, error))
+                {
+                    return false;
                 }
             }
         }

@@ -1227,6 +1227,25 @@ namespace ConsoleCmd
             : CommandCore::Fail("animation.playback.failed", log, std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_animation_render_population(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 4 || (ctx.parts[3] != "32" && ctx.parts[3] != "64"))
+        {
+            return CommandCore::InvalidArguments("animation.render.population <model-path> <clip-name> <32|64>");
+        }
+        RenderTest::AnimationPopulationReport report;
+        std::string error;
+        const bool passed = RenderTest::SetupAnimationPopulation(ctx.parts[1], ctx.parts[2],
+            ctx.parts[3] == "32" ? 32 : 64, report, error);
+        auto data = CommandCore::CommandData::Object();
+        data.Set("actors", CommandCore::CommandData::Int(report.actors));
+        data.Set("skinnedMeshes", CommandCore::CommandData::Int(report.skinnedMeshes));
+        data.Set("distinctPalettes", CommandCore::CommandData::Int(report.distinctPalettes));
+        data.Set("clip", CommandCore::CommandData::String(ctx.parts[2]));
+        return passed ? CommandCore::Ok({}, std::move(data))
+            : CommandCore::Fail("animation.population.failed", error, std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_animation_visual_probe(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() < 2 || ctx.parts.size() > 3)
@@ -1275,6 +1294,7 @@ namespace ConsoleCmd
         reg.Result({ "animation.baseline.probe" }, &Cmd_animation_baseline_probe);
         reg.Result({ "animation.playback.probe" }, &Cmd_animation_playback_probe);
         reg.Result({ "animation.visual.probe" }, &Cmd_animation_visual_probe);
+        reg.Result({ "animation.render.population" }, &Cmd_animation_render_population);
         reg.Result({ "animator.param" }, &Cmd_animator_param);
         reg.Result({ "script.invoke" }, &Cmd_script_invoke);
         reg.Result({ "script.reload" }, &Cmd_script_reload);
